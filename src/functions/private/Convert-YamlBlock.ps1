@@ -85,6 +85,7 @@
                 break
             }
             if ($currentIndent -gt $IndentLevel) {
+                Write-Error "Content: $line"
                 throw "Unexpected indentation at line $($i + 1)"
             }
             $content = $line.Trim()
@@ -106,6 +107,7 @@
                     $i++
                 }
             } else {
+                Write-Error "Content: $line"
                 throw "Expected '-' for sequence item at line $($i + 1)"
             }
         }
@@ -127,6 +129,7 @@
                 break
             }
             if ($currentIndent -gt $IndentLevel) {
+                Write-Error "Content: $line"
                 throw "Unexpected indentation at line $($i + 1)"
             }
             $content = $line.Trim()
@@ -148,6 +151,7 @@
                 $hashtable[$key] = $value
                 $i++
             } else {
+                Write-Error "Content: $line"
                 throw "Invalid YAML syntax at line $($i + 1)"
             }
         }
