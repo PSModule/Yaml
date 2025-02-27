@@ -1,13 +1,57 @@
 ﻿function Convert-YamlBlock {
     <#
+        .SYNOPSIS
+        Converts a block of YAML text into a PowerShell object.
 
+        .DESCRIPTION
+        This function processes a block of YAML lines and converts it into a corresponding PowerShell object.
+        It determines whether the block is a sequence or a mapping and parses it accordingly. If the block
+        represents a sequence (starting with '-'), it returns an array. If it represents a mapping, it returns
+        a hashtable. Unexpected indentation or invalid YAML syntax will result in an error.
+
+        .EXAMPLE
+        Convert-YamlBlock -Lines @("key: value") -StartIndex 0 -IndentLevel 0
+
+        Output:
+        ```powershell
+        object     : @{key=value}
+        next_index : 1
+        ```
+
+        Parses a simple key-value pair YAML block and returns a hashtable.
+
+        .EXAMPLE
+        Convert-YamlBlock -Lines @("- item1", "- item2") -StartIndex 0 -IndentLevel 0
+
+        Output:
+        ```powershell
+        object     : @("item1", "item2")
+        next_index : 2
+        ```
+
+        Parses a YAML sequence into a PowerShell array.
+
+        .OUTPUTS
+        hashtable. Returns a hashtable if the YAML block represents a mapping.
+
+        array. Returns an array if the YAML block represents a sequence.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Convert-YamlBlock/
     #>
+    [OutputType([hashtable])]
+    [CmdletBinding()]
     param (
+        # An array of YAML lines to process.
+        [Parameter(Mandatory)]
+        [string[]] $Lines,
 
-        [string[]]$Lines,
+        # The starting index in the array from which parsing should begin.
+        [Parameter(Mandatory)]
+        [int] $StartIndex,
 
-        [int]$StartIndex,
-
+        # The indentation level to be considered while parsing the YAML block.
+        [Parameter(Mandatory)]
         [int] $IndentLevel
     )
 
