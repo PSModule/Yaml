@@ -44,9 +44,10 @@ fruits:
   - Cherry
 '@
                 $result = ConvertFrom-Yaml -Yaml $yaml
-                ($result.fruits) | Should -BeOfType [string[]]
                 $result.fruits.Count | Should -Be 3
                 $result.fruits[0] | Should -Be 'Apple'
+                $result.fruits[1] | Should -Be 'Banana'
+                $result.fruits[2] | Should -Be 'Cherry'
             }
         }
 
