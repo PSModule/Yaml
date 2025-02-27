@@ -59,7 +59,9 @@ company:
   employees:
     - name: Alice
       age: 28
-      skills: ["C#", "PowerShell"]
+      skills:
+        - Python
+        - JavaScript
     - name: Bob
       age: 35
       skills:
@@ -71,6 +73,12 @@ company:
                 $result.company.name | Should -Be 'TechCorp'
                 $result.company.employees.Count | Should -Be 2
                 $result.company.employees[0].name | Should -Be 'Alice'
+                $result.company.employees[0].age | Should -Be 28
+                $result.company.employees[0].skills | Should -Contain 'Python'
+                $result.company.employees[0].skills | Should -Contain 'JavaScript'
+                $result.company.employees[1].name | Should -Be 'Bob'
+                $result.company.employees[1].age | Should -Be 35
+                $result.company.employees[1].skills | Should -Contain 'Python'
                 $result.company.employees[1].skills | Should -Contain 'Go'
             }
         }
