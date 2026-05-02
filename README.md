@@ -1,6 +1,13 @@
-# {{ NAME }}
+# Yaml
 
-{{ DESCRIPTION }}
+A PowerShell module for working with YAML — parse YAML strings into PowerShell objects and serialize PowerShell objects back into YAML.
+
+The module ships two cmdlets that mirror PowerShell's built-in `ConvertFrom-Json` / `ConvertTo-Json`, so the experience is familiar:
+
+- `ConvertFrom-Yaml` — parses a YAML string into a `[PSCustomObject]` (or an ordered hashtable with `-AsHashtable`).
+- `ConvertTo-Yaml` — serializes a PowerShell object, hashtable, or array into a YAML-formatted string.
+
+No external dependencies — pure PowerShell. Aligned with the [YAML 1.2.2 core schema](https://yaml.org/spec/1.2.2/#103-core-schema).
 
 ## Prerequisites
 
@@ -13,18 +20,21 @@ This uses the following external resources:
 To install the module from the PowerShell Gallery, you can use the following command:
 
 ```powershell
-Install-PSResource -Name {{ NAME }}
-Import-Module -Name {{ NAME }}
+Install-PSResource -Name Yaml
+Import-Module -Name Yaml
 ```
 
 ## Usage
 
 The module provides two cmdlets that mirror PowerShell's built-in `ConvertFrom-Json` / `ConvertTo-Json`:
 
-| Cmdlet              | Alias            | Purpose                                |
-| ------------------- | ---------------- | -------------------------------------- |
-| `ConvertFrom-Yaml`  | `ConvertFrom-Yml` | Parse a YAML string into an object.   |
-| `ConvertTo-Yaml`    | `ConvertTo-Yml`  | Serialize an object into a YAML string. |
+| Cmdlet              | Alias             | Purpose                                  |
+| ------------------- | ----------------- | ---------------------------------------- |
+| `ConvertFrom-Yaml`  | `ConvertFrom-Yml` | Parse a YAML string into an object.      |
+| `ConvertTo-Yaml`    | `ConvertTo-Yml`   | Serialize an object into a YAML string.  |
+
+> [!IMPORTANT]
+> The input to `ConvertFrom-Yaml` must be a valid YAML string. The cmdlet does not read files or extract YAML frontmatter from markdown — that is the caller's responsibility (for example, using a Markdown module to extract frontmatter, then piping the result into `ConvertFrom-Yaml`).
 
 ### YAML specification
 
@@ -37,7 +47,7 @@ Practical implications of the core schema:
 - Integers and floats parse to their native types using invariant culture.
 - Anything else is a string. Quoted strings (`'...'`, `"..."`) always preserve the string type.
 
-The supported YAML subset covers block-style mappings, block-style sequences, nested structures, single- and double-quoted scalars (with `\n`, `\t`, `\r`, `\\`, `\"` escapes in double quotes), and full-line / inline `#` comments. Flow style (`[a, b]`, `{a: 1}`), block scalars (`|`, `>`), anchors, aliases, tags, multi-document streams, and `!!timestamp` are not yet supported.
+The supported YAML subset covers block-style mappings, block-style sequences, nested structures, single- and double-quoted scalars (with `\n`, `\t`, `\r`, `\\`, `\"` escapes in double quotes), document start (`---`) and end (`...`) markers, and full-line / inline `#` comments. Flow style (`[a, b]`, `{a: 1}`), block scalars (`|`, `>`), anchors, aliases, tags, multi-document streams, and `!!timestamp` are not yet supported.
 
 ### Example 1: Parse a YAML string
 
@@ -59,13 +69,7 @@ $yaml | ConvertFrom-Yaml
 Get-Content config.yaml -Raw | ConvertFrom-Yaml -AsHashtable
 ```
 
-### Example 3: Parse YAML frontmatter from a markdown file
-
-```powershell
-Get-Content post.md -Raw | ConvertFrom-Yaml
-```
-
-### Example 4: Convert an object to YAML
+### Example 3: Convert an object to YAML
 
 ```powershell
 [ordered]@{
@@ -74,7 +78,7 @@ Get-Content post.md -Raw | ConvertFrom-Yaml
 } | ConvertTo-Yaml
 ```
 
-### Example 5: Force a top-level YAML sequence
+### Example 4: Force a top-level YAML sequence
 
 ```powershell
 Get-Process | Select-Object -First 3 Name, Id | ConvertTo-Yaml -AsArray

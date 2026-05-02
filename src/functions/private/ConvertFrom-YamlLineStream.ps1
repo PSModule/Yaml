@@ -47,6 +47,12 @@
             continue
         }
 
+        # Skip YAML document markers: --- (start) and ... (end).
+        $trimmed = $stripped.Trim()
+        if ($trimmed -eq '---' -or $trimmed -eq '...') {
+            continue
+        }
+
         $result.Add([pscustomobject]@{
                 Indent  = $indent
                 Content = $stripped.TrimEnd()

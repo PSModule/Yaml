@@ -87,10 +87,10 @@ Describe 'ConvertFrom-Yaml' {
 
     Context 'Mappings' {
         It 'Parses a flat mapping into a PSCustomObject by default' {
-            $yaml = @"
+            $yaml = @'
 name: Alice
 age: 30
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result | Should -BeOfType [PSCustomObject]
             $result.name | Should -Be 'Alice'
@@ -98,13 +98,13 @@ age: 30
         }
 
         It 'Parses nested mappings' {
-            $yaml = @"
+            $yaml = @'
 person:
   name: Alice
   address:
     city: Oslo
     country: Norway
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result.person.name | Should -Be 'Alice'
             $result.person.address.city | Should -Be 'Oslo'
@@ -112,11 +112,11 @@ person:
         }
 
         It 'Preserves key insertion order' {
-            $yaml = @"
+            $yaml = @'
 zebra: 1
 apple: 2
 mango: 3
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $names = $result.PSObject.Properties.Name
             $names[0] | Should -Be 'zebra'
@@ -127,11 +127,11 @@ mango: 3
 
     Context 'Sequences' {
         It 'Parses a sequence of scalars' {
-            $yaml = @"
+            $yaml = @'
 - one
 - two
 - three
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml -NoEnumerate
             $result.Count | Should -Be 3
             $result[0] | Should -Be 'one'
@@ -139,25 +139,25 @@ mango: 3
         }
 
         It 'Parses a sequence under a key' {
-            $yaml = @"
+            $yaml = @'
 items:
   - apple
   - banana
   - cherry
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result.items.Count | Should -Be 3
             $result.items[1] | Should -Be 'banana'
         }
 
         It 'Parses a sequence of mappings' {
-            $yaml = @"
+            $yaml = @'
 people:
   - name: Alice
     age: 30
   - name: Bob
     age: 25
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result.people.Count | Should -Be 2
             $result.people[0].name | Should -Be 'Alice'
@@ -174,11 +174,11 @@ people:
         }
 
         It 'Returns nested structures as ordered dictionaries' {
-            $yaml = @"
+            $yaml = @'
 outer:
   inner:
     leaf: value
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml -AsHashtable
             $result['outer'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
             $result['outer']['inner']['leaf'] | Should -Be 'value'
@@ -193,48 +193,43 @@ outer:
 
     Context '-NoEnumerate' {
         It 'Returns a single-element top-level sequence as an array when -NoEnumerate is set' {
-            $yaml = "- only"
+            $yaml = '- only'
             $result = $yaml | ConvertFrom-Yaml -NoEnumerate
-            ,$result | Should -BeOfType [System.Object[]]
+            , $result | Should -BeOfType [System.Object[]]
             $result.Count | Should -Be 1
         }
     }
 
-    Context 'Frontmatter' {
-        It 'Parses YAML between --- delimiters' {
-            $content = @"
+    Context 'Document markers' {
+        It 'Tolerates a leading --- document-start marker' {
+            $yaml = @'
 ---
-title: Hello
-draft: false
----
-# Markdown body here
-
-Some content.
-"@
-            $result = $content | ConvertFrom-Yaml
-            $result.title | Should -Be 'Hello'
-            $result.draft | Should -BeFalse
+name: Alice
+age: 30
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.name | Should -Be 'Alice'
+            $result.age | Should -Be 30
         }
 
-        It 'Parses content that is only frontmatter' {
-            $content = @"
----
-key: value
----
-"@
-            $result = $content | ConvertFrom-Yaml
-            $result.key | Should -Be 'value'
+        It 'Tolerates a trailing ... document-end marker' {
+            $yaml = @'
+name: Alice
+...
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.name | Should -Be 'Alice'
         }
     }
 
     Context 'Comments and blank lines' {
         It 'Ignores full-line comments' {
-            $yaml = @"
+            $yaml = @'
 # this is a comment
 name: Alice
 # another comment
 age: 30
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result.name | Should -Be 'Alice'
             $result.age | Should -Be 30
@@ -246,12 +241,12 @@ age: 30
         }
 
         It 'Ignores blank lines' {
-            $yaml = @"
+            $yaml = @'
 name: Alice
 
 age: 30
 
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml
             $result.name | Should -Be 'Alice'
             $result.age | Should -Be 30
@@ -260,21 +255,21 @@ age: 30
 
     Context '-Depth' {
         It 'Throws when nesting exceeds -Depth' {
-            $yaml = @"
+            $yaml = @'
 a:
   b:
     c:
       d: value
-"@
+'@
             { $yaml | ConvertFrom-Yaml -Depth 2 } | Should -Throw
         }
 
         It 'Allows nesting within -Depth' {
-            $yaml = @"
+            $yaml = @'
 a:
   b:
     c: value
-"@
+'@
             $result = $yaml | ConvertFrom-Yaml -Depth 5
             $result.a.b.c | Should -Be 'value'
         }

@@ -7,14 +7,17 @@
         Parses a YAML document and returns a `[PSCustomObject]` (default) or an
         `[ordered]` hashtable when `-AsHashtable` is specified.
 
-        Supports a useful subset of YAML 1.2:
+        Supports a useful subset of YAML 1.2.2 (core schema):
           - Block-style mappings (key: value)
           - Block-style sequences (- item)
           - Nested structures
-          - Scalars: strings, integers, floats, booleans, null
+          - Scalars: strings, integers, floats, booleans (`true`/`false`), null (`null`/`~`/empty)
           - Single- and double-quoted strings (with `\n`, `\t`, `\r`, `\\`, `\"` in double quotes)
-          - YAML frontmatter delimited by `---` (typical in markdown)
+          - Document start (`---`) and end (`...`) markers are tolerated
           - Full-line comments (`#`) and inline comments after values
+
+        Input must be a valid YAML string. Reading frontmatter out of a markdown
+        document is the responsibility of the caller (see the Markdown module).
 
         Out of scope for this version: flow style (`[a, b]`, `{a: 1}`), block scalars
         (`|`, `>`), anchors/aliases, tags, multi-document streams, and `!!timestamp`.
@@ -41,11 +44,6 @@
         Get-Content config.yaml -Raw | ConvertFrom-Yaml -AsHashtable
 
         Reads a YAML file and returns it as an ordered hashtable.
-
-        .EXAMPLE
-        Get-Content post.md -Raw | ConvertFrom-Yaml
-
-        Extracts and parses the YAML frontmatter from a markdown file.
 
         .OUTPUTS
         System.Management.Automation.PSCustomObject
@@ -92,10 +90,7 @@
             return $null
         }
 
-        # Strip frontmatter delimiters: leading "---" line and trailing "---" line.
-        $text = ConvertFrom-YamlFrontmatter -Text $text
-
-        # Pre-process into logical lines (drop comments and blank lines, keep indentation).
+        # Pre-process into logical lines (drop comments, blank lines, and document markers).
         $lines = ConvertFrom-YamlLineStream -Text $text
         if ($lines.Count -eq 0) {
             return $null
