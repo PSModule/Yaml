@@ -1,19 +1,51 @@
 ﻿<#
-  .SYNOPSIS
-    This is a general example of how to use the module.
+    .SYNOPSIS
+    Example usage of the Yaml module: parse YAML to objects and convert objects back to YAML.
 #>
 
-# Import the module
-Import-Module -Name 'PSModule'
+Import-Module -Name 'Yaml'
 
-# Define the path to the font file
-$FontFilePath = 'C:\Fonts\CodeNewRoman\CodeNewRomanNerdFontPropo-Regular.tff'
+# 1. Parse a YAML string into a PSCustomObject
+$yaml = @'
+name: Alice
+age: 30
+skills:
+  - PowerShell
+  - YAML
+'@
 
-# Install the font
-Install-Font -Path $FontFilePath -Verbose
+$person = $yaml | ConvertFrom-Yaml
+$person.name        # Alice
+$person.skills[0]   # PowerShell
 
-# List installed fonts
-Get-Font -Name 'CodeNewRomanNerdFontPropo-Regular'
+# 2. Parse YAML as an ordered hashtable
+$hash = $yaml | ConvertFrom-Yaml -AsHashtable
+$hash['age']        # 30
 
-# Uninstall the font
-Get-Font -Name 'CodeNewRomanNerdFontPropo-Regular' | Uninstall-Font -Verbose
+# 3. Parse YAML frontmatter from a markdown document
+$markdown = @'
+---
+title: Hello world
+draft: false
+---
+# Body
+
+Markdown content here.
+'@
+
+$frontmatter = $markdown | ConvertFrom-Yaml
+$frontmatter.title  # Hello world
+
+# 4. Convert an object to YAML
+[ordered]@{
+    name   = 'Alice'
+    age    = 30
+    skills = @('PowerShell', 'YAML')
+} | ConvertTo-Yaml
+
+# 5. Force a top-level sequence with -AsArray
+Get-Process | Select-Object -First 3 Name, Id | ConvertTo-Yaml -AsArray
+
+# 6. Round-trip
+$obj = [ordered]@{ a = 1; b = @('x', 'y') }
+$obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable

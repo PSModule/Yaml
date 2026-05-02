@@ -18,23 +18,52 @@ Import-Module -Name {{ NAME }}
 
 ## Usage
 
-Here is a list of example that are typical use cases for the module.
+The module provides two cmdlets that mirror PowerShell's built-in `ConvertFrom-Json` / `ConvertTo-Json`:
 
-### Example 1: Greet an entity
+| Cmdlet              | Alias            | Purpose                                |
+| ------------------- | ---------------- | -------------------------------------- |
+| `ConvertFrom-Yaml`  | `ConvertFrom-Yml` | Parse a YAML string into an object.   |
+| `ConvertTo-Yaml`    | `ConvertTo-Yml`  | Serialize an object into a YAML string. |
 
-Provide examples for typical commands that a user would like to do with the module.
+### Example 1: Parse a YAML string
 
 ```powershell
-Greet-Entity -Name 'World'
-Hello, World!
+$yaml = @'
+name: Alice
+age: 30
+skills:
+  - PowerShell
+  - YAML
+'@
+
+$yaml | ConvertFrom-Yaml
 ```
 
-### Example 2
-
-Provide examples for typical commands that a user would like to do with the module.
+### Example 2: Parse YAML as an ordered hashtable
 
 ```powershell
-Import-Module -Name PSModuleTemplate
+Get-Content config.yaml -Raw | ConvertFrom-Yaml -AsHashtable
+```
+
+### Example 3: Parse YAML frontmatter from a markdown file
+
+```powershell
+Get-Content post.md -Raw | ConvertFrom-Yaml
+```
+
+### Example 4: Convert an object to YAML
+
+```powershell
+[ordered]@{
+    name = 'Alice'
+    skills = @('PowerShell', 'YAML')
+} | ConvertTo-Yaml
+```
+
+### Example 5: Force a top-level YAML sequence
+
+```powershell
+Get-Process | Select-Object -First 3 Name, Id | ConvertTo-Yaml -AsArray
 ```
 
 ### Find more examples
