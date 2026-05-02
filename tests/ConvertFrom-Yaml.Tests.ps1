@@ -131,6 +131,46 @@ mango: 3
             $names[1] | Should -Be 'apple'
             $names[2] | Should -Be 'mango'
         }
+
+        It 'Preserves raw text of YAML-special keys without type resolution' {
+            $yaml = @'
+true: a
+false: b
+null: c
+~: d
+'@
+            $result = $yaml | ConvertFrom-Yaml -AsHashtable
+            $result.Keys | Should -Contain 'true'
+            $result.Keys | Should -Contain 'false'
+            $result.Keys | Should -Contain 'null'
+            $result.Keys | Should -Contain '~'
+            $result['true'] | Should -Be 'a'
+            $result['false'] | Should -Be 'b'
+            $result['null'] | Should -Be 'c'
+            $result['~'] | Should -Be 'd'
+        }
+
+        It 'Handles quoted mapping keys with escapes' {
+            $yaml = @'
+"key\nwith": value1
+'single''s': value2
+'@
+            $result = $yaml | ConvertFrom-Yaml -AsHashtable
+            $result.Keys | Should -Contain "key`nwith"
+            $result["key`nwith"] | Should -Be 'value1'
+            $result.Keys | Should -Contain "single's"
+            $result["single's"] | Should -Be 'value2'
+        }
+
+        It 'Parses keys that collide with built-in member names' {
+            $yaml = @'
+ToString: hello
+GetType: world
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.PSObject.Properties['ToString'].Value | Should -Be 'hello'
+            $result.PSObject.Properties['GetType'].Value | Should -Be 'world'
+        }
     }
 
     Context 'Sequences' {

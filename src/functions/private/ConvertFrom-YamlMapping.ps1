@@ -30,25 +30,32 @@
             throw "ConvertFrom-Yaml: expected mapping key at line $($line.Number): '$($line.Content)'."
         }
 
-        $key = ConvertFrom-YamlScalar -Raw $line.Content.Substring(0, $colonIdx).Trim()
+        $rawKey = $line.Content.Substring(0, $colonIdx).Trim()
+        if ($rawKey.Length -ge 2 -and $rawKey[0] -eq "'" -and $rawKey[-1] -eq "'") {
+            $key = ($rawKey.Substring(1, $rawKey.Length - 2)) -replace "''", "'"
+        } elseif ($rawKey.Length -ge 2 -and $rawKey[0] -eq '"' -and $rawKey[-1] -eq '"') {
+            $key = Expand-YamlDoubleQuoted -Text ($rawKey.Substring(1, $rawKey.Length - 2))
+        } else {
+            $key = $rawKey
+        }
         $rest = $line.Content.Substring($colonIdx + 1).Trim()
 
         $Context.Index++
 
         if ($rest.Length -gt 0) {
-            $map[[string]$key] = ConvertFrom-YamlScalar -Raw $rest
+            $map[$key] = ConvertFrom-YamlScalar -Raw $rest
             continue
         }
 
         # Value on subsequent indented lines (mapping or sequence) or null.
         if ($Context.Index -ge $lines.Count) {
-            $map[[string]$key] = $null
+            $map[$key] = $null
             continue
         }
 
         $next = $lines[$Context.Index]
         if ($next.Indent -le $Indent) {
-            $map[[string]$key] = $null
+            $map[$key] = $null
             continue
         }
 
@@ -56,16 +63,12 @@
         # We require the child to be indented strictly greater than the key here for clarity.
         $childIndent = $next.Indent
         $value = ConvertFrom-YamlNode -Context $Context -Indent $childIndent -Depth ($Depth + 1)
-        $map[[string]$key] = $value
+        $map[$key] = $value
     }
 
     if ($Context.AsHashtable) {
         return $map
     }
 
-    $obj = [pscustomobject]@{}
-    foreach ($k in $map.Keys) {
-        Add-Member -InputObject $obj -MemberType NoteProperty -Name $k -Value $map[$k]
-    }
-    return $obj
+    return [pscustomobject]$map
 }
