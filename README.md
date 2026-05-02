@@ -5,6 +5,7 @@
 ## Prerequisites
 
 This uses the following external resources:
+
 - The [PSModule framework](https://github.com/PSModule) for building, testing and publishing the module.
 
 ## Installation
@@ -24,6 +25,19 @@ The module provides two cmdlets that mirror PowerShell's built-in `ConvertFrom-J
 | ------------------- | ---------------- | -------------------------------------- |
 | `ConvertFrom-Yaml`  | `ConvertFrom-Yml` | Parse a YAML string into an object.   |
 | `ConvertTo-Yaml`    | `ConvertTo-Yml`  | Serialize an object into a YAML string. |
+
+### YAML specification
+
+The module aligns with [**YAML 1.2.2**](https://yaml.org/spec/1.2.2/) (October 2021) — the latest revision of the YAML specification — and follows the [**core schema**](https://yaml.org/spec/1.2.2/#103-core-schema) for scalar resolution.
+
+Practical implications of the core schema:
+
+- `true` and `false` (lowercase only) parse as `[bool]`. `True`, `TRUE`, `yes`, `no`, `on`, `off`, etc. are plain strings.
+- `null`, `~`, and an empty value parse as `$null`. `Null`, `NULL` are plain strings.
+- Integers and floats parse to their native types using invariant culture.
+- Anything else is a string. Quoted strings (`'...'`, `"..."`) always preserve the string type.
+
+The supported YAML subset covers block-style mappings, block-style sequences, nested structures, single- and double-quoted scalars (with `\n`, `\t`, `\r`, `\\`, `\"` escapes in double quotes), and full-line / inline `#` comments. Flow style (`[a, b]`, `{a: 1}`), block scalars (`|`, `>`), anchors, aliases, tags, multi-document streams, and `!!timestamp` are not yet supported.
 
 ### Example 1: Parse a YAML string
 

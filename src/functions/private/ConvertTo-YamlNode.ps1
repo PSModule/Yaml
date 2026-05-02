@@ -407,18 +407,11 @@ function Test-YamlPlainSafe {
     if ($Text.Length -eq 0) { return $false }
     if ($Text -ne $Text.Trim()) { return $false }
 
-    # Strings that look like reserved literals must be quoted to preserve the string type.
-    $reserved = @(
-        'true', 'True', 'TRUE',
-        'false', 'False', 'FALSE',
-        'yes', 'Yes', 'YES',
-        'no', 'No', 'NO',
-        'on', 'On', 'ON',
-        'off', 'Off', 'OFF',
-        'null', 'Null', 'NULL',
-        '~'
-    )
-    if ($Text -in $reserved) { return $false }
+    # Strings that match YAML 1.2.2 core schema literals must be quoted to preserve string type.
+    # Comparison is case-sensitive — only the lowercase canonical forms are recognised by parsers.
+    if ($Text -ceq 'true' -or $Text -ceq 'false' -or $Text -ceq 'null' -or $Text -ceq '~') {
+        return $false
+    }
 
     # Strings that parse as a number must be quoted.
     $tmpInt = 0L

@@ -62,7 +62,7 @@ Describe 'ConvertTo-Yaml' {
     Context 'Mappings' {
         It 'Renders a flat hashtable' {
             $yaml = ([ordered]@{ name = 'Alice'; age = 30 }) | ConvertTo-Yaml
-            $lines = $yaml.TrimEnd("`r","`n") -split "`r?`n"
+            $lines = $yaml.TrimEnd("`r", "`n") -split "`r?`n"
             $lines[0] | Should -Be 'name: Alice'
             $lines[1] | Should -Be 'age: 30'
         }
@@ -70,7 +70,7 @@ Describe 'ConvertTo-Yaml' {
         It 'Renders nested mappings with 2-space indent by default' {
             $obj = [ordered]@{
                 person = [ordered]@{
-                    name = 'Alice'
+                    name    = 'Alice'
                     address = [ordered]@{
                         city = 'Oslo'
                     }
@@ -200,9 +200,9 @@ Describe 'Round-trip ConvertTo-Yaml | ConvertFrom-Yaml' {
     It 'Preserves a nested mapping' {
         $obj = [ordered]@{
             person = [ordered]@{
-                name = 'Alice'
+                name    = 'Alice'
                 address = [ordered]@{
-                    city = 'Oslo'
+                    city    = 'Oslo'
                     country = 'Norway'
                 }
             }

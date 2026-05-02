@@ -232,16 +232,12 @@ function ConvertFrom-YamlScalar {
         return (Expand-YamlDoubleQuoted -Text $inner)
     }
 
-    # Null literals.
-    if ($value -in @('~', 'null', 'Null', 'NULL')) { return $null }
+    # Null literal (YAML 1.2.2 core schema): empty, ~, null only. Case-sensitive.
+    if ($value -ceq '~' -or $value -ceq 'null') { return $null }
 
-    # Boolean literals.
-    if ($value -in @('true', 'True', 'TRUE', 'yes', 'Yes', 'YES', 'on', 'On', 'ON')) {
-        return $true
-    }
-    if ($value -in @('false', 'False', 'FALSE', 'no', 'No', 'NO', 'off', 'Off', 'OFF')) {
-        return $false
-    }
+    # Boolean literal (YAML 1.2.2 core schema): true / false only. Case-sensitive.
+    if ($value -ceq 'true') { return $true }
+    if ($value -ceq 'false') { return $false }
 
     # Integer.
     $intVal = 0

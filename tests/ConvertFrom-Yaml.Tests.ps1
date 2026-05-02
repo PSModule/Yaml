@@ -29,18 +29,28 @@ Describe 'ConvertFrom-Yaml' {
             $result.ratio | Should -BeOfType [double]
         }
 
-        It 'Parses boolean true variants' {
-            $result = "a: true`nb: True`nc: yes" | ConvertFrom-Yaml
+        It 'Parses boolean true' {
+            $result = 'a: true' | ConvertFrom-Yaml
             $result.a | Should -BeTrue
-            $result.b | Should -BeTrue
-            $result.c | Should -BeTrue
+            $result.a | Should -BeOfType [bool]
         }
 
-        It 'Parses boolean false variants' {
-            $result = "a: false`nb: False`nc: no" | ConvertFrom-Yaml
+        It 'Parses boolean false' {
+            $result = 'a: false' | ConvertFrom-Yaml
             $result.a | Should -BeFalse
-            $result.b | Should -BeFalse
-            $result.c | Should -BeFalse
+            $result.a | Should -BeOfType [bool]
+        }
+
+        It 'Treats non-canonical boolean-like words as strings (YAML 1.2.2)' {
+            # YAML 1.2.2 core schema only recognizes lowercase true/false. Everything else is a string.
+            $result = "a: True`nb: TRUE`nc: yes`nd: No`ne: on`nf: OFF" | ConvertFrom-Yaml
+            $result.a | Should -Be 'True'
+            $result.a | Should -BeOfType [string]
+            $result.b | Should -Be 'TRUE'
+            $result.c | Should -Be 'yes'
+            $result.d | Should -Be 'No'
+            $result.e | Should -Be 'on'
+            $result.f | Should -Be 'OFF'
         }
 
         It 'Parses null values' {
@@ -48,6 +58,13 @@ Describe 'ConvertFrom-Yaml' {
             $result.a | Should -BeNullOrEmpty
             $result.b | Should -BeNullOrEmpty
             $result.c | Should -BeNullOrEmpty
+        }
+
+        It 'Treats non-canonical null-like words as strings (YAML 1.2.2)' {
+            $result = "a: Null`nb: NULL" | ConvertFrom-Yaml
+            $result.a | Should -Be 'Null'
+            $result.a | Should -BeOfType [string]
+            $result.b | Should -Be 'NULL'
         }
 
         It 'Parses single-quoted strings preserving content' {

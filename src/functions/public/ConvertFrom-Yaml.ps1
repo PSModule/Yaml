@@ -102,10 +102,10 @@
         }
 
         $context = [pscustomobject]@{
-            Lines      = $lines
-            Index      = 0
+            Lines       = $lines
+            Index       = 0
             AsHashtable = [bool] $AsHashtable
-            MaxDepth   = $Depth
+            MaxDepth    = $Depth
         }
 
         $result = ConvertFrom-YamlNode -Context $context -Indent 0 -Depth 0
