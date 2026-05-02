@@ -34,7 +34,7 @@
         age: 30
 
         .EXAMPLE
-        Get-Process | Select-Object -First 3 Name, Id | ConvertTo-Yaml -AsArray
+        Get-Process | Select-Object -First 3 Name, ID | ConvertTo-Yaml -AsArray
 
         Serializes a list of objects as a YAML sequence.
 

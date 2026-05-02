@@ -8,13 +8,13 @@
         `[ordered]` hashtable when `-AsHashtable` is specified.
 
         Supports a useful subset of YAML 1.2.2 (core schema):
-          - Block-style mappings (key: value)
-          - Block-style sequences (- item)
-          - Nested structures
-          - Scalars: strings, integers, floats, booleans (`true`/`false`), null (`null`/`~`/empty)
-          - Single- and double-quoted strings (with `\n`, `\t`, `\r`, `\\`, `\"` in double quotes)
-          - Document start (`---`) and end (`...`) markers are tolerated
-          - Full-line comments (`#`) and inline comments after values
+        - Block-style mappings (key: value)
+        - Block-style sequences (- item)
+        - Nested structures
+        - Scalars: strings, integers, floats, booleans (`true`/`false`), null (`null`/`~`/empty)
+        - Single- and double-quoted strings (with `\n`, `\t`, `\r`, `\\`, `\"` in double quotes)
+        - Document start (`---`) and end (`...`) markers are tolerated
+        - Full-line comments (`#`) and inline comments after values
 
         Input must be a valid YAML string.
 
