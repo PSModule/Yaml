@@ -34,7 +34,7 @@ The module provides two cmdlets that mirror PowerShell's built-in `ConvertFrom-J
 | `ConvertTo-Yaml`    | `ConvertTo-Yml`   | Serialize an object into a YAML string.  |
 
 > [!IMPORTANT]
-> The input to `ConvertFrom-Yaml` must be a valid YAML string. The cmdlet does not read files or extract YAML frontmatter from markdown — that is the caller's responsibility (for example, using a Markdown module to extract frontmatter, then piping the result into `ConvertFrom-Yaml`).
+> The input to `ConvertFrom-Yaml` must be a valid YAML string. The cmdlet does not read files — use `Get-Content -Raw` or similar to read the file first, then pipe the string into `ConvertFrom-Yaml`.
 
 ### YAML specification
 

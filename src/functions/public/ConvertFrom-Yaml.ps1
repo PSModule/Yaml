@@ -16,8 +16,7 @@
           - Document start (`---`) and end (`...`) markers are tolerated
           - Full-line comments (`#`) and inline comments after values
 
-        Input must be a valid YAML string. Reading frontmatter out of a markdown
-        document is the responsibility of the caller (see the Markdown module).
+        Input must be a valid YAML string.
 
         Out of scope for this version: flow style (`[a, b]`, `{a: 1}`), block scalars
         (`|`, `>`), anchors/aliases, tags, multi-document streams, and `!!timestamp`.
