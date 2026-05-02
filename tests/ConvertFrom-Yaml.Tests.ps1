@@ -43,7 +43,15 @@ Describe 'ConvertFrom-Yaml' {
 
         It 'Treats non-canonical boolean-like words as strings (YAML 1.2.2)' {
             # YAML 1.2.2 core schema only recognizes lowercase true/false. Everything else is a string.
-            $result = "a: True`nb: TRUE`nc: yes`nd: No`ne: on`nf: OFF" | ConvertFrom-Yaml
+            $yaml = @"
+a: True
+b: TRUE
+c: yes
+d: No
+e: on
+f: OFF
+"@
+            $result = $yaml | ConvertFrom-Yaml
             $result.a | Should -Be 'True'
             $result.a | Should -BeOfType [string]
             $result.b | Should -Be 'TRUE'

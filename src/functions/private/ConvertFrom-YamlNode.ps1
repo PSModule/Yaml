@@ -279,13 +279,15 @@ function Expand-YamlDoubleQuoted {
         if ($c -eq '\' -and $i + 1 -lt $Text.Length) {
             $next = $Text[$i + 1]
             $expanded = $true
-            if     ($next -eq 'n')  { $null = $sb.Append("`n") }
-            elseif ($next -eq 't')  { $null = $sb.Append("`t") }
-            elseif ($next -eq 'r')  { $null = $sb.Append("`r") }
-            elseif ($next -eq '"')  { $null = $sb.Append('"') }
-            elseif ($next -eq '\') { $null = $sb.Append('\') }
-            elseif ($next -eq '0')  { $null = $sb.Append([char]0) }
-            else { $expanded = $false }
+            switch ($next) {
+                'n' { $null = $sb.Append("`n") }
+                't' { $null = $sb.Append("`t") }
+                'r' { $null = $sb.Append("`r") }
+                '"' { $null = $sb.Append('"') }
+                '\' { $null = $sb.Append('\') }
+                '0' { $null = $sb.Append([char]0) }
+                default { $expanded = $false }
+            }
 
             if ($expanded) {
                 $i += 2

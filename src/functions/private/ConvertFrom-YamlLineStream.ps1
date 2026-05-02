@@ -68,6 +68,8 @@ function Remove-YamlInlineComment {
         .SYNOPSIS
         Removes an unquoted `# comment` suffix from a YAML content line.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'This function operates on a string parameter, not system state.')]
     [CmdletBinding()]
     [OutputType([string])]
     param(

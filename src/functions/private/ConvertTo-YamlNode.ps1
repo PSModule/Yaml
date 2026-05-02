@@ -91,7 +91,7 @@ function ConvertTo-YamlMapping {
         [Parameter(Mandatory)] [pscustomobject] $Options
     )
 
-    $pairs = Get-YamlMappingPairs -Value $Value
+    $pairs = Get-YamlMappingPair -Value $Value
     if ($pairs.Count -eq 0) {
         $null = $Builder.Append('{}').AppendLine()
         return
@@ -99,7 +99,7 @@ function ConvertTo-YamlMapping {
 
     $indent = ' ' * ($Level * $Options.Indent)
     foreach ($pair in $pairs) {
-        $keyText = Format-YamlKey -Key $pair.Key -Options $Options
+        $keyText = Format-YamlKey -Key $pair.Key
         $val = $pair.Value
         $null = $Builder.Append($indent).Append($keyText).Append(':')
 
@@ -115,7 +115,7 @@ function ConvertTo-YamlMapping {
         }
 
         if (Test-YamlMappingType -Value $rawVal) {
-            $childPairs = Get-YamlMappingPairs -Value $val
+            $childPairs = Get-YamlMappingPair -Value $val
             if ($childPairs.Count -eq 0) {
                 $null = $Builder.Append(' {}').AppendLine()
             } else {
@@ -172,7 +172,7 @@ function ConvertTo-YamlSequence {
         }
 
         if (Test-YamlMappingType -Value $rawItem) {
-            $pairs = Get-YamlMappingPairs -Value $item
+            $pairs = Get-YamlMappingPair -Value $item
             if ($pairs.Count -eq 0) {
                 $null = $Builder.Append($indent).Append('- {}').AppendLine()
                 continue
@@ -180,7 +180,7 @@ function ConvertTo-YamlSequence {
             $first = $true
             $childIndent = ' ' * (($Level + 1) * $Options.Indent)
             foreach ($pair in $pairs) {
-                $keyText = Format-YamlKey -Key $pair.Key -Options $Options
+                $keyText = Format-YamlKey -Key $pair.Key
                 $prefix = if ($first) { "$indent- " } else { $childIndent }
                 $first = $false
 
@@ -225,7 +225,7 @@ function ConvertTo-YamlSequence {
     }
 }
 
-function Get-YamlMappingPairs {
+function Get-YamlMappingPair {
     <#
         .SYNOPSIS
         Returns a list of [pscustomobject]@{ Key; Value } for a dictionary or PSObject.
@@ -375,8 +375,7 @@ function Format-YamlKey {
     [OutputType([string])]
     param(
         [Parameter(Mandatory)]
-        [object] $Key,
-        [Parameter(Mandatory)] [pscustomobject] $Options
+        [object] $Key
     )
 
     $text = [string] $Key
