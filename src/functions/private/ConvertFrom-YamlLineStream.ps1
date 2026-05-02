@@ -10,6 +10,8 @@
         - Inline comments (` #...` outside quotes) are stripped from the content.
         - Tabs in indentation are not allowed (YAML spec); they are treated as one space here.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
+        Justification = 'Comma-unary operator preserves List type; PSScriptAnalyzer misdetects as Object[].')]
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[pscustomobject]])]
     param(

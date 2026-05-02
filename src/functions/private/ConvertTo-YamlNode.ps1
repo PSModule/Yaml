@@ -56,6 +56,10 @@
 }
 
 function Test-YamlMappingType {
+    <#
+        .SYNOPSIS
+        Returns true when a value should be serialized as a YAML mapping.
+    #>
     [CmdletBinding()]
     [OutputType([bool])]
     param([Parameter()] [AllowNull()] [object] $Value)
@@ -70,6 +74,10 @@ function Test-YamlMappingType {
 }
 
 function Test-YamlSequenceType {
+    <#
+        .SYNOPSIS
+        Returns true when a value should be serialized as a YAML sequence.
+    #>
     [CmdletBinding()]
     [OutputType([bool])]
     param([Parameter()] [AllowNull()] [object] $Value)
@@ -82,6 +90,10 @@ function Test-YamlSequenceType {
 }
 
 function ConvertTo-YamlMapping {
+    <#
+        .SYNOPSIS
+        Writes a mapping value as a YAML block-style mapping into the StringBuilder.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [object] $Value,
@@ -142,6 +154,10 @@ function ConvertTo-YamlMapping {
 }
 
 function ConvertTo-YamlSequence {
+    <#
+        .SYNOPSIS
+        Writes a sequence value as a YAML block-style sequence into the StringBuilder.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [object] $Value,
@@ -230,6 +246,8 @@ function Get-YamlMappingPair {
         .SYNOPSIS
         Returns a list of [pscustomobject]@{ Key; Value } for a dictionary or PSObject.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
+        Justification = 'Comma-unary operator preserves List type; PSScriptAnalyzer misdetects as Object[].')]
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[pscustomobject]])]
     param(
@@ -343,6 +361,10 @@ function Format-YamlString {
 }
 
 function Format-YamlDoubleQuoted {
+    <#
+        .SYNOPSIS
+        Wraps a string in double quotes, escaping special characters per YAML rules.
+    #>
     [CmdletBinding()]
     [OutputType([string])]
     param(
@@ -371,6 +393,10 @@ function Format-YamlDoubleQuoted {
 }
 
 function Format-YamlKey {
+    <#
+        .SYNOPSIS
+        Renders a mapping key as a YAML scalar, quoting when necessary.
+    #>
     [CmdletBinding()]
     [OutputType([string])]
     param(

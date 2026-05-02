@@ -51,6 +51,8 @@
         System.Collections.Specialized.OrderedDictionary
     #>
     [Alias('ConvertFrom-Yml')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
+        Justification = 'Comma-unary operator for -NoEnumerate returns array wrapper; PSScriptAnalyzer misdetects as Object[].')]
     [CmdletBinding()]
     [OutputType([PSCustomObject], [System.Collections.Specialized.OrderedDictionary])]
     param(

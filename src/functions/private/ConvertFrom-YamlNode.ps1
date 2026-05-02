@@ -40,7 +40,12 @@
 }
 
 function ConvertFrom-YamlMapping {
+    <#
+        .SYNOPSIS
+        Parses a YAML block-style mapping into a PSCustomObject or OrderedDictionary.
+    #>
     [CmdletBinding()]
+    [OutputType([System.Collections.Specialized.OrderedDictionary], [pscustomobject])]
     param(
         [Parameter(Mandatory)] [pscustomobject] $Context,
         [Parameter(Mandatory)] [int] $Indent,
@@ -107,7 +112,14 @@ function ConvertFrom-YamlMapping {
 }
 
 function ConvertFrom-YamlSequence {
+    <#
+        .SYNOPSIS
+        Parses a YAML block-style sequence into a PowerShell array.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
+        Justification = 'Comma-unary operator preserves array type; PSScriptAnalyzer misdetects as Object[].')]
     [CmdletBinding()]
+    [OutputType([object[]])]
     param(
         [Parameter(Mandatory)] [pscustomobject] $Context,
         [Parameter(Mandatory)] [int] $Indent,
@@ -212,6 +224,7 @@ function ConvertFrom-YamlScalar {
         Converts a raw YAML scalar token into the appropriate PowerShell type.
     #>
     [CmdletBinding()]
+    [OutputType([string], [bool], [int], [long], [double])]
     param(
         [Parameter(Mandatory)]
         [AllowEmptyString()]
