@@ -91,6 +91,74 @@ f: OFF
             $result = 'value: "line1\nline2\ttab"' | ConvertFrom-Yaml
             $result.value | Should -Be "line1`nline2`ttab"
         }
+
+        It 'Handles all supported double-quoted escapes (\r, \\, \", \0)' {
+            $result = 'cr: "a\rb"' | ConvertFrom-Yaml
+            $result.cr | Should -Be "a`rb"
+
+            $result = 'bs: "a\\b"' | ConvertFrom-Yaml
+            $result.bs | Should -Be 'a\b'
+
+            $result = 'dq: "she said \"hi\""' | ConvertFrom-Yaml
+            $result.dq | Should -Be 'she said "hi"'
+
+            $result = 'nul: "a\0b"' | ConvertFrom-Yaml
+            $result.nul | Should -Be "a$([char]0)b"
+        }
+
+        It 'Preserves single-quoted escape (double apostrophe)' {
+            $result = "value: 'it''s a test'" | ConvertFrom-Yaml
+            $result.value | Should -Be "it's a test"
+        }
+
+        It 'Parses a negative integer' {
+            $result = 'value: -7' | ConvertFrom-Yaml
+            $result.value | Should -Be -7
+            $result.value | Should -BeOfType [int]
+        }
+
+        It 'Parses a large integer as [long]' {
+            $result = 'value: 3000000000' | ConvertFrom-Yaml
+            $result.value | Should -Be 3000000000
+            $result.value | Should -BeOfType [long]
+        }
+
+        It 'Parses a negative floating-point value' {
+            $result = 'value: -3.14' | ConvertFrom-Yaml
+            $result.value | Should -Be -3.14
+            $result.value | Should -BeOfType [double]
+        }
+
+        It 'Parses scientific notation as a double' {
+            $result = 'value: 6.022e23' | ConvertFrom-Yaml
+            $result.value | Should -Be 6.022e23
+            $result.value | Should -BeOfType [double]
+        }
+
+        It 'Parses zero as an integer' {
+            $result = 'value: 0' | ConvertFrom-Yaml
+            $result.value | Should -Be 0
+            $result.value | Should -BeOfType [int]
+        }
+
+        It 'Parses leading-zero integer as a number (YAML 1.2.2 core schema)' {
+            $result = 'value: 01' | ConvertFrom-Yaml
+            $result.value | Should -Be 1
+            $result.value | Should -BeOfType [int]
+        }
+
+        It 'Parses leading-plus integer as a number (YAML 1.2.2 core schema)' {
+            $result = 'value: +42' | ConvertFrom-Yaml
+            $result.value | Should -Be 42
+            $result.value | Should -BeOfType [int]
+        }
+
+        It 'Returns empty/whitespace-only input as null' {
+            $result = '' | ConvertFrom-Yaml
+            $result | Should -BeNullOrEmpty
+            $result = '   ' | ConvertFrom-Yaml
+            $result | Should -BeNullOrEmpty
+        }
     }
 
     Context 'Mappings' {
@@ -171,6 +239,44 @@ GetType: world
             $result.PSObject.Properties['ToString'].Value | Should -Be 'hello'
             $result.PSObject.Properties['GetType'].Value | Should -Be 'world'
         }
+
+        It 'Parses a mapping with null values' {
+            $yaml = @'
+present: value
+empty:
+tilde: ~
+explicit: null
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.present | Should -Be 'value'
+            $result.empty | Should -BeNullOrEmpty
+            $result.tilde | Should -BeNullOrEmpty
+            $result.explicit | Should -BeNullOrEmpty
+        }
+
+        It 'Parses a mapping with mixed value types' {
+            $yaml = @'
+str: hello
+int: 10
+float: 2.5
+bool: true
+nothing: null
+list:
+  - a
+  - b
+child:
+  key: val
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.str | Should -Be 'hello'
+            $result.str | Should -BeOfType [string]
+            $result.int | Should -Be 10
+            $result.float | Should -Be 2.5
+            $result.bool | Should -BeTrue
+            $result.nothing | Should -BeNullOrEmpty
+            $result.list.Count | Should -Be 2
+            $result.child.key | Should -Be 'val'
+        }
     }
 
     Context 'Sequences' {
@@ -211,6 +317,55 @@ people:
             $result.people[0].name | Should -Be 'Alice'
             $result.people[1].age | Should -Be 25
         }
+
+        It 'Parses nested sequences (sequence of sequences)' {
+            $yaml = @'
+matrix:
+  -
+    - 1
+    - 2
+  -
+    - 3
+    - 4
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.matrix.Count | Should -Be 2
+            $result.matrix[0].Count | Should -Be 2
+            $result.matrix[0][0] | Should -Be 1
+            $result.matrix[1][1] | Should -Be 4
+        }
+
+        It 'Parses a sequence with null items' {
+            $yaml = @'
+- alpha
+-
+- bravo
+'@
+            $result = $yaml | ConvertFrom-Yaml -NoEnumerate
+            $result.Count | Should -Be 3
+            $result[0] | Should -Be 'alpha'
+            $result[1] | Should -BeNullOrEmpty
+            $result[2] | Should -Be 'bravo'
+        }
+
+        It 'Parses a sequence with mixed scalar types' {
+            $yaml = @'
+- hello
+- 42
+- true
+- 3.14
+- null
+'@
+            $result = $yaml | ConvertFrom-Yaml -NoEnumerate
+            $result[0] | Should -Be 'hello'
+            $result[0] | Should -BeOfType [string]
+            $result[1] | Should -Be 42
+            $result[1] | Should -BeOfType [int]
+            $result[2] | Should -BeTrue
+            $result[3] | Should -Be 3.14
+            $result[3] | Should -BeOfType [double]
+            $result[4] | Should -BeNullOrEmpty
+        }
     }
 
     Context '-AsHashtable' {
@@ -246,6 +401,35 @@ outer:
             , $result | Should -BeOfType [System.Object[]]
             $result.Count | Should -Be 1
         }
+
+        It 'Without -NoEnumerate, unwraps a single-element top-level sequence' {
+            $yaml = '- only'
+            $result = $yaml | ConvertFrom-Yaml
+            $result | Should -Be 'only'
+            $result | Should -BeOfType [string]
+        }
+    }
+
+    Context 'Pipeline input' {
+        It 'Accepts multi-line pipeline strings (simulating Get-Content)' {
+            $lines = @('name: Alice', 'age: 30')
+            $result = $lines | ConvertFrom-Yaml
+            $result.name | Should -Be 'Alice'
+            $result.age | Should -Be 30
+        }
+    }
+
+    Context 'Deeply nested structures' {
+        It 'Parses 4 levels of nesting' {
+            $yaml = @'
+a:
+  b:
+    c:
+      d: deep
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.a.b.c.d | Should -Be 'deep'
+        }
     }
 
     Context 'Document markers' {
@@ -262,6 +446,16 @@ age: 30
 
         It 'Tolerates a trailing ... document-end marker' {
             $yaml = @'
+name: Alice
+...
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.name | Should -Be 'Alice'
+        }
+
+        It 'Tolerates both --- and ... markers together' {
+            $yaml = @'
+---
 name: Alice
 ...
 '@
@@ -288,13 +482,23 @@ age: 30
             $result.name | Should -Be 'Alice'
         }
 
+        It 'Preserves # inside double-quoted strings' {
+            $result = 'value: "has # inside"' | ConvertFrom-Yaml
+            $result.value | Should -Be 'has # inside'
+        }
+
+        It 'Preserves # inside single-quoted strings' {
+            $result = "value: 'has # inside'" | ConvertFrom-Yaml
+            $result.value | Should -Be 'has # inside'
+        }
+
+        It 'Does not treat # without leading space as an inline comment' {
+            $result = 'channel: news#general' | ConvertFrom-Yaml
+            $result.channel | Should -Be 'news#general'
+        }
+
         It 'Ignores blank lines' {
-            $yaml = @'
-name: Alice
-
-age: 30
-
-'@
+            $yaml = "name: Alice`n`nage: 30`n"
             $result = $yaml | ConvertFrom-Yaml
             $result.name | Should -Be 'Alice'
             $result.age | Should -Be 30
@@ -352,11 +556,7 @@ a:
         }
 
         It 'Parses sequence items {} and [] correctly' {
-            $yaml = @'
-- {}
-- []
-- hello
-'@
+            $yaml = "- {}`n- []`n- hello"
             $result = $yaml | ConvertFrom-Yaml -NoEnumerate -AsHashtable
             $result[0] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
             $result[0].Count | Should -Be 0

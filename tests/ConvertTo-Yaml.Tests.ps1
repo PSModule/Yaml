@@ -57,6 +57,62 @@ Describe 'ConvertTo-Yaml' {
             $yaml = @{ value = "line1`nline2" } | ConvertTo-Yaml
             $yaml | Should -Match '"line1\\nline2"'
         }
+
+        It 'Renders strings with \r using double-quoted escapes' {
+            $yaml = @{ value = "a`rb" } | ConvertTo-Yaml
+            $yaml | Should -Match '"a\\rb"'
+        }
+
+        It 'Renders strings with backslash as plain text (no control characters)' {
+            $yaml = @{ value = 'path\to\file' } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'value: path\to\file'
+        }
+
+        It 'Renders an empty string with quotes' {
+            $yaml = @{ value = '' } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Match "value:\s+''"
+        }
+
+        It 'Renders a negative integer without quotes' {
+            $yaml = @{ value = -7 } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'value: -7'
+        }
+
+        It 'Renders a [long] integer without quotes' {
+            $yaml = @{ value = [long]3000000000 } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'value: 3000000000'
+        }
+
+        It 'Renders a negative double without quotes' {
+            $yaml = @{ value = -3.14 } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'value: -3.14'
+        }
+
+        It 'Renders zero without quotes' {
+            $yaml = @{ value = 0 } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'value: 0'
+        }
+
+        It 'Quotes strings that look like tilde to preserve type' {
+            $yaml = @{ value = '~' } | ConvertTo-Yaml
+            $yaml.Trim() | Should -Match "value:\s+(""~""|'~')"
+        }
+
+        It 'Renders a DateTime as an ISO 8601 string' {
+            $dt = [datetime]::new(2026, 5, 3, 12, 0, 0, [System.DateTimeKind]::Utc)
+            $yaml = @{ value = $dt } | ConvertTo-Yaml
+            $yaml | Should -Match '2026-05-03T12:00:00'
+        }
+
+        It 'Quotes strings containing a colon to prevent ambiguity' {
+            $yaml = @{ value = 'http://example.com' } | ConvertTo-Yaml
+            $yaml | Should -Match "(""http://example\.com""|'http://example\.com')"
+        }
+
+        It 'Quotes strings starting with special YAML characters' {
+            $yaml = @{ value = '- not a list' } | ConvertTo-Yaml
+            $yaml | Should -Match "(""- not a list""|'- not a list')"
+        }
     }
 
     Context 'Mappings' {
@@ -89,6 +145,34 @@ Describe 'ConvertTo-Yaml' {
             $yaml | Should -Match 'name: Alice'
             $yaml | Should -Match 'age: 30'
         }
+
+        It 'Renders a mapping with null values' {
+            $yaml = ([ordered]@{ a = $null; b = 'ok' }) | ConvertTo-Yaml
+            $yaml | Should -Match '(?m)^a: null'
+            $yaml | Should -Match '(?m)^b: ok'
+        }
+
+        It 'Renders a mapping with mixed value types' {
+            $obj = [ordered]@{
+                str     = 'hello'
+                int     = 10
+                float   = 2.5
+                bool    = $true
+                nothing = $null
+                list    = @('a', 'b')
+                child   = [ordered]@{ key = 'val' }
+            }
+            $yaml = $obj | ConvertTo-Yaml
+            $yaml | Should -Match '(?m)^str: hello'
+            $yaml | Should -Match '(?m)^int: 10'
+            $yaml | Should -Match '(?m)^float: 2\.5'
+            $yaml | Should -Match '(?m)^bool: true'
+            $yaml | Should -Match '(?m)^nothing: null'
+            $yaml | Should -Match '(?m)^list:'
+            $yaml | Should -Match '(?m)^  - a'
+            $yaml | Should -Match '(?m)^child:'
+            $yaml | Should -Match '(?m)^  key: val'
+        }
     }
 
     Context 'Sequences' {
@@ -120,6 +204,35 @@ Describe 'ConvertTo-Yaml' {
             $yaml | Should -Match '(?m)^    age: 30'
             $yaml | Should -Match '(?m)^  - name: Bob'
         }
+
+        It 'Renders nested sequences (array of arrays)' {
+            $obj = [ordered]@{
+                matrix = @(
+                    , @(1, 2)
+                    , @(3, 4)
+                )
+            }
+            $yaml = $obj | ConvertTo-Yaml
+            $yaml | Should -Match '(?m)^matrix:'
+            $yaml | Should -Match '(?m)^  -'
+            $yaml | Should -Match '(?m)^    - 1'
+        }
+
+        It 'Renders a sequence with null items' {
+            $yaml = ConvertTo-Yaml -InputObject @('alpha', $null, 'bravo')
+            $yaml | Should -Match '(?m)^- alpha'
+            $yaml | Should -Match '(?m)^- null'
+            $yaml | Should -Match '(?m)^- bravo'
+        }
+
+        It 'Renders a sequence with mixed scalar types' {
+            $yaml = ConvertTo-Yaml -InputObject @('hello', 42, $true, 3.14, $null)
+            $yaml | Should -Match '(?m)^- hello'
+            $yaml | Should -Match '(?m)^- 42'
+            $yaml | Should -Match '(?m)^- true'
+            $yaml | Should -Match '(?m)^- 3\.14'
+            $yaml | Should -Match '(?m)^- null'
+        }
     }
 
     Context '-AsArray' {
@@ -127,6 +240,24 @@ Describe 'ConvertTo-Yaml' {
             $obj = [ordered]@{ name = 'Alice' }
             $yaml = ConvertTo-Yaml -InputObject $obj -AsArray
             $yaml | Should -Match '(?m)^- name: Alice'
+        }
+
+        It 'Wraps multiple pipeline objects in a top-level sequence' {
+            $yaml = @(
+                [ordered]@{ name = 'Alice' }
+                [ordered]@{ name = 'Bob' }
+            ) | ConvertTo-Yaml -AsArray
+            $yaml | Should -Match '(?m)^- name: Alice'
+            $yaml | Should -Match '(?m)^- name: Bob'
+        }
+    }
+
+    Context 'Pipeline input' {
+        It 'Collects multiple pipeline objects into a sequence' {
+            $yaml = 'Alice', 'Bob', 'Charlie' | ConvertTo-Yaml
+            $yaml | Should -Match '(?m)^- Alice'
+            $yaml | Should -Match '(?m)^- Bob'
+            $yaml | Should -Match '(?m)^- Charlie'
         }
     }
 
@@ -319,5 +450,108 @@ Describe 'Round-trip ConvertTo-Yaml | ConvertFrom-Yaml' {
         $obj = [ordered]@{ items = @() }
         $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
         $result['items'].Count | Should -Be 0
+    }
+
+    It 'Preserves numeric types (int, long, double, negative)' {
+        $obj = [ordered]@{
+            int    = 42
+            long   = [long]3000000000
+            double = 3.14
+            neg    = -7
+            zero   = 0
+        }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['int'] | Should -Be 42
+        $result['int'] | Should -BeOfType [int]
+        $result['long'] | Should -Be 3000000000
+        $result['long'] | Should -BeOfType [long]
+        $result['double'] | Should -Be 3.14
+        $result['double'] | Should -BeOfType [double]
+        $result['neg'] | Should -Be -7
+        $result['zero'] | Should -Be 0
+    }
+
+    It 'Round-trips booleans and null through unquoted YAML literals' {
+        $obj = [ordered]@{ yes = $true; no = $false; nothing = $null }
+        $yaml = $obj | ConvertTo-Yaml
+
+        # Intermediate YAML must use unquoted canonical literals
+        $yaml | Should -Match '(?m)^yes: true\r?$'
+        $yaml | Should -Match '(?m)^no: false\r?$'
+        $yaml | Should -Match '(?m)^nothing: null\r?$'
+
+        # Round-trip back to PowerShell must restore native types
+        $result = $yaml | ConvertFrom-Yaml -AsHashtable
+        $result['yes'] | Should -BeTrue
+        $result['yes'] | Should -BeOfType [bool]
+        $result['no'] | Should -BeFalse
+        $result['no'] | Should -BeOfType [bool]
+        $result['nothing'] | Should -BeNullOrEmpty
+    }
+
+    It 'Preserves strings with special characters' {
+        $obj = [ordered]@{
+            newline   = "line1`nline2"
+            tab       = "col1`tcol2"
+            backslash = 'a\b'
+        }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['newline'] | Should -Be "line1`nline2"
+        $result['tab'] | Should -Be "col1`tcol2"
+        $result['backslash'] | Should -Be 'a\b'
+    }
+
+    It 'Preserves tilde as a string when quoted' {
+        $obj = [ordered]@{ value = '~' }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['value'] | Should -Be '~'
+        $result['value'] | Should -BeOfType [string]
+    }
+
+    It 'Preserves a deeply nested structure' {
+        $obj = [ordered]@{
+            a = [ordered]@{
+                b = [ordered]@{
+                    c = [ordered]@{
+                        d = 'deep'
+                    }
+                }
+            }
+        }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['a']['b']['c']['d'] | Should -Be 'deep'
+    }
+
+    It 'Preserves a mixed structure (mappings, sequences, nested)' {
+        $obj = [ordered]@{
+            name    = 'project'
+            version = 1
+            tags    = @('alpha', 'beta')
+            config  = [ordered]@{
+                debug   = $true
+                timeout = 30
+            }
+            servers = @(
+                [ordered]@{ host = 'a.example.com'; port = 80 }
+                [ordered]@{ host = 'b.example.com'; port = 443 }
+            )
+        }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['name'] | Should -Be 'project'
+        $result['version'] | Should -Be 1
+        $result['tags'].Count | Should -Be 2
+        $result['tags'][0] | Should -Be 'alpha'
+        $result['config']['debug'] | Should -BeTrue
+        $result['config']['timeout'] | Should -Be 30
+        $result['servers'].Count | Should -Be 2
+        $result['servers'][0]['host'] | Should -Be 'a.example.com'
+        $result['servers'][1]['port'] | Should -Be 443
+    }
+
+    It 'Preserves an empty string' {
+        $obj = [ordered]@{ value = '' }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['value'] | Should -Be ''
+        $result['value'] | Should -BeOfType [string]
     }
 }
