@@ -14,17 +14,18 @@
 
     $items = @($Value)
     if ($items.Count -eq 0) {
-        $null = $Builder.Append('[]').AppendLine()
+        $indent = ' ' * ($Level * $Options.Indent)
+        $null = $Builder.Append($indent).Append('[]').AppendLine()
         return
     }
 
     $indent = ' ' * ($Level * $Options.Indent)
 
     foreach ($item in $items) {
-        $rawItem = if ($item -is [psobject] -and $null -ne $item.PSObject -and $null -ne $item.PSObject.BaseObject) {
-            $item.PSObject.BaseObject
+        if ($item -is [psobject] -and $null -ne $item.PSObject -and $null -ne $item.PSObject.BaseObject) {
+            $rawItem = $item.PSObject.BaseObject
         } else {
-            $item
+            $rawItem = $item
         }
 
         if ($null -eq $item) {
@@ -46,10 +47,10 @@
                 $first = $false
 
                 $val = $pair.Value
-                $rawVal = if ($val -is [psobject] -and $null -ne $val.PSObject -and $null -ne $val.PSObject.BaseObject) {
-                    $val.PSObject.BaseObject
+                if ($val -is [psobject] -and $null -ne $val.PSObject -and $null -ne $val.PSObject.BaseObject) {
+                    $rawVal = $val.PSObject.BaseObject
                 } else {
-                    $val
+                    $rawVal = $val
                 }
 
                 if ($null -eq $val) {
@@ -58,14 +59,24 @@
                 }
 
                 if (Test-YamlMappingType -Value $rawVal) {
-                    $null = $Builder.Append($prefix).Append($keyText).Append(':').AppendLine()
-                    ConvertTo-YamlNode -Value $val -Builder $Builder -Level ($Level + 2) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+                    $childPairs = Get-YamlMappingPair -Value $val
+                    if ($childPairs.Count -eq 0) {
+                        $null = $Builder.Append($prefix).Append($keyText).Append(': {}').AppendLine()
+                    } else {
+                        $null = $Builder.Append($prefix).Append($keyText).Append(':').AppendLine()
+                        ConvertTo-YamlNode -Value $val -Builder $Builder -Level ($Level + 2) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+                    }
                     continue
                 }
 
                 if (Test-YamlSequenceType -Value $rawVal) {
-                    $null = $Builder.Append($prefix).Append($keyText).Append(':').AppendLine()
-                    ConvertTo-YamlSequence -Value $rawVal -Builder $Builder -Level ($Level + 2) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+                    $arr = @($rawVal)
+                    if ($arr.Count -eq 0) {
+                        $null = $Builder.Append($prefix).Append($keyText).Append(': []').AppendLine()
+                    } else {
+                        $null = $Builder.Append($prefix).Append($keyText).Append(':').AppendLine()
+                        ConvertTo-YamlSequence -Value $rawVal -Builder $Builder -Level ($Level + 2) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+                    }
                     continue
                 }
 
@@ -76,8 +87,13 @@
         }
 
         if (Test-YamlSequenceType -Value $rawItem) {
-            $null = $Builder.Append($indent).Append('-').AppendLine()
-            ConvertTo-YamlSequence -Value $rawItem -Builder $Builder -Level ($Level + 1) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+            $arr = @($rawItem)
+            if ($arr.Count -eq 0) {
+                $null = $Builder.Append($indent).Append('- []').AppendLine()
+            } else {
+                $null = $Builder.Append($indent).Append('-').AppendLine()
+                ConvertTo-YamlSequence -Value $rawItem -Builder $Builder -Level ($Level + 1) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+            }
             continue
         }
 

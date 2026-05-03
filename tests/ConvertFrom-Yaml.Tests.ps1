@@ -329,4 +329,39 @@ a:
                 Should -Be 'ConvertFrom-Yaml'
         }
     }
+
+    Context 'Empty collection literals' {
+        It 'Parses {} as an empty mapping (PSCustomObject by default)' {
+            $result = 'data: {}' | ConvertFrom-Yaml
+            $result.data | Should -BeOfType [PSCustomObject]
+            @($result.data.PSObject.Properties).Count | Should -Be 0
+        }
+
+        It 'Parses {} as an empty OrderedDictionary with -AsHashtable' {
+            $result = 'data: {}' | ConvertFrom-Yaml -AsHashtable
+            $result['data'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+            $result['data'].Count | Should -Be 0
+        }
+
+        It 'Parses [] as an empty array' {
+            $result = 'items: []' | ConvertFrom-Yaml
+            $result.items | Should -BeNullOrEmpty
+            # Verify via round-trip that ConvertTo-Yaml emits []
+            $yaml = [ordered]@{ items = @() } | ConvertTo-Yaml
+            $yaml | Should -Match '\[\]'
+        }
+
+        It 'Parses sequence items {} and [] correctly' {
+            $yaml = @'
+- {}
+- []
+- hello
+'@
+            $result = $yaml | ConvertFrom-Yaml -NoEnumerate -AsHashtable
+            $result[0] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+            $result[0].Count | Should -Be 0
+            $result[1].Count | Should -Be 0
+            $result[2] | Should -Be 'hello'
+        }
+    }
 }

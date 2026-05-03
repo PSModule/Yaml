@@ -14,7 +14,8 @@
 
     $pairs = Get-YamlMappingPair -Value $Value
     if ($pairs.Count -eq 0) {
-        $null = $Builder.Append('{}').AppendLine()
+        $indent = ' ' * ($Level * $Options.Indent)
+        $null = $Builder.Append($indent).Append('{}').AppendLine()
         return
     }
 
@@ -29,10 +30,10 @@
             continue
         }
 
-        $rawVal = if ($val -is [psobject] -and $null -ne $val.PSObject -and $null -ne $val.PSObject.BaseObject) {
-            $val.PSObject.BaseObject
+        if ($val -is [psobject] -and $null -ne $val.PSObject -and $null -ne $val.PSObject.BaseObject) {
+            $rawVal = $val.PSObject.BaseObject
         } else {
-            $val
+            $rawVal = $val
         }
 
         if (Test-YamlMappingType -Value $rawVal) {

@@ -43,7 +43,13 @@
         $Context.Index++
 
         if ($rest.Length -gt 0) {
-            $map[$key] = ConvertFrom-YamlScalar -Raw $rest
+            if ($rest -ceq '{}') {
+                $map[$key] = if ($Context.AsHashtable) { [ordered]@{} } else { [pscustomobject][ordered]@{} }
+            } elseif ($rest -ceq '[]') {
+                $map[$key] = @()
+            } else {
+                $map[$key] = ConvertFrom-YamlScalar -Raw $rest
+            }
             continue
         }
 

@@ -178,6 +178,69 @@ Describe 'ConvertTo-Yaml' {
             $yaml = $obj | ConvertTo-Yaml -Depth 5
             $yaml | Should -Match 'b: value'
         }
+
+        It 'Indents depth-exceeded values correctly under a mapping key' {
+            $obj = [ordered]@{
+                a = [ordered]@{
+                    b = [ordered]@{
+                        c = 'value'
+                    }
+                }
+            }
+            $yaml = $obj | ConvertTo-Yaml -Depth 1 -WarningAction SilentlyContinue
+            $lines = $yaml.TrimEnd("`r", "`n") -split "`r?`n"
+            # The depth-exceeded line should be indented under 'b:'
+            $bLine = $lines | Where-Object { $_ -match '^\s+b:' }
+            $bLine | Should -Not -BeNullOrEmpty
+            $depthLine = $lines[($lines.IndexOf($bLine) + 1)]
+            $depthLine | Should -Match '^\s{4}'
+        }
+    }
+
+    Context 'Empty collections' {
+        It 'Renders an empty hashtable as {}' {
+            $yaml = [ordered]@{} | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be '{}'
+        }
+
+        It 'Renders an empty array as []' {
+            $yaml = ConvertTo-Yaml -InputObject @()
+            $yaml.Trim() | Should -Be '[]'
+        }
+
+        It 'Renders a nested empty mapping inline' {
+            $obj = [ordered]@{ key = [ordered]@{} }
+            $yaml = $obj | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'key: {}'
+        }
+
+        It 'Renders a nested empty array inline' {
+            $obj = [ordered]@{ key = @() }
+            $yaml = $obj | ConvertTo-Yaml
+            $yaml.Trim() | Should -Be 'key: []'
+        }
+
+        It 'Renders an empty mapping value in a sequence-of-mappings inline' {
+            $obj = @(
+                [ordered]@{ name = 'Alice'; data = [ordered]@{} }
+            )
+            $yaml = ConvertTo-Yaml -InputObject $obj
+            $yaml | Should -Match 'data: \{\}'
+        }
+
+        It 'Renders an empty array value in a sequence-of-mappings inline' {
+            $obj = @(
+                [ordered]@{ name = 'Alice'; items = @() }
+            )
+            $yaml = ConvertTo-Yaml -InputObject $obj
+            $yaml | Should -Match 'items: \[\]'
+        }
+
+        It 'Renders an empty sequence item in a sequence as - []' {
+            $obj = @( @(), @('a') )
+            $yaml = ConvertTo-Yaml -InputObject $obj
+            $yaml | Should -Match '(?m)^- \[\]'
+        }
     }
 
     Context 'Aliases' {
@@ -243,5 +306,18 @@ Describe 'Round-trip ConvertTo-Yaml | ConvertFrom-Yaml' {
         $result['b'] | Should -BeOfType [string]
         $result['c'] | Should -Be 'null'
         $result['c'] | Should -BeOfType [string]
+    }
+
+    It 'Preserves an empty mapping under a key' {
+        $obj = [ordered]@{ data = [ordered]@{} }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['data'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $result['data'].Count | Should -Be 0
+    }
+
+    It 'Preserves an empty array under a key' {
+        $obj = [ordered]@{ items = @() }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['items'].Count | Should -Be 0
     }
 }

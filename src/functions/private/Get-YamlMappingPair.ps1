@@ -13,10 +13,10 @@
     )
 
     $pairs = [System.Collections.Generic.List[pscustomobject]]::new()
-    $raw = if ($Value -is [psobject] -and $null -ne $Value.PSObject -and $null -ne $Value.PSObject.BaseObject) {
-        $Value.PSObject.BaseObject
+    if ($Value -is [psobject] -and $null -ne $Value.PSObject -and $null -ne $Value.PSObject.BaseObject) {
+        $raw = $Value.PSObject.BaseObject
     } else {
-        $Value
+        $raw = $Value
     }
 
     if ($raw -is [System.Collections.IDictionary]) {

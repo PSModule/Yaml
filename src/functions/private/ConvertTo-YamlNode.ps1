@@ -24,7 +24,8 @@
 
     if ($CurrentDepth -gt $Options.Depth) {
         $repr = if ($null -eq $Value) { 'null' } else { Format-YamlScalar -Value $Value.ToString() -Options $Options }
-        $null = $Builder.Append($repr).AppendLine()
+        $indent = ' ' * ($Level * $Options.Indent)
+        $null = $Builder.Append($indent).Append($repr).AppendLine()
         return
     }
 
@@ -34,10 +35,10 @@
     }
 
     # Unwrap PSObject for type tests.
-    $raw = if ($Value -is [psobject] -and $null -ne $Value.PSObject -and $null -ne $Value.PSObject.BaseObject) {
-        $Value.PSObject.BaseObject
+    if ($Value -is [psobject] -and $null -ne $Value.PSObject -and $null -ne $Value.PSObject.BaseObject) {
+        $raw = $Value.PSObject.BaseObject
     } else {
-        $Value
+        $raw = $Value
     }
 
     if (Test-YamlMappingType -Value $raw) {

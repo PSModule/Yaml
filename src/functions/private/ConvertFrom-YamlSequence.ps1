@@ -64,6 +64,19 @@
             continue
         }
 
+        # Empty collection literals (flow-style shorthand).
+        if ($afterDash -ceq '{}') {
+            $val = if ($Context.AsHashtable) { [ordered]@{} } else { [pscustomobject][ordered]@{} }
+            $list.Add($val)
+            $Context.Index++
+            continue
+        }
+        if ($afterDash -ceq '[]') {
+            $list.Add(@())
+            $Context.Index++
+            continue
+        }
+
         # Plain scalar element.
         $list.Add((ConvertFrom-YamlScalar -Raw $afterDash))
         $Context.Index++

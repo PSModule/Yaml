@@ -83,7 +83,11 @@
         if ($AsArray) {
             ConvertTo-YamlSequence -Value $items.ToArray() -Builder $sb -Level 0 -CurrentDepth 0 -Options $options
         } else {
-            $root = if ($items.Count -eq 1) { $items[0] } else { $items.ToArray() }
+            if ($items.Count -eq 1) {
+                $root = $items[0]
+            } else {
+                $root = $items.ToArray()
+            }
             ConvertTo-YamlNode -Value $root -Builder $sb -Level 0 -CurrentDepth 0 -Options $options
         }
         return $sb.ToString().TrimEnd("`r", "`n")
