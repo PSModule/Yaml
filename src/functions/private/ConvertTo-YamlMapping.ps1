@@ -53,7 +53,7 @@
                 $null = $Builder.Append(' []').AppendLine()
             } else {
                 $null = $Builder.AppendLine()
-                ConvertTo-YamlSequence -Value $rawVal -Builder $Builder -Level ($Level + 1) -CurrentDepth ($CurrentDepth + 1) -Options $Options
+                ConvertTo-YamlNode -Value $val -Builder $Builder -Level ($Level + 1) -CurrentDepth ($CurrentDepth + 1) -Options $Options
             }
             continue
         }

@@ -18,7 +18,9 @@
         if ($Options.EnumsAsStrings) {
             return Format-YamlString -Text ($Value.ToString())
         }
-        return ([int64] $Value).ToString([cultureinfo]::InvariantCulture)
+        $underlyingType = [System.Enum]::GetUnderlyingType($Value.GetType())
+        $numeric = [System.Convert]::ChangeType($Value, $underlyingType)
+        return ([System.IConvertible]$numeric).ToString([cultureinfo]::InvariantCulture)
     }
 
     if ($Value -is [byte] -or $Value -is [sbyte] -or

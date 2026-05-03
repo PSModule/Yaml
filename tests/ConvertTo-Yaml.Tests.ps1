@@ -286,6 +286,16 @@ Describe 'ConvertTo-Yaml' {
             $yaml = $obj | ConvertTo-Yaml
             $yaml.Trim() | Should -Be 'day: 1'
         }
+
+        It 'Serializes enums with unsigned underlying type correctly' {
+            # System.Security.AccessControl.FileSystemRights has UInt32 underlying type
+            # and values that can exceed Int32.MaxValue
+            $val = [System.Security.AccessControl.FileSystemRights]::FullControl
+            $obj = [ordered]@{ rights = $val }
+            $yaml = $obj | ConvertTo-Yaml
+            $expected = [int]$val
+            $yaml.Trim() | Should -Be "rights: $expected"
+        }
     }
 
     Context '-Depth' {
@@ -325,6 +335,26 @@ Describe 'ConvertTo-Yaml' {
             $bLine | Should -Not -BeNullOrEmpty
             $depthLine = $lines[($lines.IndexOf($bLine) + 1)]
             $depthLine | Should -Match '^\s{4}'
+        }
+
+        It 'Truncates deeply nested sequences beyond -Depth' {
+            $inner = ,('innermost')
+            $middle = ,$inner
+            $outer = ,$middle
+            $yaml = ConvertTo-Yaml -InputObject $outer -Depth 1 -WarningAction SilentlyContinue
+            $yaml | Should -Not -BeNullOrEmpty
+            $yaml | Should -Not -Match 'innermost'
+        }
+
+        It 'Truncates sequences under mapping keys beyond -Depth' {
+            $obj = [ordered]@{
+                a = [ordered]@{
+                    b = @(1, 2, 3)
+                }
+            }
+            $yaml = $obj | ConvertTo-Yaml -Depth 1 -WarningAction SilentlyContinue
+            $yaml | Should -Not -BeNullOrEmpty
+            $yaml | Should -Not -Match '- 1'
         }
     }
 
