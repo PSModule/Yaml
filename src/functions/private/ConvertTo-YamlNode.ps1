@@ -30,7 +30,8 @@
     }
 
     if ($null -eq $Value) {
-        $null = $Builder.Append('null').AppendLine()
+        $indent = ' ' * ($Level * $Options.Indent)
+        $null = $Builder.Append($indent).Append('null').AppendLine()
         return
     }
 

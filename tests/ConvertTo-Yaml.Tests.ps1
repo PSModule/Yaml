@@ -293,7 +293,9 @@ Describe 'ConvertTo-Yaml' {
             $val = [System.Security.AccessControl.FileSystemRights]::FullControl
             $obj = [ordered]@{ rights = $val }
             $yaml = $obj | ConvertTo-Yaml
-            $expected = [int]$val
+            $underlyingType = [System.Enum]::GetUnderlyingType($val.GetType())
+            $numeric = [System.Convert]::ChangeType($val, $underlyingType)
+            $expected = ([System.IConvertible]$numeric).ToString([cultureinfo]::InvariantCulture)
             $yaml.Trim() | Should -Be "rights: $expected"
         }
     }

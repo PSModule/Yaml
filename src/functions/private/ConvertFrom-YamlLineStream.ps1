@@ -8,7 +8,7 @@
         - Lines that are empty or whitespace-only are skipped.
         - Lines whose first non-whitespace character is `#` are skipped.
         - Inline comments (` #...` outside quotes) are stripped from the content.
-        - Tabs in indentation are not allowed (YAML spec); they are treated as one space here.
+        - Tabs in indentation are not allowed (YAML spec); a terminating error is thrown if one is found.
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '',
         Justification = 'Comma-unary operator preserves List type; PSScriptAnalyzer misdetects as Object[].')]
@@ -31,9 +31,12 @@
             continue
         }
 
-        # Compute indent (spaces before first non-space).
+        # Compute indent (spaces before first non-space). Tabs are invalid per YAML spec.
         $indent = 0
         while ($indent -lt $raw.Length -and ($raw[$indent] -eq ' ' -or $raw[$indent] -eq "`t")) {
+            if ($raw[$indent] -eq "`t") {
+                throw "YAML forbids tab characters in indentation (line $($i + 1)). Use spaces instead."
+            }
             $indent++
         }
 

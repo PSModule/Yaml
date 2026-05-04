@@ -636,8 +636,9 @@ a:
         }
 
         It 'Parses [] as an empty array' {
-            $result = 'items: []' | ConvertFrom-Yaml
-            $result.items | Should -BeNullOrEmpty
+            $result = 'items: []' | ConvertFrom-Yaml -AsHashtable
+            $result['items'].GetType().Name | Should -Be 'Object[]'
+            $result['items'].Count | Should -Be 0
             # Verify via round-trip that ConvertTo-Yaml emits []
             $yaml = [ordered]@{ items = @() } | ConvertTo-Yaml
             $yaml | Should -Match '\[\]'
@@ -662,6 +663,11 @@ key: value
 - orphan
 '@
             { $yaml | ConvertFrom-Yaml } | Should -Throw '*unexpected content*'
+        }
+
+        It 'Throws on tab characters in indentation' {
+            $yaml = "key:`n`tvalue: 1"
+            { $yaml | ConvertFrom-Yaml } | Should -Throw '*tab*'
         }
     }
 }
