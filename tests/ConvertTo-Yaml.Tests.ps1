@@ -338,9 +338,9 @@ Describe 'ConvertTo-Yaml' {
         }
 
         It 'Truncates deeply nested sequences beyond -Depth' {
-            $inner = ,('innermost')
-            $middle = ,$inner
-            $outer = ,$middle
+            $inner = , ('innermost')
+            $middle = , $inner
+            $outer = , $middle
             $yaml = ConvertTo-Yaml -InputObject $outer -Depth 1 -WarningAction SilentlyContinue
             $yaml | Should -Not -BeNullOrEmpty
             $yaml | Should -Not -Match 'innermost'
