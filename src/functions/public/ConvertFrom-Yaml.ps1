@@ -12,7 +12,7 @@
         - Block-style sequences (- item)
         - Nested structures
         - Scalars: strings, integers, floats, booleans (`true`/`false`), null (`null`/`~`/empty)
-        - Single- and double-quoted strings (with `\n`, `\t`, `\r`, `\\`, `\"` in double quotes)
+        - Single- and double-quoted strings (with `\n`, `\t`, `\r`, `\0`, `\\`, `\"`, `\xHH` in double quotes)
         - Document start (`---`) and end (`...`) markers are tolerated
         - Full-line comments (`#`) and inline comments after values
 
@@ -108,7 +108,9 @@
 
         if ($context.Index -lt $lines.Count) {
             $leftover = $lines[$context.Index]
-            throw "ConvertFrom-Yaml: unexpected content at line $($leftover.Number): '$($leftover.Content)'. The document has trailing content that was not consumed by the parser."
+            $msg = 'ConvertFrom-Yaml: unexpected content at line {0}: ''{1}''.'
+            $msg += ' The document has trailing content that was not consumed.'
+            throw ($msg -f $leftover.Number, $leftover.Content)
         }
 
         if ($NoEnumerate -and $result -is [System.Collections.IList]) {

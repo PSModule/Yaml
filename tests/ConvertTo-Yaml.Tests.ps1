@@ -584,4 +584,15 @@ Describe 'Round-trip ConvertTo-Yaml | ConvertFrom-Yaml' {
         $result['value'] | Should -Be ''
         $result['value'] | Should -BeOfType [string]
     }
+
+    It 'Round-trips control characters via \xHH escapes' {
+        # Format-YamlDoubleQuoted emits \xHH for control chars (e.g. NUL, BEL).
+        # Expand-YamlDoubleQuoted must parse them back correctly.
+        $nul = [string][char]0
+        $bel = [string][char]7
+        $obj = [ordered]@{ nul = $nul; bel = $bel }
+        $result = $obj | ConvertTo-Yaml | ConvertFrom-Yaml -AsHashtable
+        $result['nul'] | Should -Be $nul
+        $result['bel'] | Should -Be $bel
+    }
 }

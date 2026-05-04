@@ -47,7 +47,7 @@ Practical implications of the core schema:
 - Integers and floats parse to their native types using invariant culture.
 - Anything else is a string. Quoted strings (`'...'`, `"..."`) always preserve the string type.
 
-The supported YAML subset covers block-style mappings, block-style sequences, nested structures, single- and double-quoted scalars (with `\n`, `\t`, `\r`, `\\`, `\"` escapes in double quotes), document start (`---`) and end (`...`) markers, and full-line / inline `#` comments. Flow style (`[a, b]`, `{a: 1}`), block scalars (`|`, `>`), anchors, aliases, tags, multi-document streams, and `!!timestamp` are not yet supported.
+The supported YAML subset covers block-style mappings, block-style sequences, nested structures, single- and double-quoted scalars (with `\n`, `\t`, `\r`, `\0`, `\\`, `\"`, `\xHH` escapes in double quotes), document start (`---`) and end (`...`) markers, and full-line / inline `#` comments. Flow style (`[a, b]`, `{a: 1}`), block scalars (`|`, `>`), anchors, aliases, tags, multi-document streams, and `!!timestamp` are not yet supported.
 
 ### Example 1: Parse a YAML string
 

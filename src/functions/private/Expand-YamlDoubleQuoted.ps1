@@ -25,6 +25,18 @@
                 '"' { $null = $sb.Append('"') }
                 '\' { $null = $sb.Append('\') }
                 '0' { $null = $sb.Append([char]0) }
+                'x' {
+                    if ($i + 3 -lt $Text.Length) {
+                        $hex = $Text.Substring($i + 2, 2)
+                        $code = 0
+                        if ([int]::TryParse($hex, [System.Globalization.NumberStyles]::HexNumber, $null, [ref]$code)) {
+                            $null = $sb.Append([char]$code)
+                            $i += 4
+                            continue
+                        }
+                    }
+                    $expanded = $false
+                }
                 default { $expanded = $false }
             }
 
