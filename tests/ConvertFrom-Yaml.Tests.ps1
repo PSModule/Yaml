@@ -75,6 +75,31 @@ f: OFF
             $result.b | Should -Be 'NULL'
         }
 
+        It 'Treats .NET-specific special float tokens as strings (YAML 1.2.2)' {
+            # YAML 1.2.2 core schema uses .inf/.nan (dot-prefix). Bare NaN/Infinity are plain strings.
+            $yaml = @"
+a: NaN
+b: Infinity
+c: -Infinity
+d: +Infinity
+e: nan
+f: infinity
+"@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.a | Should -Be 'NaN'
+            $result.a | Should -BeOfType [string]
+            $result.b | Should -Be 'Infinity'
+            $result.b | Should -BeOfType [string]
+            $result.c | Should -Be '-Infinity'
+            $result.c | Should -BeOfType [string]
+            $result.d | Should -Be '+Infinity'
+            $result.d | Should -BeOfType [string]
+            $result.e | Should -Be 'nan'
+            $result.e | Should -BeOfType [string]
+            $result.f | Should -Be 'infinity'
+            $result.f | Should -BeOfType [string]
+        }
+
         It 'Parses single-quoted strings preserving content' {
             $result = "value: 'true'" | ConvertFrom-Yaml
             $result.value | Should -Be 'true'
@@ -365,6 +390,22 @@ matrix:
             $result[3] | Should -Be 3.14
             $result[3] | Should -BeOfType [double]
             $result[4] | Should -BeNullOrEmpty
+        }
+
+        It 'Parses sequence inline mappings with extra spaces after the dash' {
+            # Valid YAML: the key may be indented further than "- " suggests.
+            $yaml = @'
+-   a: 1
+    b: 2
+-   x: alpha
+    y: beta
+'@
+            $result = $yaml | ConvertFrom-Yaml -NoEnumerate
+            $result.Count | Should -Be 2
+            $result[0].a | Should -Be 1
+            $result[0].b | Should -Be 2
+            $result[1].x | Should -Be 'alpha'
+            $result[1].y | Should -Be 'beta'
         }
     }
 

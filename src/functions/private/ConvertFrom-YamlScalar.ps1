@@ -43,6 +43,10 @@
     }
 
     # Float.
+    # Reject .NET-specific special float tokens that are not part of the YAML 1.2.2 core schema.
+    # Core schema uses .inf/.Inf/.INF/.nan/.NaN/.NAN (dot-prefix form). The bare NaN/Infinity
+    # words are accepted by [double]::TryParse but must remain plain strings per the spec.
+    if ($value -imatch '^[+-]?(infinity|nan)$') { return $value }
     $dblVal = 0.0
     if ([double]::TryParse($value, [System.Globalization.NumberStyles]::Float, [cultureinfo]::InvariantCulture, [ref] $dblVal)) {
         return $dblVal

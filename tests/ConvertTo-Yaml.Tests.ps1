@@ -333,7 +333,7 @@ Describe 'ConvertTo-Yaml' {
             # The depth-exceeded line should be indented under 'b:'
             $bLine = $lines | Where-Object { $_ -match '^\s+b:' }
             $bLine | Should -Not -BeNullOrEmpty
-            $depthLine = $lines[($lines.IndexOf($bLine) + 1)]
+            $depthLine = $lines[([array]::IndexOf($lines, $bLine) + 1)]
             $depthLine | Should -Match '^\s{4}'
         }
 

@@ -49,12 +49,18 @@
         $colonIdx = Find-YamlMappingColon -Content $afterDash
         if ($colonIdx -ge 0) {
             # Treat this as a single-line entry into a mapping. Build a synthetic line stream:
-            # the current "key: value" line gets re-interpreted at indent (Indent + 2), and any
-            # continuation lines at indent > (Indent + 2) belong to the same mapping.
-            $childIndent = $Indent + 2
+            # the current "key: value" line gets re-interpreted at the column where the key
+            # actually starts (Indent + 2 + any extra spaces after "- "), so that continuation
+            # lines aligned to the key column (e.g. "-   key: v\n    b: 2") are accepted.
+            $extraSpaces = 0
+            while ($extraSpaces -lt $afterDash.Length -and $afterDash[$extraSpaces] -eq ' ') {
+                $extraSpaces++
+            }
+            $childIndent = $Indent + 2 + $extraSpaces
+            $childContent = $afterDash.Substring($extraSpaces)
             $synthetic = [pscustomobject]@{
                 Indent  = $childIndent
-                Content = $afterDash
+                Content = $childContent
                 Number  = $line.Number
             }
             # Replace current line with synthetic and recurse as a mapping.
