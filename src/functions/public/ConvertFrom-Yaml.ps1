@@ -106,6 +106,11 @@
 
         $result = ConvertFrom-YamlNode -Context $context -Indent 0 -Depth 0
 
+        if ($context.Index -lt $lines.Count) {
+            $leftover = $lines[$context.Index]
+            throw "ConvertFrom-Yaml: unexpected content at line $($leftover.Number): '$($leftover.Content)'. The document has trailing content that was not consumed by the parser."
+        }
+
         if ($NoEnumerate -and $result -is [System.Collections.IList]) {
             return , $result
         }

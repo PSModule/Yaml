@@ -60,13 +60,21 @@
         }
 
         $next = $lines[$Context.Index]
-        if ($next.Indent -le $Indent) {
+        if ($next.Indent -lt $Indent) {
+            $map[$key] = $null
+            continue
+        }
+        if ($next.Indent -eq $Indent) {
+            # Indentless sequences: YAML allows a sequence to start at the same indent as the
+            # parent mapping key (e.g. "key:\n- a\n- b"). Parse these as the key's value.
+            if ($next.Content.StartsWith('- ') -or $next.Content -eq '-') {
+                $map[$key] = ConvertFrom-YamlSequence -Context $Context -Indent $Indent -Depth ($Depth + 1)
+                continue
+            }
             $map[$key] = $null
             continue
         }
 
-        # Sequences are allowed to start at the same indent as the parent key in YAML.
-        # We require the child to be indented strictly greater than the key here for clarity.
         $childIndent = $next.Indent
         $value = ConvertFrom-YamlNode -Context $Context -Indent $childIndent -Depth ($Depth + 1)
         $map[$key] = $value

@@ -392,6 +392,53 @@ matrix:
             $result[4] | Should -BeNullOrEmpty
         }
 
+        It 'Parses indentless sequences as mapping values' {
+            # YAML 1.2.2 allows sequences to start at the same indent as the parent mapping key.
+            $yaml = @'
+items:
+- apple
+- banana
+other: val
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.items.Count | Should -Be 2
+            $result.items[0] | Should -Be 'apple'
+            $result.items[1] | Should -Be 'banana'
+            $result.other | Should -Be 'val'
+        }
+
+        It 'Parses multiple indentless sequences in the same mapping' {
+            $yaml = @'
+list1:
+- a
+- b
+list2:
+- c
+- d
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.list1.Count | Should -Be 2
+            $result.list1[0] | Should -Be 'a'
+            $result.list1[1] | Should -Be 'b'
+            $result.list2.Count | Should -Be 2
+            $result.list2[0] | Should -Be 'c'
+            $result.list2[1] | Should -Be 'd'
+        }
+
+        It 'Parses indentless sequences of mappings' {
+            $yaml = @'
+people:
+- name: Alice
+  age: 30
+- name: Bob
+  age: 25
+'@
+            $result = $yaml | ConvertFrom-Yaml
+            $result.people.Count | Should -Be 2
+            $result.people[0].name | Should -Be 'Alice'
+            $result.people[1].age | Should -Be 25
+        }
+
         It 'Parses sequence inline mappings with extra spaces after the dash' {
             # Valid YAML: the key may be indented further than "- " suggests.
             $yaml = @'
@@ -603,6 +650,18 @@ a:
             $result[0].Count | Should -Be 0
             $result[1].Count | Should -Be 0
             $result[2] | Should -Be 'hello'
+        }
+    }
+
+    Context 'Error handling' {
+        It 'Throws on trailing unconsumed content' {
+            # A mapping followed by a sequence at the same level is invalid at the root —
+            # the parser should not silently discard the sequence.
+            $yaml = @'
+key: value
+- orphan
+'@
+            { $yaml | ConvertFrom-Yaml } | Should -Throw '*unexpected content*'
         }
     }
 }
