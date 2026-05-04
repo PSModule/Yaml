@@ -670,4 +670,36 @@ key: value
             { $yaml | ConvertFrom-Yaml } | Should -Throw '*tab*'
         }
     }
+
+    Context 'Plain scalars with embedded quotes' {
+        It 'Parses a plain key containing an apostrophe before the colon' {
+            $result = "owner's: Bob" | ConvertFrom-Yaml
+            $result."owner's" | Should -Be 'Bob'
+        }
+
+        It 'Parses a plain value containing an apostrophe with inline comment stripped' {
+            $result = "name: O'Connor  # a comment" | ConvertFrom-Yaml
+            $result.name | Should -Be "O'Connor"
+        }
+
+        It 'Parses a plain key with embedded double-quote before the colon' {
+            $result = 'say"hello: world' | ConvertFrom-Yaml
+            $result.'say"hello' | Should -Be 'world'
+        }
+
+        It 'Strips inline comment when value contains a mid-token double-quote' {
+            $result = 'key: val"ue  # comment' | ConvertFrom-Yaml
+            $result.key | Should -Be 'val"ue'
+        }
+
+        It 'Parses sequence items with apostrophe in plain scalar and inline comment' {
+            $yaml = @'
+- it's fine  # comment
+- also's good
+'@
+            $result = $yaml | ConvertFrom-Yaml -NoEnumerate
+            $result[0] | Should -Be "it's fine"
+            $result[1] | Should -Be "also's good"
+        }
+    }
 }
