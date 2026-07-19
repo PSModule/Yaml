@@ -13,6 +13,10 @@ if ($null -eq $yamlModule) {
 }
 
 function Get-TestYamlFingerprintLength {
+    <#
+        .SYNOPSIS
+        Returns structural fingerprint lengths for a YAML alias graph.
+    #>
     param (
         [Parameter(Mandatory)]
         [string] $Yaml
