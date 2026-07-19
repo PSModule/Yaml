@@ -1,0 +1,22 @@
+yaml-test-suite reference fixtures
+==================================
+
+Source repository:
+  https://github.com/yaml/yaml-test-suite
+Pinned commit:
+  da267a5c4782e7361e82889e76c0dc7df0e1e870
+Source directory:
+  src/
+
+The local YAML payloads are copied from these pinned test cases:
+  2JQS  Duplicate empty mapping keys
+  M5DY  Complex sequence keys
+  SBG9  Flow sequence as a mapping key
+  6BFJ  Anchors on a mapping and complex key
+  565N  Explicit binary construction
+  EHF6  Explicit map and sequence tags
+  SF5V  Duplicate YAML directive (invalid)
+  H7TQ  Extra directive words (invalid)
+  VJP3  Multi-line flow indentation, invalid and valid variants
+
+See LICENSE.txt for the upstream MIT license.
