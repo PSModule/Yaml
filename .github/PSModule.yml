@@ -16,12 +16,14 @@ Test:
 #       Skip: true
 #     MacOS:
 #       Skip: true
-# Build:
-#   Docs:
-#     Skip: true
+Build:
+  Docs:
+    # PlatyPS loads a conflicting YamlDotNet assembly before importing this module.
+    Skip: true
 
 Linter:
   env:
+    FILTER_REGEX_EXCLUDE: '.*tests/fixtures/.*'
     VALIDATE_BIOME_FORMAT: false
     VALIDATE_BIOME_LINT: false
     VALIDATE_GITHUB_ACTIONS_ZIZMOR: false

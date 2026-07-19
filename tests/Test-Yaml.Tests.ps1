@@ -59,25 +59,23 @@ Describe 'Test-Yaml' {
         $result = Test-Yaml -Yaml $yaml -MaxNodes 100 -MaxAliases 100
         $stopwatch.Stop()
 
-        $document = @(Read-YamlStreamCore -Yaml $yaml -Depth 100 -MaxNodes 100 -MaxAliases 100 `
-                -MaxScalarLength 1048576)[0]
-        $cache = [System.Collections.Generic.Dictionary[int, string]]::new()
-        $hasher = [System.Security.Cryptography.SHA256]::Create()
-        try {
-            Test-YamlNodeGraph -Node $document -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
-                -FingerprintCache $cache -FingerprintHasher $hasher
-        } finally {
-            $hasher.Dispose()
-        }
+        $fingerprintLengths = @(Get-TestYamlFingerprintLength -Yaml $yaml)
 
         $result | Should -BeTrue
         $stopwatch.Elapsed.TotalSeconds | Should -BeLessThan 5
-        @($cache.Values | Where-Object Length -NE 44).Count | Should -Be 0
+        @($fingerprintLengths | Where-Object { $_ -ne 44 }).Count | Should -Be 0
     }
 
     It 'does not swallow an unexpected runtime failure' {
-        Mock Read-YamlStream {
-            throw [System.InvalidOperationException]::new('unexpected runtime failure')
+        $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
+        if ($null -eq $loadedModule) {
+            Mock Read-YamlStream {
+                throw [System.InvalidOperationException]::new('unexpected runtime failure')
+            }
+        } else {
+            Mock Read-YamlStream -ModuleName $loadedModule.Name {
+                throw [System.InvalidOperationException]::new('unexpected runtime failure')
+            }
         }
 
         { 'name: Ada' | Test-Yaml } |
