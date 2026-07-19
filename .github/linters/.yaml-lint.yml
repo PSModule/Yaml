@@ -1,0 +1,6 @@
+---
+extends: relaxed
+
+# Official conformance fixtures intentionally preserve invalid and unusual YAML.
+ignore: |
+  tests/fixtures/

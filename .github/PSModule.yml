@@ -23,7 +23,6 @@ Build:
 
 Linter:
   env:
-    FILTER_REGEX_EXCLUDE: '.*tests/fixtures/.*'
     VALIDATE_BIOME_FORMAT: false
     VALIDATE_BIOME_LINT: false
     VALIDATE_GITHUB_ACTIONS_ZIZMOR: false
