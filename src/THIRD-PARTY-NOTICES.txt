@@ -1,0 +1,18 @@
+YamlDotNet 18.1.0
+=================
+
+Copyright (c) Antoine Aubry and contributors.
+Licensed under the MIT License. See licenses/YamlDotNet.LICENSE.txt.
+
+Package:
+  https://api.nuget.org/v3-flatcontainer/yamldotnet/18.1.0/yamldotnet.18.1.0.nupkg
+Package repository:
+  https://github.com/aaubry/YamlDotNet/tree/748334a8fa7c227740018b284b71ad95cc6b7fc7
+Bundled asset:
+  lib/netstandard2.0/YamlDotNet.dll
+Target framework:
+  netstandard2.0
+Package SHA-256:
+  59FFE65ADE67AD9D886267F877B634A450363CB81B94E19DB9CA4C36461416F6
+Bundled DLL SHA-256:
+  91CD6D1FD0AE5B64BF6B252EB3B1AF2382CBC599C29045427C45FE8403D4295D
