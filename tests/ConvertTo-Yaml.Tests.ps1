@@ -318,9 +318,9 @@ Describe 'ConvertTo-Yaml' {
 
         It 'uses explicit keys when scalar keys exceed 1024 Unicode values' {
             $atLimit = [System.Collections.Specialized.OrderedDictionary]::new()
-            $atLimit.Add(('x' * 1024), 'value')
+            $atLimit.Add(('x' * 1022), 'value')
             $overLimit = [System.Collections.Specialized.OrderedDictionary]::new()
-            $overLimitKey = [char]::ConvertFromUtf32(0x1F600) * 1025
+            $overLimitKey = [char]::ConvertFromUtf32(0x1F600) * 1023
             $overLimit.Add($overLimitKey, [ordered]@{ nested = 'value' })
 
             $atLimitYaml = ConvertTo-Yaml -InputObject $atLimit

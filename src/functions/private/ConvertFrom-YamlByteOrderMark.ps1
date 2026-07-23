@@ -24,20 +24,11 @@ function ConvertFrom-YamlByteOrderMark {
 
         $atStreamStart = $index -eq 0
         $atLineStart = $index -gt 0 -and $Text[$index - 1] -ceq "`n"
-        $beforeDirective = $index + 1 -lt $Text.Length -and $Text[$index + 1] -ceq '%'
-        $beforeDocumentStart = $false
-        if ($index + 3 -lt $Text.Length -and
-            $Text.Substring($index + 1, 3).Equals(
-                '---',
-                [System.StringComparison]::Ordinal
-            )) {
-            $afterMarker = $index + 4
-            $beforeDocumentStart = $afterMarker -ge $Text.Length -or
-            (Test-YamlWhiteSpace -Character $Text[$afterMarker]) -or
-            $Text[$afterMarker] -ceq "`n"
-        }
+        $beforeDocumentPrefix = $atLineStart -and (
+            Test-YamlDocumentPrefix -Text $Text -Index ($index + 1)
+        )
 
-        if ($atStreamStart -or ($atLineStart -and ($beforeDirective -or $beforeDocumentStart))) {
+        if ($atStreamStart -or $beforeDocumentPrefix) {
             continue
         }
 
@@ -47,7 +38,7 @@ function ConvertFrom-YamlByteOrderMark {
         $column = if ($lastBreak -lt 0) { $before.Length } else { $before.Length - $lastBreak - 1 }
         $mark = New-YamlMark -Index $index -Line $line -Column $column
         throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidByteOrderMark' -Message (
-                'A YAML byte order mark is only allowed at the start of the stream or an explicit document.'
+                'A YAML byte order mark is only allowed at the start of the stream or a document prefix.'
             ))
     }
 

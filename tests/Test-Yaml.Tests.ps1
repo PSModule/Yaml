@@ -43,16 +43,21 @@ Describe 'Test-Yaml' {
         ("['multi`n  line': value]" | Test-Yaml) | Should -BeFalse
         ("[multi`n  line: value]" | Test-Yaml) | Should -BeFalse
 
-        foreach ($quoted in @($false, $true)) {
-            foreach ($length in @(1024, 1025)) {
-                $text = 'k' * $length
-                $key = if ($quoted) { "'$text'" } else { $text }
-                foreach ($yaml in @(
-                        "[$key`: value]",
-                        "{$key`: value}"
-                    )) {
-                    ($yaml | Test-Yaml) | Should -Be ($length -eq 1024)
-                }
+        foreach ($case in @(
+                @{ Key = 'k' * 1024; Valid = $true }
+                @{ Key = 'k' * 1025; Valid = $false }
+                @{ Key = "'$('k' * 1022)'"; Valid = $true }
+                @{ Key = "'$('k' * 1023)'"; Valid = $false }
+                @{ Key = '"' + ('\u0061' * 170) + 'aa"'; Valid = $true }
+                @{ Key = '"' + ('\u0061' * 170) + 'aaa"'; Valid = $false }
+                @{ Key = '!local ' + ('k' * 1017); Valid = $true }
+                @{ Key = '!local ' + ('k' * 1018); Valid = $false }
+            )) {
+            foreach ($yaml in @(
+                    "[$($case.Key)`: value]",
+                    "{$($case.Key)`: value}"
+                )) {
+                ($yaml | Test-Yaml) | Should -Be $case.Valid
             }
         }
 
@@ -61,6 +66,12 @@ Describe 'Test-Yaml' {
             ("{$key`: value}" | Test-Yaml) |
                 Should -Be ($length -le 1024)
         }
+
+    }
+
+    It 'resolves non-specific tags before comparing representation keys' {
+        ("! x: one`n!!str x: two" | Test-Yaml) | Should -BeFalse
+        ("? ! [x]`n: one`n? !!seq [x]`n: two" | Test-Yaml) | Should -BeFalse
     }
 
     It 'accepts multiline keys in flow mappings' {

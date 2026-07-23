@@ -13,8 +13,5 @@ function Get-YamlEmissionImplicitKeyLength {
         [string] $RenderedText
     )
 
-    if ($Node.Kind.Equals('Scalar', [System.StringComparison]::Ordinal)) {
-        return Get-YamlRuneCount -Text ([string] $Node.Value)
-    }
     return Get-YamlRuneCount -Text $RenderedText
 }

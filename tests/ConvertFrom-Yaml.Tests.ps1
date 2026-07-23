@@ -204,7 +204,7 @@ folded: >
         It 'consumes byte order marks only at legal document boundaries' {
             $bom = [char] 0xFEFF
             $documents = @(
-                "${bom}%YAML 1.2`n---`none`n...`n${bom}---`ntwo" |
+                "${bom}%YAML 1.2`n---`none`n...`n${bom}# prefix comment`n`n---`ntwo" |
                     ConvertFrom-Yaml
             )
 
@@ -212,6 +212,7 @@ folded: >
             ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
             ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
             ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
+            ("---`none`n...`n${bom}# comment`ntwo" | Test-Yaml) | Should -BeFalse
         }
     }
 
