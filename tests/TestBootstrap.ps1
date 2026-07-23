@@ -7,17 +7,6 @@ if (-not [string]::IsNullOrWhiteSpace($artifactManifestOverride)) {
 }
 
 if ($null -eq $yamlModule) {
-    $yamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-    $yamlModule = if (
-        $null -ne $yamlCommand -and
-        $yamlCommand.ModuleName -eq 'Yaml' -and
-        $yamlCommand.CommandType -eq 'Function'
-    ) {
-        $yamlCommand.Module
-    }
-}
-
-if ($null -eq $yamlModule) {
     Get-ChildItem -Path (Join-Path $PSScriptRoot '..\src\functions\private') -Filter '*.ps1' |
         Sort-Object Name |
         ForEach-Object { . $_.FullName }

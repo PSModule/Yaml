@@ -99,13 +99,13 @@ Describe 'Test-Yaml' {
     }
 
     It 'does not swallow an unexpected runtime failure' {
-        $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
-        if ($null -eq $loadedModule) {
+        $yamlCommand = Get-Command -Name Test-Yaml -ErrorAction Stop
+        if ([string]::IsNullOrEmpty($yamlCommand.ModuleName)) {
             Mock Read-YamlStream {
                 throw [System.InvalidOperationException]::new('unexpected runtime failure')
             }
         } else {
-            Mock Read-YamlStream -ModuleName $loadedModule.Name {
+            Mock Read-YamlStream -ModuleName $yamlCommand.ModuleName {
                 throw [System.InvalidOperationException]::new('unexpected runtime failure')
             }
         }

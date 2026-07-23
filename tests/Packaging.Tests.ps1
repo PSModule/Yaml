@@ -11,27 +11,29 @@
 [CmdletBinding()]
 param()
 
-$importedYamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-$skipArtifactTests = [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and (
-    $null -eq $importedYamlCommand -or $importedYamlCommand.ModuleName -ne 'Yaml'
-)
+$script:repositoryRoot = $null
+$script:resolvedArtifactManifestPath = $null
+$script:artifactManifestPath = $null
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
-    $repositoryRoot = Split-Path -Parent $PSScriptRoot
-    $loadedYamlModule = if (-not [string]::IsNullOrWhiteSpace(
-            $env:PSMODULE_YAML_TEST_ARTIFACT
-        )) {
-        Import-Module -Name $env:PSMODULE_YAML_TEST_ARTIFACT -Force -Global -PassThru |
+    $script:repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    $defaultArtifactManifestPath = Join-Path $script:repositoryRoot 'outputs\module\Yaml\Yaml.psd1'
+    $script:resolvedArtifactManifestPath = if (
+        -not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)
+    ) {
+        $env:PSMODULE_YAML_TEST_ARTIFACT
+    } elseif (Test-Path -LiteralPath $defaultArtifactManifestPath -PathType Leaf) {
+        $defaultArtifactManifestPath
+    } else {
+        $null
+    }
+    $loadedYamlModule = if (-not [string]::IsNullOrWhiteSpace($script:resolvedArtifactManifestPath)) {
+        Import-Module -Name $script:resolvedArtifactManifestPath -Force -Global -PassThru |
             Where-Object Name -EQ 'Yaml' |
             Select-Object -First 1
-    } else {
-        $command = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-        if ($null -ne $command -and $command.ModuleName -eq 'Yaml') {
-            $command.Module
-        }
     }
-    $artifactManifestPath = if ($null -ne $loadedYamlModule) {
+    $script:artifactManifestPath = if ($null -ne $loadedYamlModule) {
         Join-Path $loadedYamlModule.ModuleBase 'Yaml.psd1'
     } else {
         $null
@@ -41,16 +43,16 @@ BeforeAll {
 Describe 'Dependency-free package source' {
     It 'contains no external parser assembly, license, or notice payload' {
         @(
-            Get-ChildItem -Path (Join-Path $repositoryRoot 'src\assemblies') `
+            Get-ChildItem -Path (Join-Path $script:repositoryRoot 'src\assemblies') `
                 -File -ErrorAction SilentlyContinue
         ).Count | Should -Be 0
-        Test-Path (Join-Path $repositoryRoot 'src\licenses\YamlDotNet.LICENSE.txt') | Should -BeFalse
-        Test-Path (Join-Path $repositoryRoot 'src\THIRD-PARTY-NOTICES.txt') | Should -BeFalse
+        Test-Path (Join-Path $script:repositoryRoot 'src\licenses\YamlDotNet.LICENSE.txt') | Should -BeFalse
+        Test-Path (Join-Path $script:repositoryRoot 'src\THIRD-PARTY-NOTICES.txt') | Should -BeFalse
     }
 
     It 'keeps RequiredAssemblies out of the source manifest' {
         $manifest = Import-PowerShellDataFile -Path (
-            Join-Path $repositoryRoot 'src\manifest.psd1'
+            Join-Path $script:repositoryRoot 'src\manifest.psd1'
         )
 
         $manifest.PowerShellVersion | Should -Be '7.6'
@@ -60,7 +62,7 @@ Describe 'Dependency-free package source' {
     }
 
     It 'contains no external parser references or custom assembly loader' {
-        $sourceFiles = Get-ChildItem -Path (Join-Path $repositoryRoot 'src') -Recurse -File
+        $sourceFiles = Get-ChildItem -Path (Join-Path $script:repositoryRoot 'src') -Recurse -File
         $source = $sourceFiles |
             Where-Object Extension -In @('.ps1', '.psd1', '.psm1') |
             Get-Content -Raw
@@ -71,7 +73,7 @@ Describe 'Dependency-free package source' {
     }
 
     It 'keeps the owned processor layers explicit and source-level' {
-        $privatePath = Join-Path $repositoryRoot 'src\functions\private'
+        $privatePath = Join-Path $script:repositoryRoot 'src\functions\private'
         @(
             'New-YamlReaderContext.ps1',
             'Read-YamlDirectiveBlock.ps1',
@@ -90,7 +92,7 @@ Describe 'Dependency-free package source' {
 
     It 'uses Process-PSModule 6.1.13 and treats tests as important changes' {
         $workflow = Get-Content -Path (
-            Join-Path $repositoryRoot '.github\workflows\Process-PSModule.yml'
+            Join-Path $script:repositoryRoot '.github\workflows\Process-PSModule.yml'
         ) -Raw
 
         $workflow | Should -Match 'workflow\.yml@fb1bdb8fefd243292f779d2a856a38db6fe6daf4 # v6\.1\.13'
@@ -100,7 +102,7 @@ Describe 'Dependency-free package source' {
 
     It 'does not skip generated documentation' {
         $configuration = Get-Content -Path (
-            Join-Path $repositoryRoot '.github\PSModule.yml'
+            Join-Path $script:repositoryRoot '.github\PSModule.yml'
         ) -Raw
 
         $configuration | Should -Not -Match '(?ms)Build:\s+Docs:\s+.*Skip:\s*true'
@@ -108,20 +110,20 @@ Describe 'Dependency-free package source' {
 
     It 'uses zensical configuration and does not skip site build' {
         $configuration = Get-Content -Path (
-            Join-Path $repositoryRoot '.github\PSModule.yml'
+            Join-Path $script:repositoryRoot '.github\PSModule.yml'
         ) -Raw
 
         $configuration | Should -Not -Match '(?ms)Build:\s+Site:\s+.*Skip:\s*true'
-        Test-Path -Path (Join-Path $repositoryRoot '.github\zensical.toml') | Should -BeTrue
-        Test-Path -Path (Join-Path $repositoryRoot '.github\mkdocs.yml') | Should -BeFalse
+        Test-Path -Path (Join-Path $script:repositoryRoot '.github\zensical.toml') | Should -BeTrue
+        Test-Path -Path (Join-Path $script:repositoryRoot '.github\mkdocs.yml') | Should -BeFalse
     }
 }
 
 Describe 'Generated artifact package' {
     It 'has no RequiredAssemblies or packaged DLL and has a complete FileList' `
-        -Skip:$skipArtifactTests {
-        $manifest = Import-PowerShellDataFile -Path $artifactManifestPath
-        $moduleBase = Split-Path -Parent $artifactManifestPath
+        -Skip:([string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and -not (Test-Path -LiteralPath (Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path 'outputs\module\Yaml\Yaml.psd1') -PathType Leaf)) {
+        $manifest = Import-PowerShellDataFile -Path $script:artifactManifestPath
+        $moduleBase = Split-Path -Parent $script:artifactManifestPath
 
         $manifest.PowerShellVersion | Should -Be '7.6'
         @($manifest.CompatiblePSEditions) | Should -Be @('Core')
@@ -137,7 +139,7 @@ Describe 'Generated artifact package' {
     }
 
     It 'imports in a fresh PowerShell 7 process and preserves arrays, aliases, and depth' `
-        -Skip:($skipArtifactTests -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+        -Skip:(([string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and -not (Test-Path -LiteralPath (Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path 'outputs\module\Yaml\Yaml.psd1') -PathType Leaf)) -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
         $script = @'
 $ErrorActionPreference = 'Stop'
 $ps = $PSVersionTable.PSVersion
@@ -180,7 +182,7 @@ if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
     throw 'The public maximum serialization depth failed.'
 }
 'powershell-7-ok'
-'@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
+'@.Replace('__MANIFEST__', $script:artifactManifestPath.Replace("'", "''"))
 
         (& pwsh -NoLogo -NoProfile -Command $script) |
             Should -Contain 'powershell-7-ok'
