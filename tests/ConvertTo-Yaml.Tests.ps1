@@ -181,6 +181,33 @@ Describe 'ConvertTo-Yaml' {
                 Should -Throw -ExpectedMessage '*normalize to the same YAML value*'
         }
 
+        It 'normalizes finite float key fingerprints across CLR types' {
+            $equal = [System.Collections.Specialized.OrderedDictionary]::new()
+            $equal.Add(
+                [decimal]::Parse(
+                    '100000000000000000000.0',
+                    [cultureinfo]::InvariantCulture
+                ),
+                'decimal'
+            )
+            $equal.Add([double] 1e20, 'double')
+
+            { $equal | ConvertTo-Yaml } |
+                Should -Throw -ExpectedMessage '*normalize to the same YAML value*'
+
+            $different = [System.Collections.Specialized.OrderedDictionary]::new()
+            $different.Add(
+                [decimal]::Parse(
+                    '100000000000000000001',
+                    [cultureinfo]::InvariantCulture
+                ),
+                'decimal'
+            )
+            $different.Add([double] 1e20, 'double')
+
+            { $different | ConvertTo-Yaml } | Should -Not -Throw
+        }
+
         It 'compares unordered complex keys with ordinal case-sensitive sorting' {
             $firstKey = [System.Collections.Specialized.OrderedDictionary]::new()
             $firstKey.Add('a', 1)

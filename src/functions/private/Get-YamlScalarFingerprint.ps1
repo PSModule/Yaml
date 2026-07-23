@@ -33,32 +33,8 @@ function Get-YamlScalarFingerprint {
             [datetime]::SpecifyKind($Value, [System.DateTimeKind]::Utc)
         }
         $canonicalValue = 'timestamp:{0}' -f $utcValue.Ticks
-    } elseif ($Value -is [decimal]) {
-        if ($Value -eq 0 -and
-            ([decimal]::GetBits($Value)[3] -band [int]::MinValue) -ne 0) {
-            $canonicalValue = 'float:-0'
-        } else {
-            $canonicalValue = 'float:{0}' -f $Value.ToString(
-                'G29',
-                [cultureinfo]::InvariantCulture
-            )
-        }
-    } elseif ($Value -is [double]) {
-        if ([double]::IsNaN($Value)) {
-            $canonicalValue = 'float:nan'
-        } elseif ([double]::IsPositiveInfinity($Value)) {
-            $canonicalValue = 'float:+inf'
-        } elseif ([double]::IsNegativeInfinity($Value)) {
-            $canonicalValue = 'float:-inf'
-        } elseif ($Value -eq 0) {
-            $negative = [System.BitConverter]::DoubleToInt64Bits([double] $Value) -lt 0
-            $canonicalValue = if ($negative) { 'float:-0' } else { 'float:0' }
-        } else {
-            $canonicalValue = 'float:{0}' -f $Value.ToString(
-                'R',
-                [cultureinfo]::InvariantCulture
-            )
-        }
+    } elseif ($Value -is [decimal] -or $Value -is [double] -or $Value -is [single]) {
+        $canonicalValue = 'float:{0}' -f (Get-YamlNormalizedFloat -Value $Value)
     } else {
         $canonicalValue = 'int:{0}' -f $Value.ToString([cultureinfo]::InvariantCulture)
     }

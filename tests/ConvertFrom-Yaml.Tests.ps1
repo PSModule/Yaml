@@ -376,6 +376,28 @@ date: !!timestamp 2001-12-14
                 Should -Throw
         }
 
+        It 'normalizes cross-type finite floats for key equality' {
+            $yaml = @'
+100000000000000000000.0: decimal
+1e20: double
+'@
+
+            ($yaml | Test-Yaml) | Should -BeFalse
+            { $yaml | ConvertFrom-Yaml -AsHashtable } |
+                Should -Throw -ExpectedMessage '*duplicate mapping key*'
+        }
+
+        It 'treats signed zero keys as the same YAML representation value' {
+            $yaml = @'
+0.0: positive
+-0.0: negative
+'@
+
+            ($yaml | Test-Yaml) | Should -BeFalse
+            { $yaml | ConvertFrom-Yaml -AsHashtable } |
+                Should -Throw -ExpectedMessage '*duplicate mapping key*'
+        }
+
         It 'rejects equivalent offset timestamps as duplicate keys' {
             $yaml = @'
 ? !!timestamp 2001-12-15T02:59:43.1Z
