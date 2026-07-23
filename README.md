@@ -177,7 +177,7 @@ commit `45db50ae`). The pinned archive contains 402 inputs:
   documented projection policy.
 
 The two construction-policy differences are `565N`, where this module
-constructs `!!binary` as `byte[]` instead of a Base64 string, and `J7PZ`, where
+constructs `!!binary` as `byte[]` instead of a base64 string, and `J7PZ`, where
 the explicitly supported `!!omap` tag becomes an ordered dictionary instead of
 remaining a sequence of one-entry mappings. The deterministic runner reports
 398 passing cases, four policy exclusions, and no unexplained failures.

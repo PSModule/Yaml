@@ -39,12 +39,13 @@ Describe 'Released yaml-test-suite corpus accounting' {
         @($suiteResults | Where-Object SyntaxResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object SyntaxResult -EQ 'NotApplicable').Count |
             Should -Be 0
-        @(
+        $syntaxPolicyCases = @(
             $suiteResults |
                 Where-Object SyntaxResult -EQ 'PolicyDifference' |
                 Select-Object -ExpandProperty Case |
                 Sort-Object
-        ) | Should -Be @('2JQS', 'X38W')
+        )
+        $syntaxPolicyCases | Should -Be @('2JQS', 'X38W')
     }
 
     It 'accounts for parser representation/event comparisons' {
@@ -63,12 +64,13 @@ Describe 'Released yaml-test-suite corpus accounting' {
         @($suiteResults | Where-Object JsonResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object JsonResult -EQ 'NotApplicable').Count |
             Should -Be 123
-        @(
+        $jsonPolicyCases = @(
             $suiteResults |
                 Where-Object JsonResult -EQ 'PolicyDifference' |
                 Select-Object -ExpandProperty Case |
                 Sort-Object
-        ) | Should -Be @('565N', 'J7PZ')
+        )
+        $jsonPolicyCases | Should -Be @('565N', 'J7PZ')
     }
 
     It 'accounts for out.yaml representation comparisons' {
@@ -90,7 +92,7 @@ Describe 'Released yaml-test-suite corpus accounting' {
     }
 
     It 'keeps the previously failing multi-document JSON cases green' {
-        @(
+        $jsonRegressions = @(
             $suiteResults |
                 Where-Object Case -In @(
                     '35KP', '6XDY', '6ZKB', '7Z25', '9DXL',
@@ -98,6 +100,7 @@ Describe 'Released yaml-test-suite corpus accounting' {
                     'PUW8', 'RZT7', 'U9NS', 'UT92', 'W4TN'
                 ) |
                 Where-Object JsonResult -NE 'Pass'
-        ).Count | Should -Be 0
+        )
+        $jsonRegressions.Count | Should -Be 0
     }
 }

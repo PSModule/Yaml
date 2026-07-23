@@ -15,16 +15,28 @@ $script:repositoryRoot = $null
 $script:resolvedArtifactManifestPath = $null
 $script:artifactManifestPath = $null
 
+function Test-YamlArtifactManifestAvailable {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param()
+
+    if (-not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)) {
+        return $true
+    }
+    $repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    Test-Path -LiteralPath (Join-Path $repositoryRoot 'outputs\module\Yaml\Yaml.psd1') -PathType Leaf
+}
+
+$artifactManifestAvailable = Test-YamlArtifactManifestAvailable
+
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
     $script:repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
     $defaultArtifactManifestPath = Join-Path $script:repositoryRoot 'outputs\module\Yaml\Yaml.psd1'
-    $script:resolvedArtifactManifestPath = if (
-        -not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)
-    ) {
-        $env:PSMODULE_YAML_TEST_ARTIFACT
-    } elseif (Test-Path -LiteralPath $defaultArtifactManifestPath -PathType Leaf) {
+    $script:resolvedArtifactManifestPath = if (Test-Path -LiteralPath $defaultArtifactManifestPath -PathType Leaf) {
         $defaultArtifactManifestPath
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)) {
+        $env:PSMODULE_YAML_TEST_ARTIFACT
     } else {
         $null
     }
@@ -85,8 +97,8 @@ Describe 'Dependency-free package source' {
             'ConvertTo-YamlNode.ps1',
             'Write-YamlNodeText.ps1'
         ) | ForEach-Object {
-            Test-Path -LiteralPath (Join-Path $privatePath $_) |
-                Should -BeTrue -Because "$_ defines a required processor layer"
+            $isPresent = Test-Path -LiteralPath (Join-Path $privatePath $_)
+            $isPresent | Should -BeTrue -Because "$_ defines a required processor layer"
         }
     }
 
@@ -121,7 +133,7 @@ Describe 'Dependency-free package source' {
 
 Describe 'Generated artifact package' {
     It 'has no RequiredAssemblies or packaged DLL and has a complete FileList' `
-        -Skip:([string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and -not (Test-Path -LiteralPath (Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path 'outputs\module\Yaml\Yaml.psd1') -PathType Leaf)) {
+        -Skip:(-not $artifactManifestAvailable) {
         $manifest = Import-PowerShellDataFile -Path $script:artifactManifestPath
         $moduleBase = Split-Path -Parent $script:artifactManifestPath
 
@@ -139,7 +151,9 @@ Describe 'Generated artifact package' {
     }
 
     It 'imports in a fresh PowerShell 7 process and preserves arrays, aliases, and depth' `
-        -Skip:(([string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and -not (Test-Path -LiteralPath (Join-Path (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path 'outputs\module\Yaml\Yaml.psd1') -PathType Leaf)) -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+        -Skip:((
+            -not $artifactManifestAvailable
+        ) -or ($null -eq (Get-Command pwsh -ErrorAction SilentlyContinue))) {
         $script = @'
 $ErrorActionPreference = 'Stop'
 $ps = $PSVersionTable.PSVersion

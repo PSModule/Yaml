@@ -291,7 +291,7 @@ function ConvertFrom-YamlSuiteEventText {
         $builder.ToString()
     }
 
-    function ConvertFrom-YamlSuiteEventEscapes {
+    function ConvertFrom-YamlSuiteEventEscape {
         param ([AllowNull()][string] $Value)
         if ($null -eq $Value) {
             return ''
@@ -327,7 +327,7 @@ function ConvertFrom-YamlSuiteEventText {
     $lines = $Text -split '\r?\n'
 
     foreach ($rawLine in $lines) {
-    $line = $rawLine
+        $line = $rawLine
         if ([string]::IsNullOrWhiteSpace($line)) {
             continue
         }
@@ -392,7 +392,7 @@ function ConvertFrom-YamlSuiteEventText {
                     $value = ''
                 }
                 $value = ConvertTo-YamlSuiteEventEscapedText -Value (
-                    ConvertFrom-YamlSuiteEventEscapes -Value $value
+                    ConvertFrom-YamlSuiteEventEscape -Value $value
                 )
             }
 
