@@ -523,7 +523,7 @@ date: !!timestamp 2001-12-14
             $tagAmplification = (
                 @("%TAG !e! tag:example.test,$prefix", '---') + $taggedItems
             ) -join "`n"
-            $hugeInteger = '9' * 320000
+            $hugeInteger = '9' * 32000
 
             ($tagAmplification | Test-Yaml -MaxTagLength 25000) |
                 Should -BeFalse

@@ -7,9 +7,6 @@ function Get-YamlEmissionImplicitKeyLength {
     [OutputType([int])]
     param (
         [Parameter(Mandatory)]
-        [pscustomobject] $Node,
-
-        [Parameter(Mandatory)]
         [string] $RenderedText
     )
 

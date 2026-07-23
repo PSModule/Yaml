@@ -563,7 +563,7 @@ function Read-YamlFlowNode {
             continue
         }
         if ($character -eq "`n") {
-            $pendingWhiteSpace.Clear() | Out-Null
+            $null = $pendingWhiteSpace.Clear()
             $pendingBreaks = 0
             while ($Cursor.Index -lt $Context.Text.Length -and
                 $Context.Text[$Cursor.Index] -ceq "`n") {
@@ -598,7 +598,7 @@ function Read-YamlFlowNode {
             [void] $builder.Append($pendingWhiteSpace)
         }
         $pendingBreaks = 0
-        $pendingWhiteSpace.Clear() | Out-Null
+        $null = $pendingWhiteSpace.Clear()
         [void] $builder.Append($character)
         if ($builder.Length -gt $Context.MaxScalarLength) {
             throw (New-YamlException -Start $start -End $start -ErrorId 'YamlScalarLimitExceeded' -Message (

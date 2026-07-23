@@ -132,10 +132,8 @@ function ConvertTo-YamlFlowText {
             continue
         }
         if ($frame.State -eq 'MappingValue') {
-            $keyNode = $frame.Node.Entries[$frame.Index].Key
             $explicitKey = (
-                Get-YamlEmissionImplicitKeyLength -Node $keyNode `
-                    -RenderedText $frame.KeyText
+                Get-YamlEmissionImplicitKeyLength -RenderedText $frame.KeyText
             ) -gt 1024
             $keyPrefix = if ($explicitKey) { '? ' } else { '' }
             $frame.Parts.Add("$keyPrefix$($frame.KeyText)`: $($frame.Child.Value)")

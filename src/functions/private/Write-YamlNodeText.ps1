@@ -46,8 +46,7 @@ function Write-YamlNodeText {
             $keyText = ConvertTo-YamlFlowText -Node $task.Entry.Key `
                 -EmittedReferences $EmittedReferences
             $explicitKey = (
-                Get-YamlEmissionImplicitKeyLength -Node $task.Entry.Key `
-                    -RenderedText $keyText
+                Get-YamlEmissionImplicitKeyLength -RenderedText $keyText
             ) -gt 1024
             if ($explicitKey) {
                 $spaces = ' ' * ($task.Level * $Indent)
