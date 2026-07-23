@@ -8,10 +8,12 @@ if (-not [string]::IsNullOrWhiteSpace($artifactManifestOverride)) {
 
 if ($null -eq $yamlModule) {
     $yamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-    $yamlModule = if ($null -ne $yamlCommand -and $yamlCommand.ModuleName -eq 'Yaml') {
+    $yamlModule = if (
+        $null -ne $yamlCommand -and
+        $yamlCommand.ModuleName -eq 'Yaml' -and
+        $yamlCommand.CommandType -eq 'Function'
+    ) {
         $yamlCommand.Module
-    } else {
-        Get-Module -Name Yaml -All | Select-Object -First 1
     }
 }
 

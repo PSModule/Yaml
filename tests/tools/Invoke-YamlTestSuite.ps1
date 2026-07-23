@@ -538,6 +538,13 @@ foreach ($inputFile in $inputFiles) {
     $projectedCanonical = $null
     $projectedReference = ''
     $projectionError = ''
+    $eventExpected = $null
+    $eventActual = $null
+    $jsonExpected = $null
+    $jsonActual = $null
+    $outYamlCanonical = $null
+    $emitCanonical = $null
+    $emitReference = $null
 
     try {
         $representation = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation -Arguments @($yaml)
@@ -578,7 +585,7 @@ foreach ($inputFile in $inputFiles) {
 
     if ($null -ne $stream) {
         try {
-            $projectedValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments @($stream.Value)).Value
+            $projectedValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $stream.Value)).Value
             $projectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $projectedValues)
             $projectedReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $projectedValues)
         } catch {
@@ -599,6 +606,8 @@ foreach ($inputFile in $inputFiles) {
                 [System.IO.File]::ReadAllText($eventPath, [System.Text.UTF8Encoding]::new($false, $true))
             )
             $actualEvents = ConvertTo-YamlSuiteActualEvent -Documents $representation.Value
+            $eventExpected = ($expectedEvents -join "`n")
+            $eventActual = ($actualEvents -join "`n")
             if (Compare-YamlSuiteCanonicalList -Left $actualEvents -Right $expectedEvents) {
                 $eventResult = 'Pass'
             } else {
@@ -630,6 +639,8 @@ foreach ($inputFile in $inputFiles) {
                 $expectedValues.Add((ConvertFrom-Json -InputObject $document -AsHashtable -NoEnumerate))
             }
             $expectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $expectedValues.ToArray())
+            $jsonExpected = $expectedCanonical
+            $jsonActual = $projectedCanonical
             if ($projectedCanonical -ceq $expectedCanonical) {
                 $jsonResult = 'Pass'
             } else {
@@ -656,8 +667,9 @@ foreach ($inputFile in $inputFiles) {
             $outYaml = [System.IO.File]::ReadAllText($outYamlPath, [System.Text.UTF8Encoding]::new($false, $true))
             try {
                 $outStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream -Arguments @($outYaml)
-                $outValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments @($outStream.Value)).Value
+                $outValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $outStream.Value)).Value
                 $outCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $outValues)
+                $outYamlCanonical = $outCanonical
                 if ($outCanonical -ceq $projectedCanonical) {
                     $outYamlResult = 'Pass'
                 } else {
@@ -723,6 +735,8 @@ foreach ($inputFile in $inputFiles) {
                     )
                     $roundCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $roundTripValues)
                     $roundReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $roundTripValues)
+                    $emitCanonical = $roundCanonical
+                    $emitReference = $roundReference
                     if ($roundCanonical -ceq $projectedCanonical -and $roundReference -ceq $projectedReference) {
                         $emitResult = 'Pass'
                     } else {
@@ -768,5 +782,12 @@ foreach ($inputFile in $inputFiles) {
         OutYamlReason   = $outYamlReason
         EmitResult      = $emitResult
         EmitReason      = $emitReason
+        EventExpected   = $eventExpected
+        EventActual     = $eventActual
+        JsonExpected    = $jsonExpected
+        JsonActual      = $jsonActual
+        OutYamlActual   = $outYamlCanonical
+        EmitActual      = $emitCanonical
+        EmitReferences  = $emitReference
     }
 }
