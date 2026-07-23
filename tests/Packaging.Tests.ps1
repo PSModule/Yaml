@@ -8,6 +8,10 @@
     'PSUseDeclaredVarsMoreThanAssignments', '',
     Justification = 'Required for Pester tests'
 )]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSProvideCommentHelp', '',
+    Justification = 'Internal test helper function for packaging assertions.'
+)]
 [CmdletBinding()]
 param()
 
@@ -16,8 +20,6 @@ $script:resolvedArtifactManifestPath = $null
 $script:artifactManifestPath = $null
 
 function Test-YamlArtifactManifestAvailable {
-    [CmdletBinding()]
-    [OutputType([bool])]
     param()
 
     if (-not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)) {
@@ -33,23 +35,20 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
     $script:repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
     $defaultArtifactManifestPath = Join-Path $script:repositoryRoot 'outputs\module\Yaml\Yaml.psd1'
-    $script:resolvedArtifactManifestPath = if (Test-Path -LiteralPath $defaultArtifactManifestPath -PathType Leaf) {
-        $defaultArtifactManifestPath
+    $script:resolvedArtifactManifestPath = if (
+        Test-Path -LiteralPath $defaultArtifactManifestPath -PathType Leaf
+    ) {
+        (Resolve-Path -LiteralPath $defaultArtifactManifestPath).Path
     } elseif (-not [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT)) {
-        $env:PSMODULE_YAML_TEST_ARTIFACT
+        if (Test-Path -LiteralPath $env:PSMODULE_YAML_TEST_ARTIFACT -PathType Leaf) {
+            (Resolve-Path -LiteralPath $env:PSMODULE_YAML_TEST_ARTIFACT).Path
+        } else {
+            $null
+        }
     } else {
         $null
     }
-    $loadedYamlModule = if (-not [string]::IsNullOrWhiteSpace($script:resolvedArtifactManifestPath)) {
-        Import-Module -Name $script:resolvedArtifactManifestPath -Force -Global -PassThru |
-            Where-Object Name -EQ 'Yaml' |
-            Select-Object -First 1
-    }
-    $script:artifactManifestPath = if ($null -ne $loadedYamlModule) {
-        Join-Path $loadedYamlModule.ModuleBase 'Yaml.psd1'
-    } else {
-        $null
-    }
+    $script:artifactManifestPath = $script:resolvedArtifactManifestPath
 }
 
 Describe 'Dependency-free package source' {
