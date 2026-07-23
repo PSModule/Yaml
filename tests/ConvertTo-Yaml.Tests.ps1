@@ -56,6 +56,33 @@ Describe 'ConvertTo-Yaml' {
             $result['empty'] | Should -BeOfType [string]
         }
 
+        It 'escapes quoted scalar content without duplicating characters' {
+            $inputObject = [ordered]@{
+                quote     = 'a"b'
+                slash     = 'a\b'
+                multiline = "one`ntwo"
+            }
+
+            $yaml = $inputObject | ConvertTo-Yaml
+            $result = $yaml | ConvertFrom-Yaml -AsHashtable
+
+            ($yaml | Test-Yaml) | Should -BeTrue
+            $result['quote'] | Should -Be $inputObject.quote
+            $result['slash'] | Should -Be $inputObject.slash
+            $result['multiline'] | Should -Be $inputObject.multiline
+        }
+
+        It 'emits only valid YAML characters and rejects malformed UTF-16 input' {
+            $noncharacters = ([string] [char] 0xFFFE) + [char] 0xFFFF
+            $yaml = ConvertTo-Yaml -InputObject $noncharacters
+
+            $yaml | Should -Match '\\uFFFE\\uFFFF'
+            ($yaml | Test-Yaml) | Should -BeTrue
+            ($yaml | ConvertFrom-Yaml) | Should -Be $noncharacters
+            { ConvertTo-Yaml -InputObject ([string] [char] 0xD800) } |
+                Should -Throw -ExpectedMessage '*surrogate*'
+        }
+
         It 'serializes signed, unsigned, large, decimal, and special numbers' {
             $inputObject = [ordered]@{
                 signed   = [long] -9223372036854775808
@@ -93,6 +120,19 @@ Describe 'ConvertTo-Yaml' {
             $result['utc'] | Should -BeOfType [datetimeoffset]
             $result['local'] | Should -BeOfType [datetimeoffset]
             [Text.Encoding]::UTF8.GetString($result['binary']) | Should -Be 'hello'
+        }
+
+        It 'emits aliases for repeated byte arrays and preserves their identity' {
+            $bytes = [Text.Encoding]::UTF8.GetBytes('hello')
+            $inputObject = [ordered]@{ first = $bytes; second = $bytes }
+
+            $yaml = $inputObject | ConvertTo-Yaml
+            $result = $yaml | ConvertFrom-Yaml -AsHashtable
+
+            $yaml | Should -Match '&id001 !!binary'
+            $yaml | Should -Match '\*id001'
+            , $result['first'] | Should -BeOfType [byte[]]
+            [object]::ReferenceEquals($result['first'], $result['second']) | Should -BeTrue
         }
 
         It 'serializes enum values numerically or by name' {
@@ -243,12 +283,51 @@ Describe 'ConvertTo-Yaml' {
                 Should -Throw -ExpectedMessage "*Computed*not a note property*"
         }
 
+        It 'rejects attached note properties on arrays and dictionaries' {
+            $array = [object[]] @(1, 2)
+            Add-Member -InputObject $array -MemberType NoteProperty -Name metadata -Value 'lossy'
+            $dictionary = [ordered]@{ value = 1 }
+            Add-Member -InputObject $dictionary -MemberType NoteProperty -Name metadata -Value 'lossy'
+
+            { ConvertTo-Yaml -InputObject $array } |
+                Should -Throw -ExpectedMessage '*combines collection data with attached note properties*'
+            { ConvertTo-Yaml -InputObject $dictionary } |
+                Should -Throw -ExpectedMessage '*combines collection data with attached note properties*'
+        }
+
+        It 'preserves the sign of IEEE negative zero across serialization' {
+            $negativeZero = [BitConverter]::Int64BitsToDouble([long]::MinValue)
+            $yaml = ConvertTo-Yaml -InputObject $negativeZero
+            $result = $yaml | ConvertFrom-Yaml
+
+            $yaml.Trim() | Should -Be '-0.0'
+            ([decimal]::GetBits($result)[3] -band [int]::MinValue) |
+                Should -Be ([int]::MinValue)
+        }
+
         It 'enforces depth, node, and scalar limits without truncating' {
             $nested = [ordered]@{ a = [ordered]@{ b = [ordered]@{ c = 1 } } }
 
             { $nested | ConvertTo-Yaml -Depth 2 } | Should -Throw
             { @(1, 2) | ConvertTo-Yaml -MaxNodes 2 } | Should -Throw
             { 'long' | ConvertTo-Yaml -MaxScalarLength 3 } | Should -Throw
+        }
+
+        It 'supports the public maximum depth and rejects the next level specifically' {
+            $atLimit = [ordered]@{}
+            $current = $atLimit
+            for ($level = 1; $level -lt 127; $level++) {
+                $next = [ordered]@{}
+                $current['nested'] = $next
+                $current = $next
+            }
+            $current['value'] = 1
+
+            { ConvertTo-Yaml -InputObject $atLimit -Depth 128 } | Should -Not -Throw
+
+            $overLimit = [ordered]@{ nested = $atLimit }
+            { ConvertTo-Yaml -InputObject $overLimit -Depth 128 } |
+                Should -Throw -ExpectedMessage '*configured depth limit of 128*'
         }
 
         It 'enforces the scalar limit for every emitted scalar kind' {

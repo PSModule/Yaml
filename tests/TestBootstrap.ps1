@@ -1,8 +1,21 @@
-$yamlModule = Get-Module -Name Yaml | Select-Object -First 1
-if ($null -eq $yamlModule) {
-    $assemblyPath = Join-Path $PSScriptRoot '..\src\assemblies\YamlDotNet.dll'
-    [void][System.Reflection.Assembly]::LoadFrom((Resolve-Path $assemblyPath))
+$artifactManifestOverride = $env:PSMODULE_YAML_TEST_ARTIFACT
+$yamlModule = $null
+if (-not [string]::IsNullOrWhiteSpace($artifactManifestOverride)) {
+    $yamlModule = Import-Module -Name $artifactManifestOverride -Force -Global -PassThru |
+        Where-Object Name -EQ 'Yaml' |
+        Select-Object -First 1
+}
 
+if ($null -eq $yamlModule) {
+    $yamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
+    $yamlModule = if ($null -ne $yamlCommand -and $yamlCommand.ModuleName -eq 'Yaml') {
+        $yamlCommand.Module
+    } else {
+        Get-Module -Name Yaml -All | Select-Object -First 1
+    }
+}
+
+if ($null -eq $yamlModule) {
     Get-ChildItem -Path (Join-Path $PSScriptRoot '..\src\functions\private') -Filter '*.ps1' |
         Sort-Object Name |
         ForEach-Object { . $_.FullName }
@@ -25,8 +38,9 @@ function Get-TestYamlFingerprintLength {
     $implementation = {
         param ([string] $YamlText)
 
-        $document = @(Read-YamlStreamCore -Yaml $YamlText -Depth 100 -MaxNodes 100 -MaxAliases 100 `
-                -MaxScalarLength 1048576)[0]
+        $document = (Read-YamlStreamCore -Yaml $YamlText -Depth 100 -MaxNodes 100 -MaxAliases 100 `
+                -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
+                -MaxNumericLength 4096).Value[0]
         $cache = [System.Collections.Generic.Dictionary[int, string]]::new()
         $hasher = [System.Security.Cryptography.SHA256]::Create()
         try {

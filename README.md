@@ -1,8 +1,20 @@
 # Yaml
 
-`Yaml` converts between YAML streams and PowerShell values. It uses
-YamlDotNet's low-level parser and emitter while applying YAML 1.2 core-schema
-rules in PowerShell, without activating .NET types from YAML tags.
+`Yaml` converts between YAML streams and PowerShell values. Its parser,
+schema construction, graph projection, and emitter are implemented in the
+module's PowerShell source, with no external parser library or runtime
+assembly dependency.
+
+Compatibility target: PowerShell Core LTS and newer, with the source and
+artifact contract pinned to PowerShell 7.6 (`CompatiblePSEditions = 'Core'`).
+
+The implementation is layered: Unicode and c-printable validation feeds a
+document/directive scanner; context-aware block and flow readers produce syntax
+tokens; an iterative composer builds the representation graph; the core-schema
+constructor and PowerShell projector create public values. Serialization uses a
+separate safe value classifier, iterative reference-graph normalizer, and
+presentation emitter. Internal arrays, nulls, and byte arrays move through
+boxed values rather than the PowerShell pipeline.
 
 ## Installation
 
@@ -104,7 +116,8 @@ ConvertTo-Yaml -InputObject $items
 
 `-EnumsAsStrings` emits enum names instead of their underlying numeric values.
 `-Indent` accepts 2 through 9 spaces. `-Depth`, `-MaxNodes`, and
-`-MaxScalarLength` constrain serialization.
+`-MaxScalarLength` constrain serialization. The maximum supported depth is
+128, and the default is 100.
 
 Repeated acyclic collection references are emitted with anchors and aliases.
 Cyclic graphs and unsupported runtime objects fail specifically; values are
@@ -137,13 +150,39 @@ limit violations. Unexpected runtime failures are not suppressed.
   represent it.
 - YAML merge keys are not expanded; `<<` is ordinary mapping data under the
   YAML 1.2 core schema.
-- Parsing defaults to depth 100, 100000 nodes, 1000 aliases, and 1048576
-  decoded characters per scalar. The corresponding limit parameters can be
-  lowered for untrusted input.
+- Parsing defaults to depth 100, 100000 nodes, 1000 aliases, 1048576 decoded
+  characters per scalar, 1024 characters per expanded tag, 65536 cumulative
+  expanded tag characters, and 4096 digits per numeric scalar. The
+  corresponding limit parameters can be lowered for untrusted input.
+- The public maximum depth of 128 is exercised for parsing and serialization
+  in fresh PowerShell 7.6+ artifact tests.
 
 Default object projection requires mapping keys that can be represented
 without loss as PowerShell properties. Use `-AsHashtable` when that restriction
 does not fit the data.
+
+## Conformance corpus
+
+The offline test gate runs the complete released `yaml-test-suite` data corpus
+at commit `6ad3d2c62885d82fc349026c136ef560838fdf3d` (generated from source
+commit `45db50ae`). The pinned archive contains 402 inputs:
+
+- all 94 fixtures marked invalid are rejected;
+- 306 of 308 fixtures marked valid are accepted;
+- the other two valid-syntax fixtures, `2JQS` and `X38W`, are deliberately
+  rejected because this module rejects duplicate mapping keys;
+- 282 fixtures include `in.json`; three belong to invalid inputs, 277 of the
+  279 applicable constructions match exactly, and two use a different
+  documented projection policy.
+
+The two construction-policy differences are `565N`, where this module
+constructs `!!binary` as `byte[]` instead of a Base64 string, and `J7PZ`, where
+the explicitly supported `!!omap` tag becomes an ordered dictionary instead of
+remaining a sequence of one-entry mappings. The deterministic runner reports
+398 passing cases, four policy exclusions, and no unexplained failures.
+
+These results are a pinned compatibility measurement, not a claim that a finite
+corpus proves complete YAML 1.2.2 compliance.
 
 ## Compatibility boundaries
 
@@ -153,17 +192,10 @@ trips do **not** preserve comments, scalar style, tag spelling or handles,
 anchor names, mapping presentation, line endings, or source formatting.
 Unknown application tags are not reconstructed.
 
-Exact numeric CLR widths and enum CLR types are also not reconstructed after a
-YAML round trip. The emitter writes a deliberately limited YAML
-1.2-compatible subset even though YamlDotNet describes its emitter as YAML
-1.1.
-
-## Third-party component
-
-The packaged module includes YamlDotNet 18.1.0
-`lib/netstandard2.0/YamlDotNet.dll`. See
-[`src/THIRD-PARTY-NOTICES.txt`](src/THIRD-PARTY-NOTICES.txt) and
-[`src/licenses/YamlDotNet.LICENSE.txt`](src/licenses/YamlDotNet.LICENSE.txt).
+Exact integer CLR widths and enum CLR types are not reconstructed after a YAML
+round trip. Finite non-exponent decimal values are constructed as `Decimal`
+when representable; other finite floats use `Double`. The emitter writes a
+deliberately limited YAML 1.2-compatible subset.
 
 ## Contributing
 

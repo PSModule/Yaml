@@ -1,0 +1,772 @@
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory)]
+    [ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })]
+    [string] $Path,
+
+    [switch] $CompareJson,
+    [switch] $CompareEvents,
+    [switch] $CompareOutYaml,
+    [switch] $CompareEmitRoundTrip
+)
+
+. (Join-Path $PSScriptRoot '..\TestBootstrap.ps1')
+
+if (-not $PSBoundParameters.ContainsKey('CompareJson') -and
+    -not $PSBoundParameters.ContainsKey('CompareEvents') -and
+    -not $PSBoundParameters.ContainsKey('CompareOutYaml') -and
+    -not $PSBoundParameters.ContainsKey('CompareEmitRoundTrip')) {
+    $CompareJson = $true
+    $CompareEvents = $true
+    $CompareOutYaml = $true
+    $CompareEmitRoundTrip = $true
+}
+
+function Invoke-InYamlModule {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [scriptblock] $ScriptBlock,
+
+        [AllowNull()]
+        [object[]] $Arguments = @()
+    )
+
+    if ($null -eq $yamlModule) {
+        return & $ScriptBlock @Arguments
+    }
+
+    return & $yamlModule $ScriptBlock @Arguments
+}
+
+function Split-YamlSuiteJsonDocument {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Text
+    )
+
+    $documents = [System.Collections.Generic.List[string]]::new()
+    $index = 0
+    while ($index -lt $Text.Length) {
+        while ($index -lt $Text.Length -and [char]::IsWhiteSpace($Text[$index])) {
+            $index++
+        }
+        if ($index -ge $Text.Length) {
+            break
+        }
+
+        $start = $index
+        $first = $Text[$index]
+        if ($first -eq '{' -or $first -eq '[') {
+            $depth = 0
+            $quoted = $false
+            $escaped = $false
+            while ($index -lt $Text.Length) {
+                $character = $Text[$index++]
+                if ($quoted) {
+                    if ($escaped) {
+                        $escaped = $false
+                    } elseif ($character -eq '\') {
+                        $escaped = $true
+                    } elseif ($character -eq '"') {
+                        $quoted = $false
+                    }
+                    continue
+                }
+                if ($character -eq '"') {
+                    $quoted = $true
+                } elseif ($character -eq '{' -or $character -eq '[') {
+                    $depth++
+                } elseif ($character -eq '}' -or $character -eq ']') {
+                    $depth--
+                    if ($depth -eq 0) {
+                        break
+                    }
+                }
+            }
+        } elseif ($first -eq '"') {
+            $index++
+            $escaped = $false
+            while ($index -lt $Text.Length) {
+                $character = $Text[$index++]
+                if ($escaped) {
+                    $escaped = $false
+                } elseif ($character -eq '\') {
+                    $escaped = $true
+                } elseif ($character -eq '"') {
+                    break
+                }
+            }
+        } else {
+            while ($index -lt $Text.Length -and -not [char]::IsWhiteSpace($Text[$index])) {
+                $index++
+            }
+        }
+        $documents.Add($Text.Substring($start, $index - $start))
+    }
+
+    [string[]] $documents.ToArray()
+}
+
+function ConvertTo-YamlSuiteCanonicalValue {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [AllowNull()]
+        [object] $Value
+    )
+
+    if ($null -eq $Value -or $Value -is [System.DBNull]) {
+        return 'null'
+    }
+    if ($Value -is [string]) {
+        return 'string:{0}:{1}' -f $Value.Length, $Value
+    }
+    if ($Value -is [bool]) {
+        return 'bool:{0}' -f $Value.ToString().ToLowerInvariant()
+    }
+
+    $typeCode = [System.Type]::GetTypeCode($Value.GetType())
+    if ($Value -is [System.Numerics.BigInteger] -or $typeCode -in @(
+            [System.TypeCode]::SByte,
+            [System.TypeCode]::Byte,
+            [System.TypeCode]::Int16,
+            [System.TypeCode]::UInt16,
+            [System.TypeCode]::Int32,
+            [System.TypeCode]::UInt32,
+            [System.TypeCode]::Int64,
+            [System.TypeCode]::UInt64
+        )) {
+        return 'number:{0}' -f $Value.ToString([cultureinfo]::InvariantCulture)
+    }
+    if ($Value -is [decimal]) {
+        return 'number:{0}' -f $Value.ToString('G29', [cultureinfo]::InvariantCulture)
+    }
+    if ($Value -is [single] -or $Value -is [double]) {
+        return 'number:{0}' -f ([double] $Value).ToString('R', [cultureinfo]::InvariantCulture)
+    }
+    if ($Value -is [System.Collections.IDictionary]) {
+        $entries = [System.Collections.Generic.List[string]]::new()
+        foreach ($key in $Value.Keys) {
+            if ($key -isnot [string]) {
+                return 'unsupported:non-string-mapping-key'
+            }
+            $canonicalValue = ConvertTo-YamlSuiteCanonicalValue -Value $Value[$key]
+            $entries.Add(('{0}:{1}={2}' -f $key.Length, $key, $canonicalValue))
+        }
+        $entries.Sort([System.StringComparer]::Ordinal)
+        return 'map:{0}:{{{1}}}' -f $entries.Count, ($entries -join '|')
+    }
+    if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+        if ($Value -is [byte[]]) {
+            return 'unsupported:System.Byte[]'
+        }
+        $items = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $Value) {
+            $items.Add((ConvertTo-YamlSuiteCanonicalValue -Value $item))
+        }
+        return 'sequence:{0}:[{1}]' -f $items.Count, ($items -join '|')
+    }
+    return 'unsupported:{0}' -f $Value.GetType().FullName
+}
+
+function ConvertTo-YamlSuiteReferenceSignature {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [AllowNull()]
+        [object] $Value
+    )
+
+    $idGenerator = [System.Runtime.Serialization.ObjectIDGenerator]::new()
+    $pathsById = [System.Collections.Generic.Dictionary[long, object]]::new()
+    $typesById = [System.Collections.Generic.Dictionary[long, string]]::new()
+    $stack = [System.Collections.Generic.Stack[object]]::new()
+    $stack.Push([pscustomobject]@{ Value = $Value; Path = '$' })
+
+    while ($stack.Count -gt 0) {
+        $frame = $stack.Pop()
+        $current = $frame.Value
+        if ($null -eq $current -or $current -is [string] -or $current -is [byte[]]) {
+            continue
+        }
+        if ($current -isnot [System.Collections.IDictionary] -and
+            ($current -isnot [System.Collections.IEnumerable])) {
+            continue
+        }
+
+        $first = $false
+        $id = $idGenerator.GetId($current, [ref] $first)
+        if (-not $pathsById.ContainsKey($id)) {
+            $pathsById[$id] = [System.Collections.Generic.List[string]]::new()
+            $typesById[$id] = $current.GetType().FullName
+        }
+        $pathsById[$id].Add($frame.Path)
+        if (-not $first) {
+            continue
+        }
+
+        if ($current -is [System.Collections.IDictionary]) {
+            foreach ($key in $current.Keys) {
+                $childPath = '{0}{{{1}}}' -f $frame.Path, (ConvertTo-YamlSuiteCanonicalValue -Value $key)
+                $stack.Push([pscustomobject]@{
+                        Value = $current[$key]
+                        Path  = $childPath
+                    })
+            }
+            continue
+        }
+
+        $index = 0
+        foreach ($item in $current) {
+            $stack.Push([pscustomobject]@{
+                    Value = $item
+                    Path  = ('{0}[{1}]' -f $frame.Path, $index)
+                })
+            $index++
+        }
+    }
+
+    $parts = [System.Collections.Generic.List[string]]::new()
+    foreach ($id in $pathsById.Keys) {
+        $paths = $pathsById[$id]
+        if ($paths.Count -gt 1) {
+            $sorted = [string[]] $paths.ToArray()
+            [array]::Sort($sorted, [System.StringComparer]::Ordinal)
+            $parts.Add(('{0}|{1}|{2}' -f $typesById[$id], $paths.Count, ($sorted -join ',')))
+        }
+    }
+    $output = [string[]] $parts.ToArray()
+    [array]::Sort($output, [System.StringComparer]::Ordinal)
+    return ($output -join ';')
+}
+
+function Get-YamlSuitePolicyReason {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [string] $YamlText,
+        [string] $Expected,
+        [string] $Actual,
+        [string] $DefaultReason
+    )
+
+    if ($DefaultReason) {
+        return $DefaultReason
+    }
+    if ($YamlText -cmatch '!!(?:binary|omap|pairs|set|timestamp)(?:[ \t\r\n,\[\]\{\}]|$)') {
+        return 'StandardTagProjectionPolicy'
+    }
+    if ($YamlText -cmatch '(?:^|[ \t\r\n\[\]\{\},])!<(?!tag:yaml\.org,2002:)' -or
+        $YamlText -cmatch '(?:^|[ \t\r\n\[\]\{\},])![^\s!<][^\s:,\]\}\{]*') {
+        return 'UnknownTagProjectionPolicy'
+    }
+    if (($Expected -match 'unsupported:' -or $Actual -match 'unsupported:')) {
+        return 'PowerShellTypePolicy'
+    }
+    return ''
+}
+
+function ConvertFrom-YamlSuiteEventText {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param (
+        [Parameter(Mandatory)]
+        [string] $Text
+    )
+
+    $anchorMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    $anchorCounter = 0
+    $canonical = [System.Collections.Generic.List[string]]::new()
+    $lines = $Text -split '\r?\n'
+
+    foreach ($rawLine in $lines) {
+        $line = $rawLine.Trim()
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        if ($line -in @('+STR', '-STR', '+DOC', '-DOC', '+DOC ---', '-DOC ...')) {
+            $canonical.Add($line.Substring(0, 4))
+            continue
+        }
+        if ($line -eq '-SEQ' -or $line -eq '-MAP') {
+            $canonical.Add($line)
+            continue
+        }
+
+        if ($line.StartsWith('+SEQ', [System.StringComparison]::Ordinal) -or
+            $line.StartsWith('+MAP', [System.StringComparison]::Ordinal) -or
+            $line.StartsWith('=VAL', [System.StringComparison]::Ordinal)) {
+            $prefix = $line.Substring(0, 4)
+            $rest = if ($line.Length -gt 4) { $line.Substring(4).TrimStart() } else { '' }
+            $anchor = ''
+            $tag = ''
+            $value = ''
+
+            while ($rest.Length -gt 0) {
+                if ($rest[0] -eq '&') {
+                    $space = $rest.IndexOf(' ')
+                    if ($space -lt 0) {
+                        $anchor = $rest.Substring(1)
+                        $rest = ''
+                    } else {
+                        $anchor = $rest.Substring(1, $space - 1)
+                        $rest = $rest.Substring($space + 1).TrimStart()
+                    }
+                    continue
+                }
+                if ($rest[0] -eq '<') {
+                    $end = $rest.IndexOf('>')
+                    if ($end -ge 0) {
+                        $tag = $rest.Substring(1, $end - 1)
+                        $rest = $rest.Substring($end + 1).TrimStart()
+                        continue
+                    }
+                }
+                break
+            }
+
+            if ($prefix -eq '=VAL') {
+                if ($rest.Length -gt 0 -and ($rest[0] -eq ':' -or $rest[0] -eq '"' -or $rest[0] -eq "'")) {
+                    $value = $rest.Substring(1)
+                } else {
+                    $value = $rest
+                }
+            }
+
+            $anchorToken = ''
+            if ($anchor) {
+                if (-not $anchorMap.ContainsKey($anchor)) {
+                    $anchorCounter++
+                    $anchorMap[$anchor] = 'a{0:d3}' -f $anchorCounter
+                }
+                $anchorToken = $anchorMap[$anchor]
+            }
+            $parts = [System.Collections.Generic.List[string]]::new()
+            $parts.Add($prefix)
+            if ($tag) { $parts.Add("tag=$tag") }
+            if ($anchorToken) { $parts.Add("anchor=$anchorToken") }
+            if ($prefix -eq '=VAL') { $parts.Add("value=$value") }
+            $canonical.Add(($parts -join '|'))
+            continue
+        }
+
+        if ($line.StartsWith('=ALI', [System.StringComparison]::Ordinal)) {
+            $alias = $line.Substring(4).Trim()
+            if ($alias.StartsWith('*', [System.StringComparison]::Ordinal)) {
+                $alias = $alias.Substring(1)
+            }
+            if (-not $anchorMap.ContainsKey($alias)) {
+                $anchorCounter++
+                $anchorMap[$alias] = 'a{0:d3}' -f $anchorCounter
+            }
+            $canonical.Add(('=ALI|target={0}' -f $anchorMap[$alias]))
+            continue
+        }
+
+        $canonical.Add("UNKNOWN|$line")
+    }
+
+    [string[]] $canonical.ToArray()
+}
+
+function ConvertTo-YamlSuiteActualEvent {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param (
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [object[]] $Documents
+    )
+
+    $anchorMap = [System.Collections.Generic.Dictionary[int, string]]::new()
+    $anchorCounter = 0
+    $events = [System.Collections.Generic.List[string]]::new()
+    $events.Add('+STR')
+
+    $getAnchor = {
+        param ([pscustomobject] $Node)
+        if ($null -eq $Node) { return '' }
+        if (-not $anchorMap.ContainsKey($Node.Id)) {
+            $anchorCounter++
+            $anchorMap[$Node.Id] = 'a{0:d3}' -f $anchorCounter
+        }
+        return $anchorMap[$Node.Id]
+    }
+
+    foreach ($document in $Documents) {
+        $events.Add('+DOC')
+        $stack = [System.Collections.Generic.Stack[object]]::new()
+        $stack.Push([pscustomobject]@{ Type = 'Node'; Node = $document })
+
+        while ($stack.Count -gt 0) {
+            $frame = $stack.Pop()
+            if ($frame.Type -eq 'End') {
+                $events.Add($frame.Value)
+                continue
+            }
+
+            $node = $frame.Node
+            if ($node.Kind -eq 'Alias') {
+                $targetAnchor = & $getAnchor $node.Target
+                $events.Add("=ALI|target=$targetAnchor")
+                continue
+            }
+            if ($node.Kind -eq 'Scalar') {
+                $parts = [System.Collections.Generic.List[string]]::new()
+                $parts.Add('=VAL')
+                if ($node.Tag) { $parts.Add("tag=$($node.Tag)") }
+                if ($node.Anchor) { $parts.Add("anchor=$(& $getAnchor $node)") }
+                $parts.Add(("value={0}" -f [string] $node.Value))
+                $events.Add(($parts -join '|'))
+                continue
+            }
+
+            $startParts = [System.Collections.Generic.List[string]]::new()
+            $startToken = if ($node.Kind -eq 'Sequence') { '+SEQ' } else { '+MAP' }
+            $startParts.Add($startToken)
+            if ($node.Tag) { $startParts.Add("tag=$($node.Tag)") }
+            if ($node.Anchor) { $startParts.Add("anchor=$(& $getAnchor $node)") }
+            $events.Add(($startParts -join '|'))
+
+            if ($node.Kind -eq 'Sequence') {
+                $stack.Push([pscustomobject]@{ Type = 'End'; Value = '-SEQ' })
+                for ($index = $node.Items.Count - 1; $index -ge 0; $index--) {
+                    $stack.Push([pscustomobject]@{ Type = 'Node'; Node = $node.Items[$index] })
+                }
+            } else {
+                $stack.Push([pscustomobject]@{ Type = 'End'; Value = '-MAP' })
+                for ($index = $node.Entries.Count - 1; $index -ge 0; $index--) {
+                    $stack.Push([pscustomobject]@{ Type = 'Node'; Node = $node.Entries[$index].Value })
+                    $stack.Push([pscustomobject]@{ Type = 'Node'; Node = $node.Entries[$index].Key })
+                }
+            }
+        }
+        $events.Add('-DOC')
+    }
+
+    $events.Add('-STR')
+    [string[]] $events.ToArray()
+}
+
+function Compare-YamlSuiteCanonicalList {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param (
+        [string[]] $Left,
+        [string[]] $Right
+    )
+
+    if ($Left.Length -ne $Right.Length) {
+        return $false
+    }
+    for ($index = 0; $index -lt $Left.Length; $index++) {
+        if ($Left[$index] -cne $Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+$readYamlSuiteRepresentation = {
+    param ([string] $YamlText)
+    Read-YamlStreamCore -Yaml $YamlText -Depth 128 -MaxNodes 100000 `
+        -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 `
+        -MaxTotalTagLength 65536 -MaxNumericLength 4096 -SkipGraphValidation
+}
+$readYamlSuiteStream = {
+    param ([string] $YamlText)
+    Read-YamlStream -Yaml $YamlText -Depth 128 -MaxNodes 100000 `
+        -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 `
+        -MaxTotalTagLength 65536 -MaxNumericLength 4096
+}
+$projectYamlSuiteStream = {
+    param ([object[]] $Nodes)
+    $values = [System.Collections.Generic.List[object]]::new()
+    foreach ($node in $Nodes) {
+        $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
+        $values.Add((ConvertFrom-YamlNode -Node $node -Cache $cache -AsHashtable).Value)
+    }
+    New-YamlValueBox -Value ([object[]] $values.ToArray())
+}
+
+$suiteRoot = (Resolve-Path -LiteralPath $Path).Path
+$inputFiles = @(
+    Get-ChildItem -LiteralPath $suiteRoot -Recurse -File -Filter 'in.yaml' |
+        Sort-Object FullName
+)
+
+foreach ($inputFile in $inputFiles) {
+    $casePath = $inputFile.DirectoryName.Substring($suiteRoot.Length).TrimStart(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ).Replace([System.IO.Path]::DirectorySeparatorChar, '/')
+    $yaml = [System.IO.File]::ReadAllText(
+        $inputFile.FullName,
+        [System.Text.UTF8Encoding]::new($false, $true)
+    )
+
+    $errorPath = Join-Path $inputFile.DirectoryName 'error'
+    $jsonPath = Join-Path $inputFile.DirectoryName 'in.json'
+    $eventPath = Join-Path $inputFile.DirectoryName 'test.event'
+    $outYamlPath = Join-Path $inputFile.DirectoryName 'out.yaml'
+    $emitYamlPath = Join-Path $inputFile.DirectoryName 'emit.yaml'
+
+    $expectsError = Test-Path -LiteralPath $errorPath -PathType Leaf
+    $hasJson = Test-Path -LiteralPath $jsonPath -PathType Leaf
+    $hasEvent = Test-Path -LiteralPath $eventPath -PathType Leaf
+    $hasOutYaml = Test-Path -LiteralPath $outYamlPath -PathType Leaf
+    $hasEmitYaml = Test-Path -LiteralPath $emitYamlPath -PathType Leaf
+
+    $syntaxResult = 'Pass'
+    $syntaxReason = ''
+    $eventResult = 'NotApplicable'
+    $eventReason = ''
+    $jsonResult = 'NotApplicable'
+    $jsonReason = ''
+    $outYamlResult = 'NotApplicable'
+    $outYamlReason = ''
+    $emitResult = 'NotApplicable'
+    $emitReason = ''
+
+    $representation = $null
+    $stream = $null
+    $projectedValues = $null
+    $projectedCanonical = $null
+    $projectedReference = ''
+    $projectionError = ''
+
+    try {
+        $representation = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation -Arguments @($yaml)
+    } catch {
+        if (-not $_.Exception.Data.Contains('IsYamlException')) {
+            throw
+        }
+        if ($expectsError) {
+            $syntaxResult = 'Pass'
+        } else {
+            $syntaxResult = 'Fail'
+            $syntaxReason = [string] $_.Exception.Data['YamlErrorId']
+        }
+    }
+
+    if ($syntaxResult -ne 'Fail') {
+        try {
+            $stream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream -Arguments @($yaml)
+            if ($expectsError) {
+                $syntaxResult = 'Fail'
+                $syntaxReason = 'InvalidInputAccepted'
+            }
+        } catch {
+            if (-not $_.Exception.Data.Contains('IsYamlException')) {
+                throw
+            }
+            if ($expectsError) {
+                $syntaxResult = 'Pass'
+            } elseif ($_.Exception.Data['YamlErrorId'] -eq 'YamlDuplicateKey') {
+                $syntaxResult = 'PolicyDifference'
+                $syntaxReason = 'DuplicateKeyRejected'
+            } else {
+                $syntaxResult = 'Fail'
+                $syntaxReason = [string] $_.Exception.Data['YamlErrorId']
+            }
+        }
+    }
+
+    if ($null -ne $stream) {
+        try {
+            $projectedValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments @($stream.Value)).Value
+            $projectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $projectedValues)
+            $projectedReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $projectedValues)
+        } catch {
+            if ($_.Exception.Data.Contains('YamlErrorId')) {
+                $projectionError = [string] $_.Exception.Data['YamlErrorId']
+            } else {
+                $projectionError = $_.Exception.GetType().Name
+            }
+        }
+    }
+
+    if ($CompareEvents -and $hasEvent) {
+        if ($null -eq $representation -or $expectsError) {
+            $eventResult = 'NotApplicable'
+            if ($expectsError) { $eventReason = 'InvalidSyntax' }
+        } else {
+            $expectedEvents = ConvertFrom-YamlSuiteEventText -Text (
+                [System.IO.File]::ReadAllText($eventPath, [System.Text.UTF8Encoding]::new($false, $true))
+            )
+            $actualEvents = ConvertTo-YamlSuiteActualEvent -Documents $representation.Value
+            if (Compare-YamlSuiteCanonicalList -Left $actualEvents -Right $expectedEvents) {
+                $eventResult = 'Pass'
+            } else {
+                $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected ($expectedEvents -join "`n") `
+                    -Actual ($actualEvents -join "`n") -DefaultReason ''
+                if ($reason) {
+                    $eventResult = 'PolicyDifference'
+                    $eventReason = $reason
+                } else {
+                    $eventResult = 'Fail'
+                    $eventReason = 'EventMismatch'
+                }
+            }
+        }
+    }
+
+    if ($CompareJson -and $hasJson) {
+        if ($null -eq $stream -or $expectsError -or $syntaxResult -eq 'PolicyDifference' -or
+            $null -eq $projectedValues) {
+            $jsonResult = 'NotApplicable'
+            if ($syntaxResult -eq 'PolicyDifference') { $jsonReason = $syntaxReason }
+            if ($projectionError) { $jsonReason = $projectionError }
+        } else {
+            $expectedDocuments = Split-YamlSuiteJsonDocument -Text (
+                [System.IO.File]::ReadAllText($jsonPath, [System.Text.UTF8Encoding]::new($false, $true))
+            )
+            $expectedValues = [System.Collections.Generic.List[object]]::new()
+            foreach ($document in $expectedDocuments) {
+                $expectedValues.Add((ConvertFrom-Json -InputObject $document -AsHashtable -NoEnumerate))
+            }
+            $expectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $expectedValues.ToArray())
+            if ($projectedCanonical -ceq $expectedCanonical) {
+                $jsonResult = 'Pass'
+            } else {
+                $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $expectedCanonical `
+                    -Actual $projectedCanonical -DefaultReason ''
+                if ($reason) {
+                    $jsonResult = 'PolicyDifference'
+                    $jsonReason = $reason
+                } else {
+                    $jsonResult = 'Fail'
+                    $jsonReason = 'ConstructedValueMismatch'
+                }
+            }
+        }
+    }
+
+    if ($CompareOutYaml -and $hasOutYaml) {
+        if ($null -eq $stream -or $expectsError -or $syntaxResult -eq 'PolicyDifference' -or
+            $null -eq $projectedValues) {
+            $outYamlResult = 'NotApplicable'
+            if ($syntaxResult -eq 'PolicyDifference') { $outYamlReason = $syntaxReason }
+            if ($projectionError) { $outYamlReason = $projectionError }
+        } else {
+            $outYaml = [System.IO.File]::ReadAllText($outYamlPath, [System.Text.UTF8Encoding]::new($false, $true))
+            try {
+                $outStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream -Arguments @($outYaml)
+                $outValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments @($outStream.Value)).Value
+                $outCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $outValues)
+                if ($outCanonical -ceq $projectedCanonical) {
+                    $outYamlResult = 'Pass'
+                } else {
+                    $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $projectedCanonical `
+                        -Actual $outCanonical -DefaultReason ''
+                    if ($reason) {
+                        $outYamlResult = 'PolicyDifference'
+                        $outYamlReason = $reason
+                    } else {
+                        $outYamlResult = 'Fail'
+                        $outYamlReason = 'OutYamlConstructionMismatch'
+                    }
+                }
+            } catch {
+                if ($_.Exception.Data.Contains('IsYamlException')) {
+                    $outYamlResult = 'Fail'
+                    $outYamlReason = [string] $_.Exception.Data['YamlErrorId']
+                } else {
+                    throw
+                }
+            }
+        }
+    }
+
+    if ($CompareEmitRoundTrip) {
+        if ($null -eq $stream -or $expectsError) {
+            $emitResult = 'NotApplicable'
+            if ($expectsError) { $emitReason = 'InvalidSyntax' }
+        } elseif ($projectionError) {
+            $emitResult = 'PolicyDifference'
+            $emitReason = $projectionError
+        } elseif ($syntaxResult -eq 'PolicyDifference') {
+            $emitResult = 'PolicyDifference'
+            $emitReason = $syntaxReason
+        } else {
+            try {
+                $emittedDocuments = [System.Collections.Generic.List[string]]::new()
+                foreach ($value in $projectedValues) {
+                    $emitted = Invoke-InYamlModule -ScriptBlock {
+                        param ($InputValue)
+                        ConvertTo-Yaml -InputObject $InputValue -ExplicitDocumentStart
+                    } -Arguments @($value)
+                    $emittedDocuments.Add([string] $emitted)
+                }
+                $emittedText = ($emittedDocuments.ToArray() -join "`n")
+                $isValidEmit = Invoke-InYamlModule -ScriptBlock {
+                    param ($YamlText)
+                    Test-Yaml -Yaml $YamlText -Depth 128 -MaxNodes 100000 -MaxAliases 1000 `
+                        -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
+                        -MaxNumericLength 4096
+                } -Arguments @($emittedText)
+                if (-not $isValidEmit) {
+                    $emitResult = 'Fail'
+                    $emitReason = 'EmittedYamlInvalid'
+                } else {
+                    $roundTripValues = @(
+                        Invoke-InYamlModule -ScriptBlock {
+                            param ($YamlText)
+                            ConvertFrom-Yaml -Yaml $YamlText -AsHashtable -NoEnumerate -Depth 128 `
+                                -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 `
+                                -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
+                        } -Arguments @($emittedText)
+                    )
+                    $roundCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $roundTripValues)
+                    $roundReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $roundTripValues)
+                    if ($roundCanonical -ceq $projectedCanonical -and $roundReference -ceq $projectedReference) {
+                        $emitResult = 'Pass'
+                    } else {
+                        $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $projectedCanonical `
+                            -Actual $roundCanonical -DefaultReason ''
+                        if ($reason) {
+                            $emitResult = 'PolicyDifference'
+                            $emitReason = $reason
+                        } else {
+                            $emitResult = 'Fail'
+                            $emitReason = 'EmitRoundTripMismatch'
+                        }
+                    }
+                }
+            } catch [System.NotSupportedException] {
+                $emitResult = 'PolicyDifference'
+                $emitReason = 'UnsupportedEmissionType'
+            } catch {
+                if ($_.Exception.Data.Contains('IsYamlException')) {
+                    $emitResult = 'Fail'
+                    $emitReason = [string] $_.Exception.Data['YamlErrorId']
+                } else {
+                    throw
+                }
+            }
+        }
+    }
+
+    [pscustomobject]@{
+        Case            = $casePath
+        ExpectsError    = $expectsError
+        HasJson         = $hasJson
+        HasEvent        = $hasEvent
+        HasOutYaml      = $hasOutYaml
+        HasEmitYaml     = $hasEmitYaml
+        SyntaxResult    = $syntaxResult
+        SyntaxReason    = $syntaxReason
+        EventResult     = $eventResult
+        EventReason     = $eventReason
+        JsonResult      = $jsonResult
+        JsonReason      = $jsonReason
+        OutYamlResult   = $outYamlResult
+        OutYamlReason   = $outYamlReason
+        EmitResult      = $emitResult
+        EmitReason      = $emitReason
+    }
+}

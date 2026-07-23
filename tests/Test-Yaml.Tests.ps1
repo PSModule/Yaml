@@ -27,6 +27,30 @@ Describe 'Test-Yaml' {
 
     It 'returns false for malformed syntax' {
         ('items: [one, two' | Test-Yaml) | Should -BeFalse
+        ("[ key`n  : value ]" | Test-Yaml) | Should -BeFalse
+        ("{ key`n  : value }" | Test-Yaml) | Should -BeTrue
+        ((('k' * 1025) + ': value') | Test-Yaml) | Should -BeFalse
+        ("%YAML 1.1#invalid`n---`nvalue" | Test-Yaml) | Should -BeFalse
+        ('"\UFFFFFFFF"' | Test-Yaml) | Should -BeFalse
+        ('@reserved' | Test-Yaml) | Should -BeFalse
+        ("key: first`n  nested: value" | Test-Yaml) | Should -BeFalse
+        ("a: &a value`nb: !foo *a" | Test-Yaml) | Should -BeFalse
+    }
+
+    It 'validates tag directives, tag tokens, and alias properties' {
+        ("%TAG !! tag:example.com,2000:app/`n---`n!!int value" | Test-Yaml) |
+            Should -BeTrue
+        ("%TAG ! tag:first/`n%TAG ! tag:second/`n---`n!value data" | Test-Yaml) |
+            Should -BeFalse
+        ('!foo%GG value' | Test-Yaml) | Should -BeFalse
+        ('!! value' | Test-Yaml) | Should -BeFalse
+        ('!<tag:example.test,2026:bad tag> value' | Test-Yaml) | Should -BeFalse
+        ("a: &a value`nb: &b *a" | Test-Yaml) | Should -BeFalse
+    }
+
+    It 'recognizes document markers only at column zero' {
+        ("key:`n  ---" | Test-Yaml) | Should -BeTrue
+        ("key:`n  ..." | Test-Yaml) | Should -BeTrue
     }
 
     It 'returns false for duplicate mapping keys' {
@@ -43,6 +67,14 @@ Describe 'Test-Yaml' {
         ("[one, two]" | Test-Yaml -MaxNodes 2) | Should -BeFalse
         ("a: &a value`nb: *a" | Test-Yaml -MaxAliases 0) | Should -BeFalse
         ('value: long' | Test-Yaml -MaxScalarLength 4) | Should -BeFalse
+    }
+
+    It 'accepts the public maximum depth and rejects the next level as YAML data' {
+        $atLimit = ('[' * 127) + 'null' + (']' * 127)
+        $overLimit = ('[' * 128) + 'null' + (']' * 128)
+
+        ($atLimit | Test-Yaml -Depth 128 -MaxNodes 200) | Should -BeTrue
+        ($overLimit | Test-Yaml -Depth 128 -MaxNodes 200) | Should -BeFalse
     }
 
     It 'uses fixed-size fingerprints for an alias DAG' {

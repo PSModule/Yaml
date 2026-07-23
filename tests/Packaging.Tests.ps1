@@ -53,6 +53,8 @@ Describe 'Dependency-free package source' {
             Join-Path $repositoryRoot 'src\manifest.psd1'
         )
 
+        $manifest.PowerShellVersion | Should -Be '7.6'
+        @($manifest.CompatiblePSEditions) | Should -Be @('Core')
         $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
     }
@@ -121,6 +123,8 @@ Describe 'Generated artifact package' {
         $manifest = Import-PowerShellDataFile -Path $artifactManifestPath
         $moduleBase = Split-Path -Parent $artifactManifestPath
 
+        $manifest.PowerShellVersion | Should -Be '7.6'
+        @($manifest.CompatiblePSEditions) | Should -Be @('Core')
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
         $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
         @($manifest.FunctionsToExport | Sort-Object) |
@@ -132,21 +136,13 @@ Describe 'Generated artifact package' {
         { Test-ModuleManifest -Path $artifactManifestPath } | Should -Not -Throw
     }
 
-    It 'imports in a fresh PowerShell process beside an existing YamlDotNet identity' `
+    It 'imports in a fresh PowerShell 7 process and preserves arrays, aliases, and depth' `
         -Skip:($skipArtifactTests -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
         $script = @'
 $ErrorActionPreference = 'Stop'
-$name = [System.Reflection.AssemblyName]::new('YamlDotNet')
-try {
-    $null = [System.Reflection.Emit.AssemblyBuilder]::DefineDynamicAssembly(
-        $name,
-        [System.Reflection.Emit.AssemblyBuilderAccess]::Run
-    )
-} catch {
-    $null = [AppDomain]::CurrentDomain.DefineDynamicAssembly(
-        $name,
-        [System.Reflection.Emit.AssemblyBuilderAccess]::Run
-    )
+$ps = $PSVersionTable.PSVersion
+if ($ps.Major -lt 7 -or ($ps.Major -eq 7 -and $ps.Minor -lt 6)) {
+    throw "Expected PowerShell 7.6+ but got $ps."
 }
 Import-Module -Name '__MANIFEST__' -Force
 $value = 'v: []' | ConvertFrom-Yaml -AsHashtable
@@ -161,45 +157,11 @@ $roundTrip = [ordered]@{ first = $shared; second = $shared } |
     ConvertTo-Yaml |
     ConvertFrom-Yaml -AsHashtable
 if (-not [object]::ReferenceEquals($roundTrip['first'], $roundTrip['second'])) {
-    throw 'The fresh-process graph round trip lost alias identity.'
-}
-'coexistence-ok'
-'@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
-
-        (& pwsh -NoLogo -NoProfile -Command $script) | Should -Contain 'coexistence-ok'
-        $LASTEXITCODE | Should -Be 0
-    }
-
-    It 'preserves internal arrays and aliases in a fresh Windows PowerShell 5.1 process' `
-        -Skip:($skipArtifactTests -or $null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue)) {
-        $script = @'
-$ErrorActionPreference = 'Stop'
-$name = [System.Reflection.AssemblyName]::new('YamlDotNet')
-$null = [AppDomain]::CurrentDomain.DefineDynamicAssembly(
-    $name,
-    [System.Reflection.Emit.AssemblyBuilderAccess]::Run
-)
-Import-Module -Name '__MANIFEST__' -Force
-$empty = 'v: []' | ConvertFrom-Yaml -AsHashtable
-if ($empty['v'] -isnot [object[]] -or $empty['v'].Count -ne 0) {
-    throw 'The empty sequence was corrupted.'
-}
-$binary = "a: &x !!binary SGVsbG8=`nb: *x" | ConvertFrom-Yaml -AsHashtable
-if ($binary['a'] -isnot [byte[]] -or -not [object]::ReferenceEquals($binary['a'], $binary['b'])) {
-    throw 'The binary value or alias identity was corrupted.'
-}
-$sequence = "a: &x []`nb: *x" | ConvertFrom-Yaml -AsHashtable
-if ($sequence['a'] -isnot [object[]] -or
-    -not [object]::ReferenceEquals($sequence['a'], $sequence['b'])) {
-    throw 'The sequence alias identity was corrupted.'
-}
-$recursive = 'a: &x [*x]' | ConvertFrom-Yaml -AsHashtable
-if (-not [object]::ReferenceEquals($recursive['a'], $recursive['a'][0])) {
-    throw 'The recursive alias was corrupted.'
+   throw 'The fresh-process graph round trip lost alias identity.'
 }
 $negativeZero = [BitConverter]::Int64BitsToDouble([long]::MinValue)
 if ((ConvertTo-Yaml -InputObject $negativeZero).Trim() -ne '-0.0') {
-    throw 'The negative-zero sign was lost.'
+   throw 'The negative-zero sign was lost.'
 }
 $flow = ('[' * 127) + 'null' + (']' * 127)
 if (-not (Test-Yaml -Yaml $flow -Depth 128 -MaxNodes 200)) {
@@ -217,11 +179,11 @@ $deepYaml = ConvertTo-Yaml -InputObject $atLimit -Depth 128 -MaxNodes 300
 if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
     throw 'The public maximum serialization depth failed.'
 }
-'windows-powershell-ok'
+'powershell-7-ok'
 '@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
 
-        (& powershell.exe -NoLogo -NoProfile -Command $script) |
-            Should -Contain 'windows-powershell-ok'
+        (& pwsh -NoLogo -NoProfile -Command $script) |
+            Should -Contain 'powershell-7-ok'
         $LASTEXITCODE | Should -Be 0
     }
 }

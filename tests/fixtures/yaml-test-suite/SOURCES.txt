@@ -20,3 +20,16 @@ The local YAML payloads are copied from these pinned test cases:
   VJP3  Multi-line flow indentation, invalid and valid variants
 
 See LICENSE.txt for the upstream MIT license.
+
+The complete released data corpus is vendored as:
+  yaml-test-suite-data-2022-01-17.zip
+Data commit:
+  6ad3d2c62885d82fc349026c136ef560838fdf3d
+Generated from source commit:
+  45db50ae
+Archive SHA-256:
+  DCC1F037B13F6C3032D5190C447B6A6EF5560738A4C104F29B4243B0AB8F8029
+
+The archive contains 402 released inputs in 352 case directories. It is
+consumed locally by tests/tools/Invoke-YamlTestSuite.ps1 without network
+access.
