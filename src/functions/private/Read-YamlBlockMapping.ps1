@@ -182,14 +182,6 @@ function Read-YamlBlockMapping {
                     'A block mapping entry is missing its value indicator.'
                 ))
         }
-        if ($colon -gt 1024) {
-            $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn + $colon) `
-                -Line $lineNumber -Column ($contentColumn + $colon)
-            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidImplicitKey' -Message (
-                    'An implicit mapping key cannot exceed 1024 characters.'
-                ))
-        }
-
         if ($colon -eq 0) {
             $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn) `
                 -Line $lineNumber -Column $contentColumn
@@ -198,6 +190,13 @@ function Read-YamlBlockMapping {
             $keyText = $content.Substring(0, $colon).TrimEnd(' ', "`t")
             $key = Read-YamlBlockKey -Context $Context -Text $keyText -Line $lineNumber `
                 -Column $contentColumn -Depth ($Depth + 1)
+        }
+        if ((Get-YamlImplicitKeyLength -Node $key -Context $Context) -gt 1024) {
+            $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn + $colon) `
+                -Line $lineNumber -Column ($contentColumn + $colon)
+            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidImplicitKey' -Message (
+                    'An implicit mapping key cannot exceed 1024 Unicode scalar values.'
+                ))
         }
 
         $valueStart = $colon + 1

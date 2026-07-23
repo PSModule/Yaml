@@ -153,6 +153,17 @@ folded: >
 
             $result | Should -Be @('foo  bar', "foo`nbar")
         }
+
+        It 'accepts adjacent flow collection values after a colon' {
+            $sequenceValue = '{foo:[bar]}' | ConvertFrom-Yaml
+            $mappingValue = '{foo:{bar: baz}}' | ConvertFrom-Yaml
+            $sequencePair = '[foo:[bar]]' | ConvertFrom-Yaml -NoEnumerate
+
+            $sequenceValue.foo | Should -Be @('bar')
+            $mappingValue.foo.bar | Should -Be 'baz'
+            $sequencePair.Count | Should -Be 1
+            $sequencePair[0].foo | Should -Be @('bar')
+        }
     }
 
     Context 'Streams and pipeline input' {

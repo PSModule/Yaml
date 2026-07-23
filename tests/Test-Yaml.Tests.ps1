@@ -37,6 +37,37 @@ Describe 'Test-Yaml' {
         ("a: &a value`nb: !foo *a" | Test-Yaml) | Should -BeFalse
     }
 
+    It 'enforces implicit-key line and Unicode scalar limits' {
+        $emoji = [char]::ConvertFromUtf32(0x1F600)
+
+        ("['multi`n  line': value]" | Test-Yaml) | Should -BeFalse
+        ("[multi`n  line: value]" | Test-Yaml) | Should -BeFalse
+
+        foreach ($quoted in @($false, $true)) {
+            foreach ($length in @(1024, 1025)) {
+                $text = 'k' * $length
+                $key = if ($quoted) { "'$text'" } else { $text }
+                foreach ($yaml in @(
+                        "[$key`: value]",
+                        "{$key`: value}"
+                    )) {
+                    ($yaml | Test-Yaml) | Should -Be ($length -eq 1024)
+                }
+            }
+        }
+
+        foreach ($length in @(513, 1024, 1025)) {
+            $key = $emoji * $length
+            ("{$key`: value}" | Test-Yaml) |
+                Should -Be ($length -le 1024)
+        }
+    }
+
+    It 'accepts multiline keys in flow mappings' {
+        ("{'multi`n  line': value}" | Test-Yaml) | Should -BeTrue
+        ("{multi`n  line: value}" | Test-Yaml) | Should -BeTrue
+    }
+
     It 'validates tag directives, tag tokens, and alias properties' {
         ("%TAG !! tag:example.com,2000:app/`n---`n!!int value" | Test-Yaml) |
             Should -BeTrue
