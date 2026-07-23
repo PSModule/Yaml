@@ -111,7 +111,7 @@ function Read-YamlBlockMapping {
                     -FirstItemText $firstItem -FirstItemColumn $itemColumn
             } else {
                 $key = Read-YamlBlockNode -Context $Context -ParentIndent $Indent -Depth ($Depth + 1) `
-                    -Segment $keyText -SegmentColumn $keyColumn
+                    -Segment $keyText -SegmentColumn $keyColumn -AllowIndentlessSequence
             }
 
             Skip-YamlBlockTrivia -Context $Context

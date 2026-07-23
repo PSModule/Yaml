@@ -234,6 +234,26 @@ copy: *source
             $enumerator.Value | Should -Be 'value'
         }
 
+        It 'parses explicit complex keys whose sequence content starts on the next line' {
+            $yaml = @'
+--- &mapping
+? &key
+- &item a
+- b
+- c
+: value
+'@
+            $result = @($yaml | ConvertFrom-Yaml -AsHashtable -NoEnumerate)
+
+            $result.Count | Should -Be 1
+            $mapping = $result[0]
+            $mapping.Count | Should -Be 1
+            $entry = $mapping.GetEnumerator() | Select-Object -First 1
+            , $entry.Key | Should -BeOfType [object[]]
+            $entry.Key | Should -Be @('a', 'b', 'c')
+            $entry.Value | Should -Be 'value'
+        }
+
         It 'matches standard tags ordinally and treats case variants as unknown' {
             $result = "integer: !!INT 12`nset: !!SET {one: null}" |
                 ConvertFrom-Yaml -AsHashtable
