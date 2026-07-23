@@ -202,5 +202,20 @@ Describe 'Pinned yaml-test-suite reference cases' {
             $result.canonical,
             $result.generic
         ) | Should -BeTrue
+        , $result.canonical | Should -BeOfType [byte[]]
+        , $result.generic | Should -BeOfType [byte[]]
+    }
+
+    It 'projects the legacy ordered map in case J7PZ as an ordered dictionary' {
+        $result = @'
+--- !!omap
+- Mark McGwire: 65
+- Sammy Sosa: 63
+- Ken Griffy: 58
+'@ | ConvertFrom-Yaml
+
+        $result | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        @($result.Keys) | Should -Be @('Mark McGwire', 'Sammy Sosa', 'Ken Griffy')
+        @($result.Values) | Should -Be @(65, 63, 58)
     }
 }

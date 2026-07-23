@@ -243,26 +243,19 @@ function ConvertTo-YamlSuiteReferenceSignature {
     return ($output -join ';')
 }
 
-function Get-YamlSuitePolicyReason {
+function Get-YamlSuiteJsonPolicyReason {
     [CmdletBinding()]
     [OutputType([string])]
     param (
-        [string] $YamlText,
-        [string] $Expected,
-        [string] $Actual,
-        [string] $DefaultReason
+        [Parameter(Mandatory)]
+        [string] $Case
     )
 
-    if ($DefaultReason) {
-        return $DefaultReason
+    switch -CaseSensitive ($Case) {
+        '565N' { return 'BinaryByteArrayProjection' }
+        'J7PZ' { return 'LegacyOrderedMapProjection' }
+        default { return '' }
     }
-    if ($YamlText -cmatch '!!(?:binary|omap|pairs|set|timestamp)(?:[ \t\r\n,\[\]\{\}]|$)') {
-        return 'StandardTagProjectionPolicy'
-    }
-    if (($Expected -match 'unsupported:' -or $Actual -match 'unsupported:')) {
-        return 'PowerShellTypePolicy'
-    }
-    return ''
 }
 
 function ConvertFrom-YamlSuiteEventText {
@@ -694,9 +687,10 @@ foreach ($inputFile in $inputFiles) {
             }
             if ($expectsError) {
                 $syntaxResult = 'Pass'
-            } elseif ($_.Exception.Data['YamlErrorId'] -eq 'YamlDuplicateKey') {
+            } elseif ($casePath -cin @('2JQS', 'X38W') -and
+                $_.Exception.Data['YamlErrorId'] -eq 'YamlDuplicateKey') {
                 $syntaxResult = 'PolicyDifference'
-                $syntaxReason = 'DuplicateKeyRejected'
+                $syntaxReason = 'RepresentationMappingKeyUniqueness'
             } else {
                 $syntaxResult = 'Fail'
                 $syntaxReason = [string] $_.Exception.Data['YamlErrorId']
@@ -732,15 +726,8 @@ foreach ($inputFile in $inputFiles) {
             if (Compare-YamlSuiteCanonicalList -Left $actualEvents -Right $expectedEvents) {
                 $eventResult = 'Pass'
             } else {
-                $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected ($expectedEvents -join "`n") `
-                    -Actual ($actualEvents -join "`n") -DefaultReason ''
-                if ($reason) {
-                    $eventResult = 'PolicyDifference'
-                    $eventReason = $reason
-                } else {
-                    $eventResult = 'Fail'
-                    $eventReason = 'EventMismatch'
-                }
+                $eventResult = 'Fail'
+                $eventReason = 'EventMismatch'
             }
         }
     }
@@ -765,8 +752,7 @@ foreach ($inputFile in $inputFiles) {
             if ($projectedCanonical -ceq $expectedCanonical) {
                 $jsonResult = 'Pass'
             } else {
-                $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $expectedCanonical `
-                    -Actual $projectedCanonical -DefaultReason ''
+                $reason = Get-YamlSuiteJsonPolicyReason -Case $casePath
                 if ($reason) {
                     $jsonResult = 'PolicyDifference'
                     $jsonReason = $reason
@@ -794,15 +780,8 @@ foreach ($inputFile in $inputFiles) {
                 if ($outCanonical -ceq $projectedCanonical) {
                     $outYamlResult = 'Pass'
                 } else {
-                    $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $projectedCanonical `
-                        -Actual $outCanonical -DefaultReason ''
-                    if ($reason) {
-                        $outYamlResult = 'PolicyDifference'
-                        $outYamlReason = $reason
-                    } else {
-                        $outYamlResult = 'Fail'
-                        $outYamlReason = 'OutYamlConstructionMismatch'
-                    }
+                    $outYamlResult = 'Fail'
+                    $outYamlReason = 'OutYamlConstructionMismatch'
                 }
             } catch {
                 if ($_.Exception.Data.Contains('IsYamlException')) {
@@ -820,7 +799,7 @@ foreach ($inputFile in $inputFiles) {
             $emitResult = 'NotApplicable'
             if ($expectsError) { $emitReason = 'InvalidSyntax' }
         } elseif ($projectionError) {
-            $emitResult = 'PolicyDifference'
+            $emitResult = 'Fail'
             $emitReason = $projectionError
         } elseif ($syntaxResult -eq 'PolicyDifference') {
             $emitResult = 'PolicyDifference'
@@ -855,19 +834,12 @@ foreach ($inputFile in $inputFiles) {
                     if ($roundCanonical -ceq $projectedCanonical -and $roundReference -ceq $projectedReference) {
                         $emitResult = 'Pass'
                     } else {
-                        $reason = Get-YamlSuitePolicyReason -YamlText $yaml -Expected $projectedCanonical `
-                            -Actual $roundCanonical -DefaultReason ''
-                        if ($reason) {
-                            $emitResult = 'PolicyDifference'
-                            $emitReason = $reason
-                        } else {
-                            $emitResult = 'Fail'
-                            $emitReason = 'EmitRoundTripMismatch'
-                        }
+                        $emitResult = 'Fail'
+                        $emitReason = 'EmitRoundTripMismatch'
                     }
                 }
             } catch [System.NotSupportedException] {
-                $emitResult = 'PolicyDifference'
+                $emitResult = 'Fail'
                 $emitReason = 'UnsupportedEmissionType'
             } catch {
                 if ($_.Exception.Data.Contains('IsYamlException')) {

@@ -167,19 +167,25 @@ The offline test gate runs the complete released `yaml-test-suite` data corpus
 at commit `6ad3d2c62885d82fc349026c136ef560838fdf3d` (generated from source
 commit `45db50ae`). The pinned archive contains 402 inputs:
 
-- all 94 fixtures marked invalid are rejected;
-- 306 of 308 fixtures marked valid are accepted;
-- the other two valid-syntax fixtures, `2JQS` and `X38W`, are deliberately
-  rejected because this module rejects duplicate mapping keys;
-- 282 fixtures include `in.json`; three belong to invalid inputs, 277 of the
-  279 applicable constructions match exactly, and two use a different
-  documented projection policy.
+| Surface | Pass | PolicyDifference | Fail | NotApplicable |
+| --- | ---: | ---: | ---: | ---: |
+| Syntax and composition | 400 | 2 | 0 | 0 |
+| Representation events | 308 | 0 | 0 | 94 |
+| JSON projection | 277 | 2 | 0 | 123 |
+| `out.yaml` projection | 241 | 0 | 0 | 161 |
+| Emit and round trip | 306 | 0 | 0 | 96 |
 
-The two construction-policy differences are `565N`, where this module
-constructs `!!binary` as `byte[]` instead of a Base64 string, and `J7PZ`, where
-the explicitly supported `!!omap` tag becomes an ordered dictionary instead of
-remaining a sequence of one-entry mappings. The deterministic runner reports
-398 passing cases, four policy exclusions, and no unexplained failures.
+All 94 fixtures marked invalid are rejected. The valid `2JQS` and `X38W`
+inputs are syntactically recognized and produce matching representation
+events, then are rejected during load validation because representation
+mapping keys must be unique. They are not unsupported grammar.
+
+The two JSON projection differences are `565N`, where `!!binary` intentionally
+becomes `byte[]` instead of a Base64 string, and `J7PZ`, where legacy `!!omap`
+intentionally becomes `System.Collections.Specialized.OrderedDictionary`
+instead of remaining a sequence of one-entry mappings. No event mismatch is
+classified as policy. The deterministic runner reports no unexplained
+failures.
 
 These results are a pinned compatibility measurement, not a claim that a finite
 corpus proves complete YAML 1.2.2 compliance.

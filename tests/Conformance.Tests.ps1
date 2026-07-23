@@ -32,19 +32,22 @@ Describe 'Released yaml-test-suite corpus accounting' {
         $suiteResults.Count | Should -Be 402
     }
 
-    It 'accounts for syntax acceptance, rejection, and policy differences' {
+    It 'accounts for syntax recognition and representation-key load policy' {
         @($suiteResults | Where-Object SyntaxResult -EQ 'Pass').Count | Should -Be 400
         @($suiteResults | Where-Object SyntaxResult -EQ 'PolicyDifference').Count |
             Should -Be 2
         @($suiteResults | Where-Object SyntaxResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object SyntaxResult -EQ 'NotApplicable').Count |
             Should -Be 0
-        @(
+        $policyResults = @(
             $suiteResults |
                 Where-Object SyntaxResult -EQ 'PolicyDifference' |
-                Select-Object -ExpandProperty Case |
-                Sort-Object
-        ) | Should -Be @('2JQS', 'X38W')
+                Sort-Object Case
+        )
+        @($policyResults.Case) | Should -Be @('2JQS', 'X38W')
+        @($policyResults.SyntaxReason | Select-Object -Unique) |
+            Should -Be @('RepresentationMappingKeyUniqueness')
+        @($policyResults | Where-Object EventResult -NE 'Pass').Count | Should -Be 0
     }
 
     It 'accounts for parser representation/event comparisons' {
@@ -63,6 +66,16 @@ Describe 'Released yaml-test-suite corpus accounting' {
         @($suiteResults | Where-Object JsonResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object JsonResult -EQ 'NotApplicable').Count |
             Should -Be 123
+        $policyResults = @(
+            $suiteResults |
+                Where-Object JsonResult -EQ 'PolicyDifference' |
+                Sort-Object Case
+        )
+        @($policyResults.Case) | Should -Be @('565N', 'J7PZ')
+        @($policyResults.JsonReason) | Should -Be @(
+            'BinaryByteArrayProjection',
+            'LegacyOrderedMapProjection'
+        )
     }
 
     It 'accounts for out.yaml representation comparisons' {
