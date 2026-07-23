@@ -123,6 +123,7 @@ function ConvertTo-Yaml {
             FingerprintHasher = [System.Security.Cryptography.SHA256]::Create()
             Active            = [System.Collections.Generic.HashSet[long]]::new()
             NodeCount         = 0
+            ReservedNodeCount = 0
             MaxDepth          = $Depth
             MaxNodes          = $MaxNodes
             MaxScalarLength   = $MaxScalarLength

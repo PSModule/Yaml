@@ -34,6 +34,7 @@ function ConvertTo-YamlNode {
             Child        = $null
             KeyNode      = $null
             Fingerprints = $null
+            Reserved     = $false
         })
 
     while ($stack.Count -gt 0) {
@@ -43,6 +44,9 @@ function ConvertTo-YamlNode {
                 throw (New-YamlSerializationException -ErrorId 'YamlDepthExceeded' -Message (
                         "The object graph exceeds the configured depth limit of $($State.MaxDepth)."
                     ))
+            }
+            if ($frame.Reserved) {
+                $State.ReservedNodeCount--
             }
             $State.NodeCount++
             if ($State.NodeCount -gt $State.MaxNodes) {
@@ -122,6 +126,7 @@ function ConvertTo-YamlNode {
                     Child        = $null
                     KeyNode      = $null
                     Fingerprints = $null
+                    Reserved     = $true
                 })
             continue
         }
@@ -152,6 +157,7 @@ function ConvertTo-YamlNode {
                     Child        = $null
                     KeyNode      = $null
                     Fingerprints = $null
+                    Reserved     = $true
                 })
             continue
         }
@@ -180,6 +186,7 @@ function ConvertTo-YamlNode {
                     Child        = $null
                     KeyNode      = $null
                     Fingerprints = $null
+                    Reserved     = $true
                 })
             continue
         }

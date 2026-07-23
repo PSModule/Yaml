@@ -10,10 +10,6 @@ function Read-YamlBoundedEnumerable {
         [System.Collections.IEnumerable] $Value,
 
         [Parameter(Mandatory)]
-        [ValidateRange(0, 2147483647)]
-        [int] $MaximumItems,
-
-        [Parameter(Mandatory)]
         [int] $MaxNodes,
 
         [Parameter(Mandatory)]
@@ -21,11 +17,15 @@ function Read-YamlBoundedEnumerable {
 
         [switch] $DictionaryEntries,
 
-        [switch] $EnumsAsStrings
+        [switch] $EnumsAsStrings,
+
+        [ValidateRange(1, 2)]
+        [int] $NodesPerItem = 1
     )
 
+    $availableNodes = $State.MaxNodes - $State.NodeCount - $State.ReservedNodeCount
     if ($Value -is [System.Collections.ICollection] -and
-        $Value.Count -gt $MaximumItems) {
+        ([long] $Value.Count * $NodesPerItem) -gt $availableNodes) {
         throw (New-YamlSerializationException -ErrorId 'YamlNodeLimitExceeded' -Message (
                 "The object graph exceeds the configured limit of $MaxNodes nodes."
             ))
@@ -35,7 +35,7 @@ function Read-YamlBoundedEnumerable {
     $enumerator = $Value.GetEnumerator()
     try {
         while ($enumerator.MoveNext()) {
-            if ($items.Count -ge $MaximumItems) {
+            if (($State.NodeCount + $State.ReservedNodeCount + $NodesPerItem) -gt $MaxNodes) {
                 throw (New-YamlSerializationException -ErrorId 'YamlNodeLimitExceeded' -Message (
                         "The object graph exceeds the configured limit of $MaxNodes nodes."
                     ))
@@ -50,6 +50,7 @@ function Read-YamlBoundedEnumerable {
                 $null = Get-YamlSerializationShape -Value $item -State $State `
                     -EnumsAsStrings:$EnumsAsStrings -InspectOnly
             }
+            $State.ReservedNodeCount += $NodesPerItem
             $items.Add($item)
         }
     } finally {

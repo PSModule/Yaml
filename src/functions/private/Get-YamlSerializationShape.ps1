@@ -198,11 +198,9 @@ function Get-YamlSerializationShape {
         }
         $entries = [System.Collections.Generic.List[object]]::new()
         if ($isDictionary) {
-            $remainingNodes = [System.Math]::Max(0, $State.MaxNodes - $State.NodeCount)
-            $maximumEntries = [int] [System.Math]::Floor($remainingNodes / 2.0)
             $rawEntries = Read-YamlBoundedEnumerable -Value $Value `
-                -MaximumItems $maximumEntries -MaxNodes $State.MaxNodes -State $State `
-                -DictionaryEntries -EnumsAsStrings:$EnumsAsStrings
+                -MaxNodes $State.MaxNodes -State $State -DictionaryEntries `
+                -EnumsAsStrings:$EnumsAsStrings -NodesPerItem 2
             foreach ($entry in $rawEntries) {
                 $entries.Add([pscustomobject]@{
                         Key   = [object] $entry.Key
@@ -210,7 +208,8 @@ function Get-YamlSerializationShape {
                     })
             }
         } else {
-            if (($dataProperties.Count * 2) -gt ($State.MaxNodes - $State.NodeCount)) {
+            $availableNodes = $State.MaxNodes - $State.NodeCount - $State.ReservedNodeCount
+            if (($dataProperties.Count * 2) -gt $availableNodes) {
                 throw (New-YamlSerializationException -ErrorId 'YamlNodeLimitExceeded' -Message (
                         "The object graph exceeds the configured limit of $($State.MaxNodes) nodes."
                     ))
@@ -220,6 +219,7 @@ function Get-YamlSerializationShape {
                     -EnumsAsStrings:$EnumsAsStrings -InspectOnly
                 $null = Get-YamlSerializationShape -Value $property.Value -State $State `
                     -EnumsAsStrings:$EnumsAsStrings -InspectOnly
+                $State.ReservedNodeCount += 2
                 $entries.Add([pscustomobject]@{
                         Key   = [object] $property.Name
                         Value = [object] $property.Value
@@ -236,10 +236,8 @@ function Get-YamlSerializationShape {
         if ($InspectOnly) {
             return [pscustomobject]@{ Kind = 'Sequence'; Node = $null; Values = $null }
         }
-        $remainingNodes = [System.Math]::Max(0, $State.MaxNodes - $State.NodeCount)
         $items = Read-YamlBoundedEnumerable -Value $Value `
-            -MaximumItems $remainingNodes -MaxNodes $State.MaxNodes -State $State `
-            -EnumsAsStrings:$EnumsAsStrings
+            -MaxNodes $State.MaxNodes -State $State -EnumsAsStrings:$EnumsAsStrings
         return [pscustomobject]@{
             Kind   = 'Sequence'
             Node   = $null

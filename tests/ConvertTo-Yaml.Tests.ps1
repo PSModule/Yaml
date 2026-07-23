@@ -58,6 +58,7 @@ namespace YamlTests
     {
         private readonly object[] values;
         public int GetEnumeratorCount { get; private set; }
+        public int MoveNextCount { get; private set; }
         public int DisposeCount { get; private set; }
 
         public OneShotEnumerable(object[] values) { this.values = values; }
@@ -85,7 +86,12 @@ namespace YamlTests
             }
 
             public object Current { get { return values[index]; } }
-            public bool MoveNext() { index++; return index < values.Length; }
+            public bool MoveNext()
+            {
+                owner.MoveNextCount++;
+                index++;
+                return index < values.Length;
+            }
             public void Reset() { throw new NotSupportedException(); }
             public void Dispose() { owner.DisposeCount++; }
         }
@@ -566,6 +572,24 @@ Describe 'ConvertTo-Yaml' {
                 Should -Throw -ExpectedMessage '*configured limit of 4 nodes*'
             $source.MoveNextCount | Should -Be 4
             $source.DisposeCount | Should -Be 1
+        }
+
+        It 'shares the node budget while buffering nested enumerables' {
+            $children = [System.Collections.Generic.List[object]]::new()
+            $sources = [System.Collections.Generic.List[object]]::new()
+            foreach ($index in 1..9) {
+                $child = [YamlTests.OneShotEnumerable]::new([object[]] (1..9))
+                $children.Add($child)
+                $sources.Add($child)
+            }
+            $root = [YamlTests.OneShotEnumerable]::new([object[]] $children.ToArray())
+            $sources.Add($root)
+
+            { ConvertTo-Yaml -InputObject $root -MaxNodes 20 } |
+                Should -Throw -ExpectedMessage '*configured limit of 20 nodes*'
+            ($sources | Measure-Object -Property MoveNextCount -Sum).Sum |
+                Should -BeLessOrEqual 22
+            ($sources | Measure-Object -Property DisposeCount -Sum).Sum | Should -Be 3
         }
 
         It 'stops and disposes enumerables at the first oversized scalar' {
