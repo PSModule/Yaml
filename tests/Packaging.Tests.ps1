@@ -30,6 +30,8 @@ BeforeAll {
         $command = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
         if ($null -ne $command -and $command.ModuleName -eq 'Yaml') {
             $command.Module
+        } else {
+            $null
         }
     }
     $artifactManifestPath = if ($null -ne $loadedYamlModule) {
@@ -93,8 +95,8 @@ Describe 'Dependency-free package source' {
             'ConvertTo-YamlNode.ps1',
             'Write-YamlNodeText.ps1'
         ) | ForEach-Object {
-            Test-Path -LiteralPath (Join-Path $privatePath $_) |
-                Should -BeTrue -Because "$_ defines a required processor layer"
+            $isPresent = Test-Path -LiteralPath (Join-Path $privatePath $_)
+            $isPresent | Should -BeTrue -Because "$_ defines a required processor layer"
         }
     }
 

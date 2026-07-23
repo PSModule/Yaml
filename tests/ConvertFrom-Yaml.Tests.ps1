@@ -187,22 +187,6 @@ mapping: !<tag:example.test,2026:object>
             $result.mapping.name | Should -Be 'safe'
         }
 
-        It 'decodes percent escapes in expanded representation tags' {
-            $escaped = Get-TestYamlRepresentationRoot -Yaml (
-                "%TAG !e! tag:example.com,2000:app/`n--- !e!tag%21 value"
-            )
-            $multibyte = Get-TestYamlRepresentationRoot -Yaml (
-                "%TAG !e! tag:example.com,2000:app/`n--- !e!caf%C3%A9 value"
-            )
-
-            $escaped.Tag | Should -Be 'tag:example.com,2000:app/tag!'
-            $escaped.HasUnknownTag | Should -BeTrue
-            $multibyte.Tag | Should -Be (
-                'tag:example.com,2000:app/caf{0}' -f [char] 0x00E9
-            )
-            $multibyte.HasUnknownTag | Should -BeTrue
-        }
-
         It 'retains unknown local and global tags before neutral value projection' {
             $local = Get-TestYamlRepresentationRoot -Yaml '!local value'
             $global = Get-TestYamlRepresentationRoot -Yaml (
@@ -392,6 +376,49 @@ date: !!timestamp 2001-12-14
             ($manyTags | Test-Yaml -MaxTagLength 1024 -MaxTotalTagLength 13) | Should -BeFalse
             ($largeInteger | Test-Yaml -MaxNumericLength 4096) | Should -BeFalse
             { $largeInteger | ConvertFrom-Yaml -MaxNumericLength 4096 } | Should -Throw
+        }
+
+        It 'decodes percent escapes in expanded tags using UTF-8' {
+            $yaml = @'
+%TAG !e! tag:example.com,2000:app/
+---
+first: !e!tag%21 value
+second: !e!currency%E2%82%AC amount
+'@
+            $representation = Read-YamlStreamCore -Yaml $yaml -Depth 32 -MaxNodes 64 -MaxAliases 16 `
+                -MaxScalarLength 4096 -MaxTagLength 1024 -MaxTotalTagLength 4096 `
+                -MaxNumericLength 64
+
+            $representation.Value.Count | Should -Be 1
+            $entries = $representation.Value[0].Entries
+            $entries.Count | Should -Be 2
+            $entries[0].Value.Tag | Should -Be 'tag:example.com,2000:app/tag!'
+            $entries[1].Value.Tag | Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
+        }
+
+        It 'rejects malformed or non-UTF8 tag percent escapes' {
+            $truncated = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%2 value
+'@
+            $invalidHex = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%ZZ value
+'@
+            $invalidUtf8 = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%E2%28%A1 value
+'@
+
+            ($truncated | Test-Yaml) | Should -BeFalse
+            ($invalidHex | Test-Yaml) | Should -BeFalse
+            ($invalidUtf8 | Test-Yaml) | Should -BeFalse
+            { $truncated | ConvertFrom-Yaml } | Should -Throw
+            { $invalidHex | ConvertFrom-Yaml } | Should -Throw
+            { $invalidUtf8 | ConvertFrom-Yaml } | Should -Throw
         }
 
         It 'bounds expanded-tag storage and rejects huge numerics promptly' {

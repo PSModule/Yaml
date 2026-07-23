@@ -52,7 +52,6 @@ function Get-TestYamlFingerprintLength {
         } finally {
             $hasher.Dispose()
         }
-
         @($cache.Values | ForEach-Object Length)
     }
 

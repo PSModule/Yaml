@@ -67,18 +67,7 @@ function Resolve-YamlTag {
         }
     }
 
-    try {
-        $expanded = ConvertFrom-YamlTagUriText -Text ($prefix + $suffix)
-    } catch [System.FormatException] {
-        throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
-                "The tag token '$Token' contains a malformed URI escape."
-            ))
-    } catch [System.Text.DecoderFallbackException] {
-        throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
-                "The tag token '$Token' contains URI escapes that are not valid UTF-8."
-            ))
-    }
-
+    $expanded = ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token
     $expandedLength = $expanded.Length
     if ($expandedLength -gt $Context.MaxTagLength) {
         throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlTagLimitExceeded' -Message (

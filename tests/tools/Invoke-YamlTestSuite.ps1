@@ -1,3 +1,7 @@
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSProvideCommentHelp', '',
+    Justification = 'Internal test helper functions in this tooling script.'
+)]
 [CmdletBinding()]
 param (
     [Parameter(Mandatory)]
@@ -23,7 +27,6 @@ if (-not $PSBoundParameters.ContainsKey('CompareJson') -and
 }
 
 function Invoke-InYamlModule {
-    [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
         [scriptblock] $ScriptBlock,
@@ -40,7 +43,6 @@ function Invoke-InYamlModule {
 }
 
 function Split-YamlSuiteJsonDocument {
-    [CmdletBinding()]
     param (
         [Parameter(Mandatory)]
         [AllowEmptyString()]
@@ -111,8 +113,6 @@ function Split-YamlSuiteJsonDocument {
 }
 
 function ConvertTo-YamlSuiteCanonicalValue {
-    [CmdletBinding()]
-    [OutputType([string])]
     param (
         [AllowNull()]
         [object] $Value
@@ -173,7 +173,6 @@ function ConvertTo-YamlSuiteCanonicalValue {
 }
 
 function ConvertTo-YamlSuiteReferenceSignature {
-    [CmdletBinding()]
     [OutputType([string])]
     param (
         [AllowNull()]
@@ -244,7 +243,6 @@ function ConvertTo-YamlSuiteReferenceSignature {
 }
 
 function Get-YamlSuiteJsonPolicyReason {
-    [CmdletBinding()]
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]
@@ -259,7 +257,6 @@ function Get-YamlSuiteJsonPolicyReason {
 }
 
 function ConvertFrom-YamlSuiteEventText {
-    [CmdletBinding()]
     [OutputType([string[]])]
     param (
         [Parameter(Mandatory)]
@@ -284,7 +281,7 @@ function ConvertFrom-YamlSuiteEventText {
         $builder.ToString()
     }
 
-    function ConvertFrom-YamlSuiteEventEscapes {
+    function ConvertFrom-YamlSuiteEventEscape {
         param ([AllowNull()][string] $Value)
         if ($null -eq $Value) {
             return ''
@@ -320,7 +317,7 @@ function ConvertFrom-YamlSuiteEventText {
     $lines = $Text -split '\r?\n'
 
     foreach ($rawLine in $lines) {
-    $line = $rawLine
+        $line = $rawLine
         if ([string]::IsNullOrWhiteSpace($line)) {
             continue
         }
@@ -385,7 +382,7 @@ function ConvertFrom-YamlSuiteEventText {
                     $value = ''
                 }
                 $value = ConvertTo-YamlSuiteEventEscapedText -Value (
-                    ConvertFrom-YamlSuiteEventEscapes -Value $value
+                    ConvertFrom-YamlSuiteEventEscape -Value $value
                 )
             }
 
@@ -426,7 +423,6 @@ function ConvertFrom-YamlSuiteEventText {
 }
 
 function ConvertTo-YamlSuiteActualEvent {
-    [CmdletBinding()]
     [OutputType([string[]])]
     param (
         [Parameter(Mandatory)]
@@ -533,7 +529,6 @@ function ConvertTo-YamlSuiteActualEvent {
 }
 
 function Compare-YamlSuiteCanonicalList {
-    [CmdletBinding()]
     [OutputType([bool])]
     param (
         [string[]] $Left,
@@ -552,7 +547,6 @@ function Compare-YamlSuiteCanonicalList {
 }
 
 function Get-YamlSuiteAnchorToken {
-    [CmdletBinding()]
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]

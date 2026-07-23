@@ -128,7 +128,7 @@ Describe 'Released yaml-test-suite corpus accounting' {
     }
 
     It 'keeps the previously failing multi-document JSON cases green' {
-        @(
+        $jsonRegressions = @(
             $suiteResults |
                 Where-Object Case -In @(
                     '35KP', '6XDY', '6ZKB', '7Z25', '9DXL',
@@ -136,6 +136,7 @@ Describe 'Released yaml-test-suite corpus accounting' {
                     'PUW8', 'RZT7', 'U9NS', 'UT92', 'W4TN'
                 ) |
                 Where-Object JsonResult -NE 'Pass'
-        ).Count | Should -Be 0
+        )
+        $jsonRegressions.Count | Should -Be 0
     }
 }
