@@ -1,7 +1,8 @@
 $artifactManifestOverride = $env:PSMODULE_YAML_TEST_ARTIFACT
 $yamlModule = $null
 if (-not [string]::IsNullOrWhiteSpace($artifactManifestOverride)) {
-    $yamlModule = Import-Module -Name $artifactManifestOverride -Force -Global -PassThru |
+    $yamlModule = Import-Module -Name $artifactManifestOverride -Force -Global -PassThru `
+        -ErrorAction Stop |
         Where-Object Name -EQ 'Yaml' |
         Select-Object -First 1
 }

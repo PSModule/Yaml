@@ -14,7 +14,10 @@ param()
 BeforeAll {
     $archivePath = Join-Path $PSScriptRoot 'fixtures\yaml-test-suite\yaml-test-suite-data-2022-01-17.zip'
     $sourcesPath = Join-Path $PSScriptRoot 'fixtures\yaml-test-suite\SOURCES.txt'
+    $repositoryRoot = Split-Path -Parent $PSScriptRoot
     $suitePath = Join-Path $TestDrive 'yaml-test-suite'
+    . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
+    $conformanceYamlModule = $yamlModule
     Expand-Archive -LiteralPath $archivePath -DestinationPath $suitePath
     $suiteRoots = @(
         Get-ChildItem -LiteralPath $suitePath -Directory
@@ -34,6 +37,18 @@ BeforeAll {
 }
 
 Describe 'Released yaml-test-suite corpus accounting' {
+    It 'uses the built module for conformance in GitHub Actions' {
+        if ($env:GITHUB_ACTIONS -eq 'true') {
+            $conformanceYamlModule | Should -Not -BeNullOrEmpty
+            $command = Get-Command -Name ConvertFrom-Yaml
+            $command.Module | Should -Be $conformanceYamlModule
+            $conformanceYamlModule.ModuleBase |
+                Should -Not -Be (Join-Path $repositoryRoot 'src')
+            $conformanceYamlModule.PowerShellVersion | Should -Be '7.6'
+            @($conformanceYamlModule.CompatiblePSEditions) | Should -Be @('Core')
+        }
+    }
+
     It 'uses the pinned unmodified release archive' {
         (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash |
             Should -Be '47C173AFFEB480517B30FB77DC8C76FD48609B9B65DD1C1D3D0D0BAEE48D6AA9'

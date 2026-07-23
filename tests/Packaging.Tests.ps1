@@ -22,7 +22,8 @@ BeforeAll {
     $loadedYamlModule = if (-not [string]::IsNullOrWhiteSpace(
             $env:PSMODULE_YAML_TEST_ARTIFACT
         )) {
-        Import-Module -Name $env:PSMODULE_YAML_TEST_ARTIFACT -Force -Global -PassThru |
+        Import-Module -Name $env:PSMODULE_YAML_TEST_ARTIFACT -Force -Global -PassThru `
+            -ErrorAction Stop |
             Where-Object Name -EQ 'Yaml' |
             Select-Object -First 1
     } else {
@@ -55,8 +56,17 @@ Describe 'Dependency-free package source' {
 
         $manifest.PowerShellVersion | Should -Be '7.6'
         @($manifest.CompatiblePSEditions) | Should -Be @('Core')
+        @($manifest.CompatiblePSEditions) | Should -Not -Contain 'Desktop'
         $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
+    }
+
+    It 'declares the generated artifact runtime once in module initialization' {
+        $requirementPath = Join-Path $repositoryRoot 'src\init\requirements.ps1'
+        $source = Get-Content -LiteralPath $requirementPath -Raw
+
+        $source | Should -Match '(?m)^#Requires -Version 7\.6\r?$'
+        $source | Should -Match '(?m)^#Requires -PSEdition Core\r?$'
     }
 
     It 'contains no external parser references or custom assembly loader' {
@@ -125,24 +135,38 @@ Describe 'Generated artifact package' {
 
         $manifest.PowerShellVersion | Should -Be '7.6'
         @($manifest.CompatiblePSEditions) | Should -Be @('Core')
+        @($manifest.CompatiblePSEditions) | Should -Not -Contain 'Desktop'
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
         $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
         @($manifest.FunctionsToExport | Sort-Object) |
             Should -Be @('ConvertFrom-Yaml', 'ConvertTo-Yaml', 'Test-Yaml')
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
+        $packagedFiles = @(
+            Get-ChildItem -Path $moduleBase -Recurse -File |
+                Where-Object FullName -NE $artifactManifestPath |
+                ForEach-Object {
+                    [System.IO.Path]::GetRelativePath($moduleBase, $_.FullName)
+                } |
+                Sort-Object
+        )
+        @($manifest.FileList | Sort-Object) | Should -Be $packagedFiles
         @($manifest.FileList | Where-Object { $_ -match '\.(?:dll|exe)$' }).Count | Should -Be 0
         @($manifest.FileList | Where-Object { $_ -match 'THIRD-PARTY|YamlDotNet' }).Count | Should -Be 0
+        @($manifest.PrivateData.PSData.Tags) | Should -Not -Contain 'PSEdition_Desktop'
         @(Get-ChildItem -Path $moduleBase -Recurse -File -Filter '*.dll').Count | Should -Be 0
         { Test-ModuleManifest -Path $artifactManifestPath } | Should -Not -Throw
     }
 
-    It 'imports in a fresh PowerShell 7 process and preserves arrays, aliases, and depth' `
+    It 'imports in a fresh PowerShell 7.6 Core process and preserves arrays, aliases, and depth' `
         -Skip:($skipArtifactTests -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
         $script = @'
 $ErrorActionPreference = 'Stop'
 $ps = $PSVersionTable.PSVersion
-if ($ps.Major -lt 7 -or ($ps.Major -eq 7 -and $ps.Minor -lt 6)) {
-    throw "Expected PowerShell 7.6+ but got $ps."
+if ($ps.Major -ne 7 -or $ps.Minor -ne 6) {
+    throw "Expected PowerShell 7.6.x but got $ps."
+}
+if ($PSVersionTable.PSEdition -cne 'Core') {
+    throw "Expected PowerShell Core but got $($PSVersionTable.PSEdition)."
 }
 Import-Module -Name '__MANIFEST__' -Force
 $value = 'v: []' | ConvertFrom-Yaml -AsHashtable
@@ -179,11 +203,15 @@ $deepYaml = ConvertTo-Yaml -InputObject $atLimit -Depth 128 -MaxNodes 300
 if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
     throw 'The public maximum serialization depth failed.'
 }
-'powershell-7-ok'
+"powershell-runtime=$ps;edition=$($PSVersionTable.PSEdition)"
 '@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
 
-        (& pwsh -NoLogo -NoProfile -Command $script) |
-            Should -Contain 'powershell-7-ok'
+        $output = @(& pwsh -NoLogo -NoProfile -Command $script)
+        $runtime = $output | Where-Object { $_ -like 'powershell-runtime=*' } |
+            Select-Object -Last 1
+
+        $runtime | Should -Match '^powershell-runtime=7\.6\.\d+;edition=Core$'
+        Write-Information -MessageData $runtime -InformationAction Continue
         $LASTEXITCODE | Should -Be 0
     }
 }
