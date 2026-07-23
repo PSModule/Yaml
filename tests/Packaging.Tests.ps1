@@ -104,13 +104,14 @@ Describe 'Dependency-free package source' {
         $configuration | Should -Not -Match '(?ms)Build:\s+Docs:\s+.*Skip:\s*true'
     }
 
-    It 'skips site build until zensical.toml is adopted' {
+    It 'uses zensical configuration and does not skip site build' {
         $configuration = Get-Content -Path (
             Join-Path $repositoryRoot '.github\PSModule.yml'
         ) -Raw
 
-        $configuration | Should -Match '(?ms)Build:\s+Site:\s+.*Skip:\s*true'
-        Test-Path -Path (Join-Path $repositoryRoot 'zensical.toml') | Should -BeFalse
+        $configuration | Should -Not -Match '(?ms)Build:\s+Site:\s+.*Skip:\s*true'
+        Test-Path -Path (Join-Path $repositoryRoot '.github\zensical.toml') | Should -BeTrue
+        Test-Path -Path (Join-Path $repositoryRoot '.github\mkdocs.yml') | Should -BeFalse
     }
 }
 
