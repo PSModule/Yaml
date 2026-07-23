@@ -70,7 +70,8 @@ function Read-YamlPlainScalar {
     while ($firstComment -lt 0 -and $Context.LineIndex -lt $Context.Lines.Count) {
         $line = $Context.Lines[$Context.LineIndex]
         $trimmed = $line.TrimStart(' ', "`t")
-        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+            (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
             break
         }
         if ($trimmed.Length -eq 0) {

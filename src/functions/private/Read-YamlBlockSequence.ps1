@@ -47,7 +47,8 @@ function Read-YamlBlockSequence {
         } else {
             $line = $Context.Lines[$Context.LineIndex]
             $trimmed = $line.TrimStart(' ', "`t")
-            if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+            if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+                (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
                 break
             }
             if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
@@ -80,7 +81,9 @@ function Read-YamlBlockSequence {
             } else {
                 $nextLine = $Context.Lines[$Context.LineIndex]
                 $nextIndent = Get-YamlIndent -Line $nextLine -LineNumber $Context.LineIndex -Context $Context
-                if ($nextIndent -le $Indent -or $nextLine -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+                if ($nextIndent -le $Indent -or
+                    $nextLine -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+                    (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
                     $mark = New-YamlMark -Index ($Context.LineStarts[$line] + $itemColumn) -Line $line `
                         -Column $itemColumn
                     $item = New-YamlEmptyScalar -Context $Context -Depth ($Depth + 1) -Mark $mark

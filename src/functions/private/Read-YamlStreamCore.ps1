@@ -45,13 +45,13 @@ function Read-YamlStreamCore {
         -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength `
         -MaxTagLength $MaxTagLength -MaxTotalTagLength $MaxTotalTagLength `
         -MaxNumericLength $MaxNumericLength
-    $text = $context.Text
     $lines = $context.Lines
     $lineStarts = $context.LineStarts
     $documents = [System.Collections.Generic.List[object]]::new()
     $implicitDocumentSeen = $false
 
     while ($context.LineIndex -lt $lines.Count) {
+        Read-YamlDocumentByteOrderMark -Context $context
         Skip-YamlBlockTrivia -Context $context
         if ($context.LineIndex -ge $lines.Count) {
             break
@@ -76,7 +76,8 @@ function Read-YamlStreamCore {
 
         if ($context.LineIndex -ge $lines.Count) {
             if ($directiveSeen) {
-                $mark = New-YamlMark -Index $text.Length -Line ([Math]::Max(0, $lines.Count - 1)) -Column 0
+                $mark = New-YamlMark -Index $context.Text.Length `
+                    -Line ([Math]::Max(0, $lines.Count - 1)) -Column 0
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlDirectiveWithoutDocument' -Message (
                         'YAML directives must be followed by an explicit document start marker.'
                     ))
@@ -113,7 +114,8 @@ function Read-YamlStreamCore {
                 $context.LineIndex++
                 Skip-YamlBlockTrivia -Context $context
                 if ($context.LineIndex -ge $lines.Count -or
-                    $lines[$context.LineIndex] -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+                    $lines[$context.LineIndex] -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+                    (Test-YamlDocumentByteOrderMark -Context $context -RequireDocumentStart)) {
                     $mark = New-YamlMark -Index ($lineStarts[$markerLine] + 3) -Line $markerLine -Column 3
                     $document = New-YamlEmptyScalar -Context $context -Depth 1 -Mark $mark
                 } else {
@@ -162,6 +164,8 @@ function Read-YamlStreamCore {
         }
         $documents.Add($document)
 
+        Skip-YamlBlockTrivia -Context $context
+        Read-YamlDocumentByteOrderMark -Context $context -RequireDocumentStart
         Skip-YamlBlockTrivia -Context $context
         $explicitEnd = $false
         if ($context.LineIndex -lt $lines.Count -and

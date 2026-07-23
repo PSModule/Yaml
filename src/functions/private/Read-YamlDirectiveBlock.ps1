@@ -30,6 +30,7 @@ function Read-YamlDirectiveBlock {
         $directive = $Context.Lines[$Context.LineIndex]
         $mark = New-YamlMark -Index $Context.LineStarts[$Context.LineIndex] `
             -Line $Context.LineIndex -Column 0
+        Assert-YamlNoByteOrderMark -Text $directive -Mark $mark
         if ($directive -cmatch '^%YAML(?:[ \t]|$)') {
             if ($yamlDirectiveSeen -or $directive -cnotmatch (
                     '^%YAML[ \t]+([0-9]+)\.([0-9]+)(?:[ \t]+#.*)?$'

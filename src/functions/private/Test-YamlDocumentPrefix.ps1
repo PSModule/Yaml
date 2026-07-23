@@ -11,7 +11,9 @@ function Test-YamlDocumentPrefix {
 
         [Parameter(Mandatory)]
         [ValidateRange(0, 2147483647)]
-        [int] $Index
+        [int] $Index,
+
+        [switch] $RequireDocumentStart
     )
 
     while ($Index -lt $Text.Length) {
@@ -29,8 +31,13 @@ function Test-YamlDocumentPrefix {
             $Index = $lineEnd + 1
             continue
         }
-        if ($line.StartsWith('%', [System.StringComparison]::Ordinal)) {
-            return $true
+        if ($line.StartsWith('%', [System.StringComparison]::Ordinal) -and
+            -not $RequireDocumentStart) {
+            if ($lineEnd -ge $Text.Length) {
+                return $false
+            }
+            $Index = $lineEnd + 1
+            continue
         }
         if (-not $line.StartsWith('---', [System.StringComparison]::Ordinal)) {
             return $false

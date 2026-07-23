@@ -207,14 +207,22 @@ folded: >
                 "${bom}%YAML 1.2`n---`none`n...`n${bom}# prefix comment`n`n---`ntwo" |
                     ConvertFrom-Yaml
             )
+            $implicitBoundaryDocuments = @(
+                "---`none`n${bom}# prefix comment`n---`ntwo" | ConvertFrom-Yaml
+            )
 
             $documents | Should -Be @('one', 'two')
+            $implicitBoundaryDocuments | Should -Be @('one', 'two')
             ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
             ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
             ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
             ("---`none`n...`n${bom}# comment`ntwo" | Test-Yaml) | Should -BeFalse
             ('"foo' + $bom + 'bar"' | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
             ("'foo${bom}bar'" | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
+            ("`"a`n${bom}%foo`nb`"" | ConvertFrom-Yaml) |
+                Should -Be "a ${bom}%foo b"
+            ("|-`n${bom}%foo" | Test-Yaml) | Should -BeFalse
+            ("%FOO before${bom}after`n---`nvalue" | Test-Yaml) | Should -BeFalse
         }
     }
 

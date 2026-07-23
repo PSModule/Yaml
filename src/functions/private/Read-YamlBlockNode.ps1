@@ -44,7 +44,8 @@ function Read-YamlBlockNode {
                 -HasUnknownTag $PendingUnknownTag -Anchor $PendingAnchor
         }
         $line = $Context.Lines[$Context.LineIndex]
-        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+            (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
             $mark = New-YamlMark -Index $Context.LineStarts[$Context.LineIndex] -Line $Context.LineIndex -Column 0
             return New-YamlEmptyScalar -Context $Context -Depth $Depth -Mark $mark -Tag $PendingTag `
                 -HasUnknownTag $PendingUnknownTag -Anchor $PendingAnchor
@@ -119,7 +120,8 @@ function Read-YamlBlockNode {
         $Context.LineIndex++
         Skip-YamlBlockTrivia -Context $Context
         if ($Context.LineIndex -ge $Context.Lines.Count -or
-            $Context.Lines[$Context.LineIndex] -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+            $Context.Lines[$Context.LineIndex] -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+            (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
             $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn) `
                 -Line $lineNumber -Column $contentColumn
             return New-YamlEmptyScalar -Context $Context -Depth $Depth -Mark $mark -Tag $tag `

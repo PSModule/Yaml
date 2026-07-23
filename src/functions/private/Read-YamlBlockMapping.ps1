@@ -49,7 +49,8 @@ function Read-YamlBlockMapping {
             $lineNumber = $Context.LineIndex
             $line = $Context.Lines[$lineNumber]
             $trimmed = $line.TrimStart(' ', "`t")
-            if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+            if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+                (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
                 break
             }
             if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {

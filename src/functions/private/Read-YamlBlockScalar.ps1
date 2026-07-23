@@ -97,10 +97,11 @@ function Read-YamlBlockScalar {
     $decodedLength = 0
     while ($Context.LineIndex -lt $Context.Lines.Count) {
         $line = $Context.Lines[$Context.LineIndex]
-        Assert-YamlNoByteOrderMark -Text $line -Mark $start
-        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+        if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)' -or
+            (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
             break
         }
+        Assert-YamlNoByteOrderMark -Text $line -Mark $start
         if ($Context.LineIndex -eq $Context.Lines.Count - 1 -and
             $line.Length -eq 0 -and
             $Context.Text.EndsWith("`n", [System.StringComparison]::Ordinal)) {
