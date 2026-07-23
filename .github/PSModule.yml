@@ -17,10 +17,10 @@ Test:
 #     MacOS:
 #       Skip: true
 Build:
-  Docs:
-    # PlatyPS loads a conflicting YamlDotNet assembly before importing this module.
+  Site:
+    # Process-PSModule v6.1.13 switched Build-Site to zensical.toml only.
+    # Keep site build off until this repository migrates from .github/mkdocs.yml.
     Skip: true
-
 Linter:
   env:
     VALIDATE_BIOME_FORMAT: false
