@@ -95,6 +95,10 @@ namespace YamlTests
     }
 
     function Get-YamlTestInfinitePipeline {
+        <#
+            .SYNOPSIS
+            Produces an unbounded stream for resource-limit tests.
+        #>
         param ([string] $Item = 'value')
 
         while ($true) {
@@ -316,7 +320,8 @@ Describe 'ConvertTo-Yaml' {
             $atLimit = [System.Collections.Specialized.OrderedDictionary]::new()
             $atLimit.Add(('x' * 1024), 'value')
             $overLimit = [System.Collections.Specialized.OrderedDictionary]::new()
-            $overLimit.Add(('😀' * 1025), [ordered]@{ nested = 'value' })
+            $overLimitKey = [char]::ConvertFromUtf32(0x1F600) * 1025
+            $overLimit.Add($overLimitKey, [ordered]@{ nested = 'value' })
 
             $atLimitYaml = ConvertTo-Yaml -InputObject $atLimit
             $overLimitYaml = ConvertTo-Yaml -InputObject $overLimit
@@ -326,8 +331,8 @@ Describe 'ConvertTo-Yaml' {
             $overLimitYaml | Should -Match '^\? '
             $overLimitYaml | Should -Match '(?m)^: $'
             ($overLimitYaml | Test-Yaml) | Should -BeTrue
-            $roundTrip.Contains(('😀' * 1025)) | Should -BeTrue
-            $roundTrip[('😀' * 1025)]['nested'] | Should -Be 'value'
+            $roundTrip.Contains($overLimitKey) | Should -BeTrue
+            $roundTrip[$overLimitKey]['nested'] | Should -Be 'value'
         }
 
         It 'uses explicit keys when rendered collection keys exceed 1024 values' {
@@ -546,9 +551,11 @@ Describe 'ConvertTo-Yaml' {
         It 'stops infinite pipelines at the first oversized scalar' {
             $script:YamlTestPipelineCount = 0
 
-            { Get-YamlTestInfinitePipeline -Item 'long' |
-                    ConvertTo-Yaml -MaxScalarLength 3 } |
-                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            $conversion = {
+                Get-YamlTestInfinitePipeline -Item 'long' |
+                    ConvertTo-Yaml -MaxScalarLength 3
+            }
+            $conversion | Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
             $script:YamlTestPipelineCount | Should -Be 1
         }
 
