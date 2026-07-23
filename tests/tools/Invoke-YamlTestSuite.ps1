@@ -11,7 +11,8 @@ param (
     [switch] $CompareJson,
     [switch] $CompareEvents,
     [switch] $CompareOutYaml,
-    [switch] $CompareEmitRoundTrip
+    [switch] $CompareEmitYaml,
+    [switch] $CompareSelfRoundTrip
 )
 
 . (Join-Path $PSScriptRoot '..\TestBootstrap.ps1')
@@ -19,11 +20,13 @@ param (
 if (-not $PSBoundParameters.ContainsKey('CompareJson') -and
     -not $PSBoundParameters.ContainsKey('CompareEvents') -and
     -not $PSBoundParameters.ContainsKey('CompareOutYaml') -and
-    -not $PSBoundParameters.ContainsKey('CompareEmitRoundTrip')) {
+    -not $PSBoundParameters.ContainsKey('CompareEmitYaml') -and
+    -not $PSBoundParameters.ContainsKey('CompareSelfRoundTrip')) {
     $CompareJson = $true
     $CompareEvents = $true
     $CompareOutYaml = $true
-    $CompareEmitRoundTrip = $true
+    $CompareEmitYaml = $true
+    $CompareSelfRoundTrip = $true
 }
 
 function Invoke-InYamlModule {
@@ -754,6 +757,12 @@ $projectYamlSuiteText = {
     }
     New-YamlValueBox -Value ([object[]] $values.ToArray())
 }
+$testYamlSuiteText = {
+    param ([string] $YamlText)
+    Test-Yaml -Yaml $YamlText -Depth 128 -MaxNodes 100000 -MaxAliases 1000 `
+        -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
+        -MaxNumericLength 4096
+}
 
 $suiteRoot = (Resolve-Path -LiteralPath $Path).Path
 $inputFiles = @(
@@ -791,8 +800,10 @@ foreach ($inputFile in $inputFiles) {
     $jsonReason = ''
     $outYamlResult = 'NotApplicable'
     $outYamlReason = ''
-    $emitResult = 'NotApplicable'
-    $emitReason = ''
+    $emitYamlResult = 'NotApplicable'
+    $emitYamlReason = ''
+    $selfRoundTripResult = 'NotApplicable'
+    $selfRoundTripReason = ''
 
     $representation = $null
     $stream = $null
@@ -807,8 +818,12 @@ foreach ($inputFile in $inputFiles) {
     $jsonActual = $null
     $outYamlCanonical = $null
     $outYamlReference = $null
-    $emitCanonical = $null
-    $emitReference = $null
+    $emitYamlExpected = $null
+    $emitYamlActual = $null
+    $emitYamlExpectedReference = $null
+    $emitYamlActualReference = $null
+    $selfRoundTripCanonical = $null
+    $selfRoundTripReference = $null
 
     try {
         $representation = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation -Arguments @($yaml)
@@ -920,10 +935,12 @@ foreach ($inputFile in $inputFiles) {
     }
 
     if ($CompareOutYaml -and $hasOutYaml) {
-        if ($null -eq $stream -or $expectsError -or $syntaxResult -eq 'PolicyDifference' -or
+        if ($syntaxResult -eq 'PolicyDifference') {
+            $outYamlResult = 'PolicyDifference'
+            $outYamlReason = $syntaxReason
+        } elseif ($null -eq $stream -or $expectsError -or
             $null -eq $projectedValues) {
             $outYamlResult = 'NotApplicable'
-            if ($syntaxResult -eq 'PolicyDifference') { $outYamlReason = $syntaxReason }
             if ($projectionError) { $outYamlReason = $projectionError }
         } else {
             $outYaml = [System.IO.File]::ReadAllText($outYamlPath, [System.Text.UTF8Encoding]::new($false, $true))
@@ -954,16 +971,96 @@ foreach ($inputFile in $inputFiles) {
         }
     }
 
-    if ($CompareEmitRoundTrip) {
-        if ($null -eq $stream -or $expectsError) {
-            $emitResult = 'NotApplicable'
-            if ($expectsError) { $emitReason = 'InvalidSyntax' }
+    if ($CompareEmitYaml -and $hasEmitYaml) {
+        try {
+            $emitYaml = [System.IO.File]::ReadAllText(
+                $emitYamlPath,
+                [System.Text.UTF8Encoding]::new($false, $true)
+            )
+            $isValidFixture = Invoke-InYamlModule -ScriptBlock $testYamlSuiteText `
+                -Arguments @($emitYaml)
+            if (-not $isValidFixture) {
+                $emitYamlResult = 'Fail'
+                $emitYamlReason = 'EmitYamlInvalid'
+            } else {
+                $fixtureValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
+                        -Arguments @($emitYaml)).Value
+                $fixtureCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                    -Value ([object[]] $fixtureValues)
+                $fixtureReference = ConvertTo-YamlSuiteReferenceSignature `
+                    -Value ([object[]] $fixtureValues)
+
+                if ($null -ne $projectedCanonical -and
+                    ($fixtureCanonical -cne $projectedCanonical -or
+                    $fixtureReference -cne $projectedReference)) {
+                    $emitYamlResult = 'Fail'
+                    $emitYamlReason = 'EmitYamlRepresentationMismatch'
+                    $emitYamlExpected = $projectedCanonical
+                    $emitYamlActual = $fixtureCanonical
+                    $emitYamlExpectedReference = $projectedReference
+                    $emitYamlActualReference = $fixtureReference
+                } else {
+                    $fixtureEmittedDocuments = [System.Collections.Generic.List[string]]::new()
+                    foreach ($fixtureValue in $fixtureValues) {
+                        $fixtureEmitted = Invoke-InYamlModule -ScriptBlock {
+                            param ($InputValue)
+                            ConvertTo-Yaml -InputObject $InputValue -ExplicitDocumentStart
+                        } -Arguments (, $fixtureValue)
+                        $fixtureEmittedDocuments.Add([string] $fixtureEmitted)
+                    }
+                    $fixtureEmittedText = $fixtureEmittedDocuments.ToArray() -join "`n"
+                    $isValidFixtureEmit = Invoke-InYamlModule `
+                        -ScriptBlock $testYamlSuiteText -Arguments @($fixtureEmittedText)
+                    if (-not $isValidFixtureEmit) {
+                        $emitYamlResult = 'Fail'
+                        $emitYamlReason = 'EmittedYamlInvalid'
+                    } else {
+                        $fixtureRoundTripValues = (
+                            Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
+                                -Arguments @($fixtureEmittedText)
+                        ).Value
+                        $fixtureRoundCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                            -Value ([object[]] $fixtureRoundTripValues)
+                        $fixtureRoundReference = ConvertTo-YamlSuiteReferenceSignature `
+                            -Value ([object[]] $fixtureRoundTripValues)
+                        $emitYamlExpected = $fixtureCanonical
+                        $emitYamlActual = $fixtureRoundCanonical
+                        $emitYamlExpectedReference = $fixtureReference
+                        $emitYamlActualReference = $fixtureRoundReference
+                    }
+                    if ($emitYamlResult -ne 'Fail' -and
+                        $fixtureRoundCanonical -ceq $fixtureCanonical -and
+                        $fixtureRoundReference -ceq $fixtureReference) {
+                        $emitYamlResult = 'Pass'
+                    } elseif ($emitYamlResult -ne 'Fail') {
+                        $emitYamlResult = 'Fail'
+                        $emitYamlReason = 'EmitYamlRoundTripMismatch'
+                    }
+                }
+            }
+        } catch [System.NotSupportedException] {
+            $emitYamlResult = 'Fail'
+            $emitYamlReason = 'UnsupportedEmissionType'
+        } catch {
+            if ($_.Exception.Data.Contains('IsYamlException')) {
+                $emitYamlResult = 'Fail'
+                $emitYamlReason = [string] $_.Exception.Data['YamlErrorId']
+            } else {
+                throw
+            }
+        }
+    }
+
+    if ($CompareSelfRoundTrip) {
+        if ($syntaxResult -eq 'PolicyDifference') {
+            $selfRoundTripResult = 'PolicyDifference'
+            $selfRoundTripReason = $syntaxReason
+        } elseif ($null -eq $stream -or $expectsError) {
+            $selfRoundTripResult = 'NotApplicable'
+            if ($expectsError) { $selfRoundTripReason = 'InvalidSyntax' }
         } elseif ($projectionError) {
-            $emitResult = 'Fail'
-            $emitReason = $projectionError
-        } elseif ($syntaxResult -eq 'PolicyDifference') {
-            $emitResult = 'PolicyDifference'
-            $emitReason = $syntaxReason
+            $selfRoundTripResult = 'Fail'
+            $selfRoundTripReason = $projectionError
         } else {
             try {
                 $emittedDocuments = [System.Collections.Generic.List[string]]::new()
@@ -975,36 +1072,32 @@ foreach ($inputFile in $inputFiles) {
                     $emittedDocuments.Add([string] $emitted)
                 }
                 $emittedText = ($emittedDocuments.ToArray() -join "`n")
-                $isValidEmit = Invoke-InYamlModule -ScriptBlock {
-                    param ($YamlText)
-                    Test-Yaml -Yaml $YamlText -Depth 128 -MaxNodes 100000 -MaxAliases 1000 `
-                        -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
-                        -MaxNumericLength 4096
-                } -Arguments @($emittedText)
+                $isValidEmit = Invoke-InYamlModule -ScriptBlock $testYamlSuiteText `
+                    -Arguments @($emittedText)
                 if (-not $isValidEmit) {
-                    $emitResult = 'Fail'
-                    $emitReason = 'EmittedYamlInvalid'
+                    $selfRoundTripResult = 'Fail'
+                    $selfRoundTripReason = 'EmittedYamlInvalid'
                 } else {
                     $roundTripValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
                             -Arguments @($emittedText)).Value
                     $roundCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $roundTripValues)
                     $roundReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $roundTripValues)
-                    $emitCanonical = $roundCanonical
-                    $emitReference = $roundReference
+                    $selfRoundTripCanonical = $roundCanonical
+                    $selfRoundTripReference = $roundReference
                     if ($roundCanonical -ceq $projectedCanonical -and $roundReference -ceq $projectedReference) {
-                        $emitResult = 'Pass'
+                        $selfRoundTripResult = 'Pass'
                     } else {
-                        $emitResult = 'Fail'
-                        $emitReason = 'EmitRoundTripMismatch'
+                        $selfRoundTripResult = 'Fail'
+                        $selfRoundTripReason = 'SelfRoundTripMismatch'
                     }
                 }
             } catch [System.NotSupportedException] {
-                $emitResult = 'Fail'
-                $emitReason = 'UnsupportedEmissionType'
+                $selfRoundTripResult = 'Fail'
+                $selfRoundTripReason = 'UnsupportedEmissionType'
             } catch {
                 if ($_.Exception.Data.Contains('IsYamlException')) {
-                    $emitResult = 'Fail'
-                    $emitReason = [string] $_.Exception.Data['YamlErrorId']
+                    $selfRoundTripResult = 'Fail'
+                    $selfRoundTripReason = [string] $_.Exception.Data['YamlErrorId']
                 } else {
                     throw
                 }
@@ -1013,31 +1106,37 @@ foreach ($inputFile in $inputFiles) {
     }
 
     [pscustomobject]@{
-        Case            = $casePath
-        ExpectsError    = $expectsError
-        HasJson         = $hasJson
-        HasEvent        = $hasEvent
-        HasOutYaml      = $hasOutYaml
-        HasEmitYaml     = $hasEmitYaml
-        SyntaxResult    = $syntaxResult
-        SyntaxReason    = $syntaxReason
-        EventResult     = $eventResult
-        EventReason     = $eventReason
-        JsonResult      = $jsonResult
-        JsonReason      = $jsonReason
-        OutYamlResult   = $outYamlResult
-        OutYamlReason   = $outYamlReason
-        EmitResult      = $emitResult
-        EmitReason      = $emitReason
-        EventExpected   = $eventExpected
-        EventActual     = $eventActual
-        JsonExpected    = $jsonExpected
-        JsonActual      = $jsonActual
-        OutYamlActual   = $outYamlCanonical
-        OutYamlRefs     = $outYamlReference
-        EmitActual      = $emitCanonical
-        EmitReferences  = $emitReference
-        ProjectedActual = $projectedCanonical
-        ProjectedRefs   = $projectedReference
+        Case                 = $casePath
+        ExpectsError         = $expectsError
+        HasJson              = $hasJson
+        HasEvent             = $hasEvent
+        HasOutYaml           = $hasOutYaml
+        HasEmitYaml          = $hasEmitYaml
+        SyntaxResult         = $syntaxResult
+        SyntaxReason         = $syntaxReason
+        EventResult          = $eventResult
+        EventReason          = $eventReason
+        JsonResult           = $jsonResult
+        JsonReason           = $jsonReason
+        OutYamlResult        = $outYamlResult
+        OutYamlReason        = $outYamlReason
+        EmitYamlResult       = $emitYamlResult
+        EmitYamlReason       = $emitYamlReason
+        SelfRoundTripResult  = $selfRoundTripResult
+        SelfRoundTripReason  = $selfRoundTripReason
+        EventExpected        = $eventExpected
+        EventActual          = $eventActual
+        JsonExpected         = $jsonExpected
+        JsonActual           = $jsonActual
+        OutYamlActual        = $outYamlCanonical
+        OutYamlRefs          = $outYamlReference
+        EmitYamlExpected     = $emitYamlExpected
+        EmitYamlActual       = $emitYamlActual
+        EmitYamlExpectedRefs = $emitYamlExpectedReference
+        EmitYamlActualRefs   = $emitYamlActualReference
+        SelfRoundTripActual  = $selfRoundTripCanonical
+        SelfRoundTripRefs    = $selfRoundTripReference
+        ProjectedActual      = $projectedCanonical
+        ProjectedRefs        = $projectedReference
     }
 }

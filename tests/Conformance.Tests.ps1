@@ -33,7 +33,8 @@ BeforeAll {
             -CompareJson `
             -CompareEvents `
             -CompareOutYaml `
-            -CompareEmitRoundTrip
+            -CompareEmitYaml `
+            -CompareSelfRoundTrip
     )
     $emptySuitePath = Join-Path $TestDrive 'empty-suite'
     $null = New-Item -Path $emptySuitePath -ItemType Directory
@@ -235,19 +236,57 @@ ship-to:
     It 'accounts for out.yaml representation comparisons' {
         @($suiteResults | Where-Object OutYamlResult -EQ 'Pass').Count | Should -Be 241
         @($suiteResults | Where-Object OutYamlResult -EQ 'PolicyDifference').Count |
-            Should -Be 0
+            Should -Be 1
         @($suiteResults | Where-Object OutYamlResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object OutYamlResult -EQ 'NotApplicable').Count |
-            Should -Be 161
+            Should -Be 160
+        $outPolicy = $suiteResults | Where-Object OutYamlResult -EQ 'PolicyDifference'
+        $outPolicy.Case | Should -Be 'X38W'
+        $outPolicy.OutYamlReason | Should -Be 'RepresentationMappingKeyUniqueness'
     }
 
-    It 'accounts for emitter and round-trip comparisons' {
-        @($suiteResults | Where-Object EmitResult -EQ 'Pass').Count | Should -Be 306
-        @($suiteResults | Where-Object EmitResult -EQ 'PolicyDifference').Count |
+    It 'validates the 55 official emit.yaml fixtures separately' {
+        @($suiteResults | Where-Object HasEmitYaml).Count | Should -Be 55
+        @($suiteResults | Where-Object EmitYamlResult -EQ 'Pass').Count | Should -Be 55
+        @($suiteResults | Where-Object EmitYamlResult -EQ 'PolicyDifference').Count |
             Should -Be 0
-        @($suiteResults | Where-Object EmitResult -EQ 'Fail').Count | Should -Be 0
-        @($suiteResults | Where-Object EmitResult -EQ 'NotApplicable').Count |
-            Should -Be 96
+        @($suiteResults | Where-Object EmitYamlResult -EQ 'Fail').Count | Should -Be 0
+        @($suiteResults | Where-Object EmitYamlResult -EQ 'NotApplicable').Count |
+            Should -Be 347
+    }
+
+    It 'reads official emit.yaml content rather than counting its presence' {
+        $mutatedSuitePath = Join-Path $TestDrive 'mutated-emit-fixture'
+        $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force
+        Copy-Item -LiteralPath (Join-Path $suiteDataPath '2LFX') `
+            -Destination $mutatedSuitePath -Recurse
+        '--- altered' | Set-Content `
+            -LiteralPath (Join-Path $mutatedSuitePath '2LFX\emit.yaml') `
+            -Encoding utf8NoBOM
+
+        $mutatedResult = & $runnerPath -Path $mutatedSuitePath -CompareEmitYaml
+
+        $mutatedResult.EmitYamlResult | Should -Be 'Fail'
+        $mutatedResult.EmitYamlReason | Should -Be 'EmitYamlRepresentationMismatch'
+    }
+
+    It 'accounts honestly for general module self-round-trips' {
+        @($suiteResults | Where-Object SelfRoundTripResult -EQ 'Pass').Count |
+            Should -Be 306
+        @($suiteResults | Where-Object SelfRoundTripResult -EQ 'PolicyDifference').Count |
+            Should -Be 2
+        @($suiteResults | Where-Object SelfRoundTripResult -EQ 'Fail').Count |
+            Should -Be 0
+        @($suiteResults | Where-Object SelfRoundTripResult -EQ 'NotApplicable').Count |
+            Should -Be 94
+        $policyResults = @(
+            $suiteResults |
+                Where-Object SelfRoundTripResult -EQ 'PolicyDifference' |
+                Sort-Object Case
+        )
+        @($policyResults.Case) | Should -Be @('2JQS', 'X38W')
+        @($policyResults.SelfRoundTripReason | Select-Object -Unique) |
+            Should -Be @('RepresentationMappingKeyUniqueness')
     }
 
     It 'keeps the previously failing multi-document JSON cases green' {

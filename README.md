@@ -175,20 +175,24 @@ The archive contains 402 inputs:
 | Syntax and composition | 400 | 2 | 0 | 0 |
 | Representation events | 308 | 0 | 0 | 94 |
 | JSON projection | 277 | 2 | 0 | 123 |
-| `out.yaml` projection | 241 | 0 | 0 | 161 |
-| Emit and round trip | 306 | 0 | 0 | 96 |
+| `out.yaml` projection | 241 | 1 | 0 | 160 |
+| Official `emit.yaml` fixtures | 55 | 0 | 0 | 347 |
+| Module self-round-trip | 306 | 2 | 0 | 94 |
 
 All 94 fixtures marked invalid are rejected. The valid `2JQS` and `X38W`
 inputs are syntactically recognized and produce matching representation
 events, then are rejected during load validation because representation
-mapping keys must be unique. They are not unsupported grammar.
+mapping keys must be unique. They are not unsupported grammar. Both are
+reported as policy differences for module self-round-trip; `X38W`, the one
+case with an `out.yaml` fixture, is also reported that way on that surface.
 
 The two JSON projection differences are `565N`, where `!!binary` intentionally
 becomes `byte[]` instead of a Base64 string, and `J7PZ`, where legacy `!!omap`
 intentionally becomes `System.Collections.Specialized.OrderedDictionary`
 instead of remaining a sequence of one-entry mappings. No event mismatch is
-classified as policy. The deterministic runner reports no unexplained
-failures.
+classified as policy. All 55 official `emit.yaml` fixtures are read and
+validated independently of the 402-input module self-round-trip. The
+deterministic runner reports no unexplained failures.
 
 These results are a pinned compatibility measurement, not a claim that a finite
 corpus proves complete YAML 1.2.2 compliance.
