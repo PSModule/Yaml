@@ -97,7 +97,7 @@ function Resolve-YamlTag {
     )
 
     [pscustomobject]@{
-        Tag       = if ($known) { $expanded } else { '' }
+        Tag       = $expanded
         IsUnknown = -not $known
     }
 }

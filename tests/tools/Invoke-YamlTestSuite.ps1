@@ -277,13 +277,61 @@ function ConvertFrom-YamlSuiteEventText {
         [string] $Text
     )
 
+    function ConvertTo-YamlSuiteEventEscapedText {
+        param ([AllowNull()][string] $Value)
+        if ($null -eq $Value) {
+            return ''
+        }
+        $builder = [System.Text.StringBuilder]::new()
+        foreach ($character in $Value.ToCharArray()) {
+            switch ($character) {
+                '\' { [void] $builder.Append('\\') }
+                "`n" { [void] $builder.Append('\n') }
+                "`r" { [void] $builder.Append('\r') }
+                "`t" { [void] $builder.Append('\t') }
+                default { [void] $builder.Append($character) }
+            }
+        }
+        $builder.ToString()
+    }
+
+    function ConvertFrom-YamlSuiteEventEscapes {
+        param ([AllowNull()][string] $Value)
+        if ($null -eq $Value) {
+            return ''
+        }
+        $builder = [System.Text.StringBuilder]::new()
+        $index = 0
+        while ($index -lt $Value.Length) {
+            $current = $Value[$index]
+            if ($current -eq '\' -and $index + 1 -lt $Value.Length) {
+                $index++
+                switch ($Value[$index]) {
+                    'n' { [void] $builder.Append("`n") }
+                    'r' { [void] $builder.Append("`r") }
+                    't' { [void] $builder.Append("`t") }
+                    'b' { [void] $builder.Append("`b") }
+                    '\' { [void] $builder.Append('\') }
+                    default {
+                        [void] $builder.Append($Value[$index])
+                    }
+                }
+                $index++
+                continue
+            }
+            [void] $builder.Append($current)
+            $index++
+        }
+        $builder.ToString()
+    }
+
     $anchorMap = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
     $anchorCounter = 0
     $canonical = [System.Collections.Generic.List[string]]::new()
     $lines = $Text -split '\r?\n'
 
     foreach ($rawLine in $lines) {
-        $line = $rawLine.Trim()
+    $line = $rawLine
         if ([string]::IsNullOrWhiteSpace($line)) {
             continue
         }
@@ -305,8 +353,14 @@ function ConvertFrom-YamlSuiteEventText {
             $anchor = ''
             $tag = ''
             $value = ''
+            $style = ''
 
             while ($rest.Length -gt 0) {
+                if ($rest.StartsWith('[]', [System.StringComparison]::Ordinal) -or
+                    $rest.StartsWith('{}', [System.StringComparison]::Ordinal)) {
+                    $rest = $rest.Substring(2).TrimStart()
+                    continue
+                }
                 if ($rest[0] -eq '&') {
                     $space = $rest.IndexOf(' ')
                     if ($space -lt 0) {
@@ -330,11 +384,20 @@ function ConvertFrom-YamlSuiteEventText {
             }
 
             if ($prefix -eq '=VAL') {
-                if ($rest.Length -gt 0 -and ($rest[0] -eq ':' -or $rest[0] -eq '"' -or $rest[0] -eq "'")) {
+                if ($rest.Length -gt 0 -and
+                    ($rest[0] -eq ':' -or $rest[0] -eq '"' -or $rest[0] -eq "'" -or
+                    $rest[0] -eq '|' -or $rest[0] -eq '>')) {
+                    $style = [string] $rest[0]
                     $value = $rest.Substring(1)
                 } else {
                     $value = $rest
                 }
+                if ($style -in @('|', '>') -and [string]::IsNullOrEmpty($value)) {
+                    $value = ''
+                }
+                $value = ConvertTo-YamlSuiteEventEscapedText -Value (
+                    ConvertFrom-YamlSuiteEventEscapes -Value $value
+                )
             }
 
             $anchorToken = ''
@@ -347,7 +410,7 @@ function ConvertFrom-YamlSuiteEventText {
             }
             $parts = [System.Collections.Generic.List[string]]::new()
             $parts.Add($prefix)
-            if ($tag) { $parts.Add("tag=$tag") }
+            if ($tag -and $tag -ne '!') { $parts.Add("tag=$tag") }
             if ($anchorToken) { $parts.Add("anchor=$anchorToken") }
             if ($prefix -eq '=VAL') { $parts.Add("value=$value") }
             $canonical.Add(($parts -join '|'))
@@ -382,20 +445,30 @@ function ConvertTo-YamlSuiteActualEvent {
         [object[]] $Documents
     )
 
-    $anchorMap = [System.Collections.Generic.Dictionary[int, string]]::new()
+    function ConvertTo-YamlSuiteEventEscapedText {
+        param ([AllowNull()][string] $Value)
+        if ($null -eq $Value) {
+            return ''
+        }
+        $builder = [System.Text.StringBuilder]::new()
+        foreach ($character in $Value.ToCharArray()) {
+            switch ($character) {
+                '\' { [void] $builder.Append('\\') }
+                "`n" { [void] $builder.Append('\n') }
+                "`r" { [void] $builder.Append('\r') }
+                "`t" { [void] $builder.Append('\t') }
+                default { [void] $builder.Append($character) }
+            }
+        }
+        $builder.ToString()
+    }
+
+    $anchorMap = [System.Collections.Generic.Dictionary[string, string]]::new(
+        [System.StringComparer]::Ordinal
+    )
     $anchorCounter = 0
     $events = [System.Collections.Generic.List[string]]::new()
     $events.Add('+STR')
-
-    $getAnchor = {
-        param ([pscustomobject] $Node)
-        if ($null -eq $Node) { return '' }
-        if (-not $anchorMap.ContainsKey($Node.Id)) {
-            $anchorCounter++
-            $anchorMap[$Node.Id] = 'a{0:d3}' -f $anchorCounter
-        }
-        return $anchorMap[$Node.Id]
-    }
 
     foreach ($document in $Documents) {
         $events.Add('+DOC')
@@ -411,16 +484,29 @@ function ConvertTo-YamlSuiteActualEvent {
 
             $node = $frame.Node
             if ($node.Kind -eq 'Alias') {
-                $targetAnchor = & $getAnchor $node.Target
+                $targetAnchorKey = if ([string]::IsNullOrEmpty($node.Target.Anchor)) {
+                    'id:{0}' -f $node.Target.Id
+                } else {
+                    $node.Target.Anchor
+                }
+                $targetAnchor = Get-YamlSuiteAnchorToken -Key $targetAnchorKey `
+                    -AnchorMap $anchorMap -AnchorCounter ([ref] $anchorCounter)
                 $events.Add("=ALI|target=$targetAnchor")
                 continue
             }
             if ($node.Kind -eq 'Scalar') {
                 $parts = [System.Collections.Generic.List[string]]::new()
                 $parts.Add('=VAL')
-                if ($node.Tag) { $parts.Add("tag=$($node.Tag)") }
-                if ($node.Anchor) { $parts.Add("anchor=$(& $getAnchor $node)") }
-                $parts.Add(("value={0}" -f [string] $node.Value))
+                if ($node.Tag -and $node.Tag -ne '!') { $parts.Add("tag=$($node.Tag)") }
+                if ($node.Anchor) {
+                    $parts.Add("anchor=$(
+                            Get-YamlSuiteAnchorToken -Key $node.Anchor -AnchorMap $anchorMap `
+                                -AnchorCounter ([ref] $anchorCounter)
+                        )")
+                }
+                $parts.Add(("value={0}" -f (
+                            ConvertTo-YamlSuiteEventEscapedText -Value ([string] $node.Value)
+                        )))
                 $events.Add(($parts -join '|'))
                 continue
             }
@@ -428,8 +514,13 @@ function ConvertTo-YamlSuiteActualEvent {
             $startParts = [System.Collections.Generic.List[string]]::new()
             $startToken = if ($node.Kind -eq 'Sequence') { '+SEQ' } else { '+MAP' }
             $startParts.Add($startToken)
-            if ($node.Tag) { $startParts.Add("tag=$($node.Tag)") }
-            if ($node.Anchor) { $startParts.Add("anchor=$(& $getAnchor $node)") }
+            if ($node.Tag -and $node.Tag -ne '!') { $startParts.Add("tag=$($node.Tag)") }
+            if ($node.Anchor) {
+                $startParts.Add("anchor=$(
+                        Get-YamlSuiteAnchorToken -Key $node.Anchor -AnchorMap $anchorMap `
+                            -AnchorCounter ([ref] $anchorCounter)
+                    )")
+            }
             $events.Add(($startParts -join '|'))
 
             if ($node.Kind -eq 'Sequence') {
@@ -471,6 +562,27 @@ function Compare-YamlSuiteCanonicalList {
     return $true
 }
 
+function Get-YamlSuiteAnchorToken {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param (
+        [Parameter(Mandatory)]
+        [string] $Key,
+
+        [Parameter(Mandatory)]
+        [System.Collections.Generic.Dictionary[string, string]] $AnchorMap,
+
+        [Parameter(Mandatory)]
+        [ref] $AnchorCounter
+    )
+
+    if (-not $AnchorMap.ContainsKey($Key)) {
+        $AnchorCounter.Value++
+        $AnchorMap[$Key] = 'a{0:d3}' -f $AnchorCounter.Value
+    }
+    $AnchorMap[$Key]
+}
+
 $readYamlSuiteRepresentation = {
     param ([string] $YamlText)
     Read-YamlStreamCore -Yaml $YamlText -Depth 128 -MaxNodes 100000 `
@@ -487,6 +599,19 @@ $projectYamlSuiteStream = {
     param ([object[]] $Nodes)
     $values = [System.Collections.Generic.List[object]]::new()
     foreach ($node in $Nodes) {
+        $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
+        $values.Add((ConvertFrom-YamlNode -Node $node -Cache $cache -AsHashtable).Value)
+    }
+    New-YamlValueBox -Value ([object[]] $values.ToArray())
+}
+$projectYamlSuiteText = {
+    param ([string] $YamlText)
+
+    $stream = Read-YamlStream -Yaml $YamlText -Depth 128 -MaxNodes 100000 `
+        -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 `
+        -MaxTotalTagLength 65536 -MaxNumericLength 4096
+    $values = [System.Collections.Generic.List[object]]::new()
+    foreach ($node in $stream.Value) {
         $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
         $values.Add((ConvertFrom-YamlNode -Node $node -Cache $cache -AsHashtable).Value)
     }
@@ -711,7 +836,7 @@ foreach ($inputFile in $inputFiles) {
                     $emitted = Invoke-InYamlModule -ScriptBlock {
                         param ($InputValue)
                         ConvertTo-Yaml -InputObject $InputValue -ExplicitDocumentStart
-                    } -Arguments @($value)
+                    } -Arguments (, $value)
                     $emittedDocuments.Add([string] $emitted)
                 }
                 $emittedText = ($emittedDocuments.ToArray() -join "`n")
@@ -725,14 +850,8 @@ foreach ($inputFile in $inputFiles) {
                     $emitResult = 'Fail'
                     $emitReason = 'EmittedYamlInvalid'
                 } else {
-                    $roundTripValues = @(
-                        Invoke-InYamlModule -ScriptBlock {
-                            param ($YamlText)
-                            ConvertFrom-Yaml -Yaml $YamlText -AsHashtable -NoEnumerate -Depth 128 `
-                                -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 `
-                                -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
-                        } -Arguments @($emittedText)
-                    )
+                    $roundTripValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
+                            -Arguments @($emittedText)).Value
                     $roundCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $roundTripValues)
                     $roundReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $roundTripValues)
                     $emitCanonical = $roundCanonical
@@ -789,5 +908,7 @@ foreach ($inputFile in $inputFiles) {
         OutYamlActual   = $outYamlCanonical
         EmitActual      = $emitCanonical
         EmitReferences  = $emitReference
+        ProjectedActual = $projectedCanonical
+        ProjectedRefs   = $projectedReference
     }
 }
