@@ -812,6 +812,8 @@ foreach ($inputFile in $inputFiles) {
     $projectedJsonCanonical = $null
     $projectedReference = ''
     $projectionError = ''
+    $jsonOracleValues = $null
+    $jsonOracleCanonical = $null
     $eventExpected = $null
     $eventActual = $null
     $jsonExpected = $null
@@ -879,6 +881,19 @@ foreach ($inputFile in $inputFiles) {
         }
     }
 
+    if ($hasJson -and ($CompareJson -or ($CompareEmitYaml -and $hasEmitYaml))) {
+        $expectedDocuments = Split-YamlSuiteJsonDocument -Text (
+            [System.IO.File]::ReadAllText($jsonPath, [System.Text.UTF8Encoding]::new($false, $true))
+        )
+        $expectedValues = [System.Collections.Generic.List[object]]::new()
+        foreach ($document in $expectedDocuments) {
+            $expectedValues.Add((ConvertFrom-Json -InputObject $document -AsHashtable -NoEnumerate))
+        }
+        $jsonOracleValues = [object[]] $expectedValues.ToArray()
+        $jsonOracleCanonical = ConvertTo-YamlSuiteCanonicalValue `
+            -Value $jsonOracleValues -SortMappings
+    }
+
     if ($CompareEvents -and $hasEvent) {
         if ($null -eq $representation -or $expectsError) {
             $eventResult = 'NotApplicable'
@@ -906,22 +921,13 @@ foreach ($inputFile in $inputFiles) {
             if ($syntaxResult -eq 'PolicyDifference') { $jsonReason = $syntaxReason }
             if ($projectionError) { $jsonReason = $projectionError }
         } else {
-            $expectedDocuments = Split-YamlSuiteJsonDocument -Text (
-                [System.IO.File]::ReadAllText($jsonPath, [System.Text.UTF8Encoding]::new($false, $true))
-            )
-            $expectedValues = [System.Collections.Generic.List[object]]::new()
-            foreach ($document in $expectedDocuments) {
-                $expectedValues.Add((ConvertFrom-Json -InputObject $document -AsHashtable -NoEnumerate))
-            }
-            $expectedCanonical = ConvertTo-YamlSuiteCanonicalValue `
-                -Value ([object[]] $expectedValues.ToArray()) -SortMappings
-            $jsonExpected = $expectedCanonical
+            $jsonExpected = $jsonOracleCanonical
             $jsonActual = $projectedJsonCanonical
-            if ($projectedJsonCanonical -ceq $expectedCanonical) {
+            if ($projectedJsonCanonical -ceq $jsonOracleCanonical) {
                 $jsonResult = 'Pass'
             } else {
                 $reason = Get-YamlSuiteJsonPolicyReason `
-                    -ExpectedValues ([object[]] $expectedValues.ToArray()) `
+                    -ExpectedValues $jsonOracleValues `
                     -ActualValues ([object[]] $projectedValues)
                 if ($reason) {
                     $jsonResult = 'PolicyDifference'
@@ -990,14 +996,30 @@ foreach ($inputFile in $inputFiles) {
                 $fixtureReference = ConvertTo-YamlSuiteReferenceSignature `
                     -Value ([object[]] $fixtureValues)
 
-                if ($null -ne $projectedCanonical -and
-                    ($fixtureCanonical -cne $projectedCanonical -or
-                    $fixtureReference -cne $projectedReference)) {
+                $fixtureOracleCanonical = $null
+                $fixtureOracleActual = $fixtureCanonical
+                $fixtureReferenceMismatch = $false
+                if ($null -ne $projectedCanonical) {
+                    $fixtureOracleCanonical = $projectedCanonical
+                    $fixtureReferenceMismatch = $fixtureReference -cne $projectedReference
+                } elseif ($null -ne $jsonOracleCanonical) {
+                    $fixtureOracleCanonical = $jsonOracleCanonical
+                    $fixtureOracleActual = ConvertTo-YamlSuiteCanonicalValue `
+                        -Value ([object[]] $fixtureValues) -SortMappings
+                }
+
+                if ($null -eq $fixtureOracleCanonical) {
+                    $emitYamlResult = 'Fail'
+                    $emitYamlReason = 'EmitYamlOracleUnavailable'
+                } elseif ($fixtureOracleActual -cne $fixtureOracleCanonical -or
+                    $fixtureReferenceMismatch) {
                     $emitYamlResult = 'Fail'
                     $emitYamlReason = 'EmitYamlRepresentationMismatch'
-                    $emitYamlExpected = $projectedCanonical
-                    $emitYamlActual = $fixtureCanonical
-                    $emitYamlExpectedReference = $projectedReference
+                    $emitYamlExpected = $fixtureOracleCanonical
+                    $emitYamlActual = $fixtureOracleActual
+                    if ($null -ne $projectedCanonical) {
+                        $emitYamlExpectedReference = $projectedReference
+                    }
                     $emitYamlActualReference = $fixtureReference
                 } else {
                     $fixtureEmittedDocuments = [System.Collections.Generic.List[string]]::new()

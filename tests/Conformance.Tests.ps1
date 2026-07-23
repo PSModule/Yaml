@@ -270,6 +270,31 @@ ship-to:
         $mutatedResult.EmitYamlReason | Should -Be 'EmitYamlRepresentationMismatch'
     }
 
+    It 'uses JSON as the oracle for invalid-source emit fixtures' {
+        $mutatedSuitePath = Join-Path $TestDrive 'mutated-invalid-emit-fixtures'
+        $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force
+        Copy-Item -LiteralPath (Join-Path $suiteDataPath 'DK95') `
+            -Destination $mutatedSuitePath -Recurse
+        foreach ($case in @('01', '06')) {
+            '--- altered' | Set-Content `
+                -LiteralPath (Join-Path $mutatedSuitePath "DK95\$case\emit.yaml") `
+                -Encoding utf8NoBOM
+        }
+
+        $mutatedResults = @(
+            & $runnerPath -Path $mutatedSuitePath -CompareEmitYaml
+        )
+        $invalidFixtureResults = @(
+            $mutatedResults |
+                Where-Object Case -In @('DK95/01', 'DK95/06') |
+                Sort-Object Case
+        )
+
+        @($invalidFixtureResults.EmitYamlResult) | Should -Be @('Fail', 'Fail')
+        @($invalidFixtureResults.EmitYamlReason | Select-Object -Unique) |
+            Should -Be @('EmitYamlRepresentationMismatch')
+    }
+
     It 'accounts honestly for general module self-round-trips' {
         @($suiteResults | Where-Object SelfRoundTripResult -EQ 'Pass').Count |
             Should -Be 306
