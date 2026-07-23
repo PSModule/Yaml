@@ -13,6 +13,95 @@ param()
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
+    if ($null -eq ('YamlTests.InfiniteEnumerable' -as [type])) {
+        Add-Type -TypeDefinition @'
+namespace YamlTests
+{
+    using System;
+    using System.Collections;
+
+    public sealed class InfiniteEnumerable : IEnumerable
+    {
+        private readonly object value;
+        public int MoveNextCount { get; private set; }
+        public int DisposeCount { get; private set; }
+
+        public InfiniteEnumerable() : this(1) { }
+        public InfiniteEnumerable(object value) { this.value = value; }
+        public IEnumerator GetEnumerator() { return new Enumerator(this, value); }
+
+        private sealed class Enumerator : IEnumerator, IDisposable
+        {
+            private readonly InfiniteEnumerable owner;
+            private readonly object value;
+
+            public Enumerator(InfiniteEnumerable owner, object value)
+            {
+                this.owner = owner;
+                this.value = value;
+            }
+
+            public object Current { get { return value; } }
+
+            public bool MoveNext()
+            {
+                owner.MoveNextCount++;
+                return true;
+            }
+
+            public void Reset() { throw new NotSupportedException(); }
+            public void Dispose() { owner.DisposeCount++; }
+        }
+    }
+
+    public sealed class OneShotEnumerable : IEnumerable
+    {
+        private readonly object[] values;
+        public int GetEnumeratorCount { get; private set; }
+        public int DisposeCount { get; private set; }
+
+        public OneShotEnumerable(object[] values) { this.values = values; }
+
+        public IEnumerator GetEnumerator()
+        {
+            GetEnumeratorCount++;
+            if (GetEnumeratorCount > 1)
+            {
+                throw new InvalidOperationException("The enumerable was consumed more than once.");
+            }
+            return new Enumerator(this, values);
+        }
+
+        private sealed class Enumerator : IEnumerator, IDisposable
+        {
+            private readonly OneShotEnumerable owner;
+            private readonly object[] values;
+            private int index = -1;
+
+            public Enumerator(OneShotEnumerable owner, object[] values)
+            {
+                this.owner = owner;
+                this.values = values;
+            }
+
+            public object Current { get { return values[index]; } }
+            public bool MoveNext() { index++; return index < values.Length; }
+            public void Reset() { throw new NotSupportedException(); }
+            public void Dispose() { owner.DisposeCount++; }
+        }
+    }
+}
+'@
+    }
+
+    function Get-YamlTestInfinitePipeline {
+        param ([string] $Item = 'value')
+
+        while ($true) {
+            $script:YamlTestPipelineCount++
+            $Item
+        }
+    }
 }
 
 Describe 'ConvertTo-Yaml' {
@@ -346,6 +435,60 @@ Describe 'ConvertTo-Yaml' {
             { $nested | ConvertTo-Yaml -Depth 2 } | Should -Throw
             { @(1, 2) | ConvertTo-Yaml -MaxNodes 2 } | Should -Throw
             { 'long' | ConvertTo-Yaml -MaxScalarLength 3 } | Should -Throw
+        }
+
+        It 'stops infinite pipelines at the node budget' {
+            $script:YamlTestPipelineCount = 0
+
+            { Get-YamlTestInfinitePipeline | ConvertTo-Yaml -MaxNodes 4 } |
+                Should -Throw -ExpectedMessage '*configured limit of 4 nodes*'
+            $script:YamlTestPipelineCount | Should -BeLessOrEqual 4
+        }
+
+        It 'stops infinite pipelines at the first oversized scalar' {
+            $script:YamlTestPipelineCount = 0
+
+            { Get-YamlTestInfinitePipeline -Item 'long' |
+                    ConvertTo-Yaml -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            $script:YamlTestPipelineCount | Should -Be 1
+        }
+
+        It 'stops and disposes infinite enumerables at the node budget' {
+            $source = [YamlTests.InfiniteEnumerable]::new()
+
+            { ConvertTo-Yaml -InputObject $source -MaxNodes 4 } |
+                Should -Throw -ExpectedMessage '*configured limit of 4 nodes*'
+            $source.MoveNextCount | Should -Be 4
+            $source.DisposeCount | Should -Be 1
+        }
+
+        It 'stops and disposes enumerables at the first oversized scalar' {
+            $source = [YamlTests.InfiniteEnumerable]::new('long')
+
+            { ConvertTo-Yaml -InputObject $source -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            $source.MoveNextCount | Should -Be 1
+            $source.DisposeCount | Should -Be 1
+        }
+
+        It 'does not re-enumerate repeated references' {
+            $source = [YamlTests.OneShotEnumerable]::new([object[]] @(1, 2))
+            $inputObject = [ordered]@{ first = $source; second = $source }
+
+            $yaml = ConvertTo-Yaml -InputObject $inputObject
+
+            $source.GetEnumeratorCount | Should -Be 1
+            $source.DisposeCount | Should -Be 1
+            $yaml | Should -Match '&id001'
+            $yaml | Should -Match '\*id001'
+        }
+
+        It 'prechecks Base64 output before allocating the encoded scalar' {
+            $bytes = [byte[]] @(1, 2, 3)
+
+            { ConvertTo-Yaml -InputObject $bytes -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
         }
 
         It 'supports the public maximum depth and rejects the next level specifically' {

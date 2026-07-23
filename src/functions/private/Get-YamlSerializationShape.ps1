@@ -13,7 +13,9 @@ function Get-YamlSerializationShape {
         [Parameter(Mandatory)]
         [pscustomobject] $State,
 
-        [switch] $EnumsAsStrings
+        [switch] $EnumsAsStrings,
+
+        [switch] $InspectOnly
     )
 
     $scalar = New-YamlEmissionNode -Kind Scalar
@@ -189,6 +191,15 @@ function Get-YamlSerializationShape {
     }
 
     if ($isByteArray) {
+        $base64Length = [long] 4 * [long] [System.Math]::Ceiling($Value.LongLength / 3.0)
+        if ($base64Length -gt $State.MaxScalarLength) {
+            throw (New-YamlSerializationException -ErrorId 'YamlScalarLimitExceeded' -Message (
+                    "A scalar exceeds the configured limit of $($State.MaxScalarLength) characters."
+                ))
+        }
+        if ($InspectOnly) {
+            return [pscustomobject]@{ Kind = 'Binary'; Node = $null; Values = $null }
+        }
         $scalar.Tag = 'tag:yaml.org,2002:binary'
         $scalar.Value = [System.Convert]::ToBase64String($Value)
         $scalar.Style = 'DoubleQuoted'
@@ -197,16 +208,33 @@ function Get-YamlSerializationShape {
     }
 
     if ($isDictionary -or $isPropertyBag) {
+        if ($InspectOnly) {
+            return [pscustomobject]@{ Kind = 'Mapping'; Node = $null; Values = $null }
+        }
         $entries = [System.Collections.Generic.List[object]]::new()
         if ($isDictionary) {
-            foreach ($entry in $Value.GetEnumerator()) {
+            $remainingNodes = [System.Math]::Max(0, $State.MaxNodes - $State.NodeCount)
+            $maximumEntries = [int] [System.Math]::Floor($remainingNodes / 2.0)
+            $rawEntries = Read-YamlBoundedEnumerable -Value $Value `
+                -MaximumItems $maximumEntries -MaxNodes $State.MaxNodes -State $State `
+                -DictionaryEntries -EnumsAsStrings:$EnumsAsStrings
+            foreach ($entry in $rawEntries) {
                 $entries.Add([pscustomobject]@{
                         Key   = [object] $entry.Key
                         Value = [object] $entry.Value
                     })
             }
         } else {
+            if (($dataProperties.Count * 2) -gt ($State.MaxNodes - $State.NodeCount)) {
+                throw (New-YamlSerializationException -ErrorId 'YamlNodeLimitExceeded' -Message (
+                        "The object graph exceeds the configured limit of $($State.MaxNodes) nodes."
+                    ))
+            }
             foreach ($property in $dataProperties) {
+                $null = Get-YamlSerializationShape -Value $property.Name -State $State `
+                    -EnumsAsStrings:$EnumsAsStrings -InspectOnly
+                $null = Get-YamlSerializationShape -Value $property.Value -State $State `
+                    -EnumsAsStrings:$EnumsAsStrings -InspectOnly
                 $entries.Add([pscustomobject]@{
                         Key   = [object] $property.Name
                         Value = [object] $property.Value
@@ -220,10 +248,13 @@ function Get-YamlSerializationShape {
         }
     }
     if ($isSequence) {
-        $items = [System.Collections.Generic.List[object]]::new()
-        foreach ($item in $Value) {
-            $items.Add([object] $item)
+        if ($InspectOnly) {
+            return [pscustomobject]@{ Kind = 'Sequence'; Node = $null; Values = $null }
         }
+        $remainingNodes = [System.Math]::Max(0, $State.MaxNodes - $State.NodeCount)
+        $items = Read-YamlBoundedEnumerable -Value $Value `
+            -MaximumItems $remainingNodes -MaxNodes $State.MaxNodes -State $State `
+            -EnumsAsStrings:$EnumsAsStrings
         return [pscustomobject]@{
             Kind   = 'Sequence'
             Node   = $null

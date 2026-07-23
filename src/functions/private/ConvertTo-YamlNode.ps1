@@ -51,6 +51,25 @@ function ConvertTo-YamlNode {
                     ))
             }
 
+            $isReference = Test-YamlSerializationReference -Value $frame.Value
+            if ($isReference) {
+                $firstTime = $false
+                $frame.ReferenceId = $State.IdGenerator.GetId($frame.Value, [ref] $firstTime)
+                if (-not $firstTime) {
+                    $State.ReferenceCounts[$frame.ReferenceId]++
+                    if ($State.Active.Contains($frame.ReferenceId)) {
+                        throw (New-YamlSerializationException -ErrorId 'YamlCycleDetected' -Message (
+                                "A cycle was detected while serializing type '$($frame.Value.GetType().FullName)'."
+                            ))
+                    }
+                    $frame.Holder.Value = $State.NodesById[$frame.ReferenceId]
+                    [void] $stack.Pop()
+                    continue
+                }
+                $State.ReferenceCounts[$frame.ReferenceId] = 1
+                $State.ReferenceOrder.Add($frame.ReferenceId)
+            }
+
             $frame.Shape = Get-YamlSerializationShape -Value $frame.Value -State $State `
                 -EnumsAsStrings:$EnumsAsStrings
             if ($frame.Shape.Kind -eq 'Scalar') {
@@ -59,22 +78,6 @@ function ConvertTo-YamlNode {
                 continue
             }
 
-            $firstTime = $false
-            $frame.ReferenceId = $State.IdGenerator.GetId($frame.Value, [ref] $firstTime)
-            if (-not $firstTime) {
-                $State.ReferenceCounts[$frame.ReferenceId]++
-                if ($State.Active.Contains($frame.ReferenceId)) {
-                    throw (New-YamlSerializationException -ErrorId 'YamlCycleDetected' -Message (
-                            "A cycle was detected while serializing type '$($frame.Value.GetType().FullName)'."
-                        ))
-                }
-                $frame.Holder.Value = $State.NodesById[$frame.ReferenceId]
-                [void] $stack.Pop()
-                continue
-            }
-
-            $State.ReferenceCounts[$frame.ReferenceId] = 1
-            $State.ReferenceOrder.Add($frame.ReferenceId)
             if ($frame.Shape.Kind -eq 'Binary') {
                 $frame.Shape.Node.ReferenceId = $frame.ReferenceId
                 $State.NodesById[$frame.ReferenceId] = $frame.Shape.Node

@@ -76,8 +76,31 @@ function ConvertTo-Yaml {
 
     begin {
         $values = [System.Collections.Generic.List[object]]::new()
+        $inspectionState = [pscustomobject]@{
+            MaxScalarLength = $MaxScalarLength
+            MaxNodes        = $MaxNodes
+            NodeCount       = 0
+        }
     }
     process {
+        try {
+            $null = Get-YamlSerializationShape -Value $InputObject -State $inspectionState `
+                -EnumsAsStrings:$EnumsAsStrings -InspectOnly
+            if ($values.Count -gt 0 -and ($values.Count + 2) -gt $MaxNodes) {
+                throw (New-YamlSerializationException -ErrorId 'YamlNodeLimitExceeded' -Message (
+                        "The object graph exceeds the configured limit of $MaxNodes nodes."
+                    ))
+            }
+        } catch [System.NotSupportedException] {
+            $record = New-YamlErrorRecord -Exception $_.Exception `
+                -DefaultErrorId 'YamlUnsupportedType' -Category InvalidType -TargetObject $InputObject
+            $PSCmdlet.ThrowTerminatingError($record)
+        } catch [System.InvalidOperationException] {
+            $record = New-YamlErrorRecord -Exception $_.Exception `
+                -DefaultErrorId 'YamlSerializationFailed' -Category InvalidOperation `
+                -TargetObject $InputObject
+            $PSCmdlet.ThrowTerminatingError($record)
+        }
         $values.Add($InputObject)
     }
     end {
