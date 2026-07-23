@@ -379,21 +379,18 @@ date: !!timestamp 2001-12-14
         }
 
         It 'decodes percent escapes in expanded tags using UTF-8' {
-            $yaml = @'
-%TAG !e! tag:example.com,2000:app/
----
-first: !e!tag%21 value
-second: !e!currency%E2%82%AC amount
-'@
-            $representation = Read-YamlStreamCore -Yaml $yaml -Depth 32 -MaxNodes 64 -MaxAliases 16 `
-                -MaxScalarLength 4096 -MaxTagLength 1024 -MaxTotalTagLength 4096 `
-                -MaxNumericLength 64
+            $escaped = Get-TestYamlRepresentationRoot -Yaml (
+                "%TAG !e! tag:example.com,2000:app/`n--- !e!tag%21 value"
+            )
+            $multibyte = Get-TestYamlRepresentationRoot -Yaml (
+                "%TAG !e! tag:example.com,2000:app/`n--- !e!currency%E2%82%AC amount"
+            )
 
-            $representation.Value.Count | Should -Be 1
-            $entries = $representation.Value[0].Entries
-            $entries.Count | Should -Be 2
-            $entries[0].Value.Tag | Should -Be 'tag:example.com,2000:app/tag!'
-            $entries[1].Value.Tag | Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
+            $escaped.Tag | Should -Be 'tag:example.com,2000:app/tag!'
+            $escaped.HasUnknownTag | Should -BeTrue
+            $multibyte.Tag |
+                Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
+            $multibyte.HasUnknownTag | Should -BeTrue
         }
 
         It 'rejects malformed or non-UTF8 tag percent escapes' {
