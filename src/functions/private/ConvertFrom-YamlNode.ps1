@@ -154,7 +154,9 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'OmapValue') {
-            $frame.Result.Add($frame.Key, $frame.Child.PSObject.Properties['Value'].Value)
+            Add-YamlDictionaryEntry -Dictionary $frame.Result -Key $frame.Key `
+                -Value $frame.Child.PSObject.Properties['Value'].Value `
+                -KeyNode $frame.Node.Items[$frame.Index].Entries[0].Key
             $frame.Index++
             $frame.State = 'OmapKey'
             continue
@@ -188,7 +190,8 @@ function ConvertFrom-YamlNode {
                 $frame.Key = $keyValue
             }
             if ($frame.Node.Tag -ceq 'tag:yaml.org,2002:set') {
-                $frame.Result.Add($frame.Key, $null)
+                Add-YamlDictionaryEntry -Dictionary $frame.Result -Key $frame.Key -Value $null `
+                    -KeyNode $frame.Node.Entries[$frame.Index].Key
                 $frame.Index++
                 $frame.State = 'DictionaryKey'
                 continue
@@ -209,7 +212,9 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'DictionaryValue') {
-            $frame.Result.Add($frame.Key, $frame.Child.PSObject.Properties['Value'].Value)
+            Add-YamlDictionaryEntry -Dictionary $frame.Result -Key $frame.Key `
+                -Value $frame.Child.PSObject.Properties['Value'].Value `
+                -KeyNode $frame.Node.Entries[$frame.Index].Key
             $frame.Index++
             $frame.State = 'DictionaryKey'
             continue
@@ -242,6 +247,13 @@ function ConvertFrom-YamlNode {
                 throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
                         -ErrorId 'YamlMappingKeyNotString' -Message (
                         'This mapping key cannot be represented as a PSCustomObject property. Use -AsHashtable.'
+                    ))
+            }
+            if (Test-YamlReservedPropertyName -Name $frame.Key) {
+                $keyNode = $frame.Node.Entries[$frame.Index].Key
+                throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
+                        -ErrorId 'YamlPropertyNameReserved' -Message (
+                        "The mapping key '$($frame.Key)' is reserved by PowerShell ETS. Use -AsHashtable."
                     ))
             }
             if (-not $frame.Names.Add($frame.Key)) {

@@ -57,13 +57,22 @@ function Get-YamlSerializationShape {
         -not $isByteArray
     )
     $isCustomObject = $Value -is [System.Management.Automation.PSCustomObject]
+    $isPurePropertyBag = $isCustomObject -or (
+        $dataProperties.Count -gt 0 -and $Value.GetType() -eq [object]
+    )
     if ($dataProperties.Count -gt 0 -and ($isDictionary -or $isSequence -or $isByteArray)) {
         throw (New-YamlSerializationException -Kind NotSupported `
                 -ErrorId 'YamlMixedObjectSemantics' -Message (
                 "Type '$($Value.GetType().FullName)' combines collection data with attached note properties and cannot be represented without loss."
             ))
     }
-    $isPropertyBag = $isCustomObject -or $dataProperties.Count -gt 0
+    if ($dataProperties.Count -gt 0 -and -not $isPurePropertyBag) {
+        throw (New-YamlSerializationException -Kind NotSupported `
+                -ErrorId 'YamlMixedObjectSemantics' -Message (
+                "Type '$($Value.GetType().FullName)' combines scalar data with attached note properties and cannot be represented without loss."
+            ))
+    }
+    $isPropertyBag = $isPurePropertyBag
 
     if (-not $isPropertyBag -and ($Value -is [string] -or $Value -is [char])) {
         $scalar.Value = [string] $Value

@@ -125,6 +125,23 @@ folded: >
             $result['name'] | Should -Be 'two'
         }
 
+        It 'classifies ETS-reserved property names and preserves them with AsHashtable' {
+            foreach ($name in @(
+                    'PSObject',
+                    'psobject',
+                    'PSTypeNames',
+                    'PSBase',
+                    'PSAdapted',
+                    'PSExtended'
+                )) {
+                { "$name`: value" | ConvertFrom-Yaml } |
+                    Should -Throw -ExpectedMessage '*Use -AsHashtable*'
+
+                $result = "$name`: value" | ConvertFrom-Yaml -AsHashtable
+                $result[$name] | Should -Be 'value'
+            }
+        }
+
         It 'enumerates only top-level sequences by default' {
             $result = "- one`n- two" | ConvertFrom-Yaml
 
@@ -344,6 +361,14 @@ copy: *source
             $result['integer'] | Should -Be '12'
             $result['set'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
             $result['set']['one'] | Should -BeNullOrEmpty
+        }
+
+        It 'classifies projection collisions from representation-distinct tagged keys' {
+            $yaml = "!foo x: one`n!bar x: two"
+
+            ($yaml | Test-Yaml) | Should -BeTrue
+            { $yaml | ConvertFrom-Yaml -AsHashtable } |
+                Should -Throw -ExpectedMessage '*cannot be projected distinctly*'
         }
 
         It 'uses deterministic UTC semantics for zone-less explicit timestamps' {

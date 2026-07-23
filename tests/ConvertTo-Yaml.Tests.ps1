@@ -322,6 +322,14 @@ Describe 'ConvertTo-Yaml' {
                 Should -Throw -ExpectedMessage '*combines collection data with attached note properties*'
         }
 
+        It 'rejects attached note properties on scalar values' {
+            $value = [psobject] 42
+            Add-Member -InputObject $value -MemberType NoteProperty -Name metadata -Value 'lossy'
+
+            { ConvertTo-Yaml -InputObject $value } |
+                Should -Throw -ExpectedMessage '*combines scalar data with attached note properties*'
+        }
+
         It 'preserves the sign of IEEE negative zero across serialization' {
             $negativeZero = [BitConverter]::Int64BitsToDouble([long]::MinValue)
             $yaml = ConvertTo-Yaml -InputObject $negativeZero
