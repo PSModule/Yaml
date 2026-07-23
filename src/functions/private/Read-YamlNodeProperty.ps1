@@ -25,7 +25,8 @@ function Read-YamlNodeProperty {
     $unknown = $false
     $anchor = ''
     while ($position -lt $Text.Length) {
-        while ($position -lt $Text.Length -and [char]::IsWhiteSpace($Text[$position])) {
+        while ($position -lt $Text.Length -and
+            (Test-YamlWhiteSpace -Character $Text[$position])) {
             $position++
         }
         if ($position -ge $Text.Length) {
@@ -47,7 +48,8 @@ function Read-YamlNodeProperty {
                 }
                 $position = $end + 1
             } else {
-                while ($position -lt $Text.Length -and -not [char]::IsWhiteSpace($Text[$position]) -and
+                while ($position -lt $Text.Length -and
+                    -not (Test-YamlWhiteSpace -Character $Text[$position]) -and
                     $Text[$position] -notin @(',', '[', ']', '{', '}')) {
                     $position++
                 }
@@ -76,7 +78,8 @@ function Read-YamlNodeProperty {
                     ))
             }
             $start = ++$position
-            while ($position -lt $Text.Length -and -not [char]::IsWhiteSpace($Text[$position]) -and
+            while ($position -lt $Text.Length -and
+                -not (Test-YamlWhiteSpace -Character $Text[$position]) -and
                 $Text[$position] -notin @(',', '[', ']', '{', '}')) {
                 $position++
             }
@@ -97,7 +100,10 @@ function Read-YamlNodeProperty {
         Tag           = $tag
         HasUnknownTag = $unknown
         Anchor        = $anchor
-        Rest          = $Text.Substring($position).TrimStart()
-        Consumed      = $position + ($Text.Substring($position).Length - $Text.Substring($position).TrimStart().Length)
+        Rest          = $Text.Substring($position).TrimStart(' ', "`t")
+        Consumed      = $position + (
+            $Text.Substring($position).Length -
+            $Text.Substring($position).TrimStart(' ', "`t").Length
+        )
     }
 }

@@ -62,11 +62,14 @@ function Read-YamlBlockSequence {
             if (-not (Test-YamlIndicator -Text $content -Indicator '-')) {
                 break
             }
-            $rest = $content.Substring(1).TrimStart()
-            $itemColumn = $Indent + 1 + ($content.Substring(1).Length - $content.Substring(1).TrimStart().Length)
+            $rest = $content.Substring(1).TrimStart(' ', "`t")
+            $itemColumn = $Indent + 1 + (
+                $content.Substring(1).Length -
+                $content.Substring(1).TrimStart(' ', "`t").Length
+            )
         }
 
-        if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $rest))) {
+        if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $rest))) {
             $line = $Context.LineIndex
             $Context.LineIndex++
             Skip-YamlBlockTrivia -Context $Context

@@ -29,7 +29,9 @@ function Read-YamlBlockNode {
         [AllowEmptyString()]
         [string] $PendingAnchor = '',
 
-        [switch] $AllowIndentlessSequence
+        [switch] $AllowIndentlessSequence,
+
+        [switch] $DisallowCompactMapping
     )
 
     $hasSegment = $PSBoundParameters.ContainsKey('Segment')
@@ -67,8 +69,9 @@ function Read-YamlBlockNode {
     if (
         (-not [string]::IsNullOrEmpty($PendingTag) -or $PendingUnknownTag -or
         -not [string]::IsNullOrEmpty($PendingAnchor)) -and
+        -not $DisallowCompactMapping -and
         -not (Test-YamlIndicator -Text $Segment -Indicator '-') -and
-        ((Find-YamlMappingColon -Text $Segment) -ge 0 -or
+        ((Find-YamlMappingColon -Text $Segment -AllowAnchorFallback) -ge 0 -or
         (Test-YamlIndicator -Text $Segment -Indicator '?'))
     ) {
         return Read-YamlBlockMapping -Context $Context -Indent $SegmentColumn -Depth $Depth `
@@ -78,8 +81,9 @@ function Read-YamlBlockNode {
     if (
         [string]::IsNullOrEmpty($PendingTag) -and -not $PendingUnknownTag -and
         [string]::IsNullOrEmpty($PendingAnchor) -and
+        -not $DisallowCompactMapping -and
         -not (Test-YamlIndicator -Text $Segment -Indicator '-') -and
-        ((Find-YamlMappingColon -Text $Segment) -ge 0 -or
+        ((Find-YamlMappingColon -Text $Segment -AllowAnchorFallback) -ge 0 -or
         (Test-YamlIndicator -Text $Segment -Indicator '?'))
     ) {
         return Read-YamlBlockMapping -Context $Context -Indent $SegmentColumn -Depth $Depth `
@@ -111,7 +115,7 @@ function Read-YamlBlockNode {
     $rest = Get-YamlContentWithoutComment -Text $restSource
     $contentColumn = $SegmentColumn + $properties.Consumed
 
-    if ([string]::IsNullOrWhiteSpace($rest)) {
+    if ([string]::IsNullOrEmpty($rest)) {
         $Context.LineIndex++
         Skip-YamlBlockTrivia -Context $Context
         if ($Context.LineIndex -ge $Context.Lines.Count -or
@@ -154,7 +158,7 @@ function Read-YamlBlockNode {
         }
         $firstSource = $rest.Substring(1)
         if ($firstSource.IndexOf("`t", [System.StringComparison]::Ordinal) -ge 0 -and
-            $firstSource.Trim() -eq '-') {
+            $firstSource.Trim(' ', "`t") -ceq '-') {
             $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn + 1) `
                 -Line $lineNumber -Column ($contentColumn + 1)
             throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidIndentation' -Message (
@@ -162,15 +166,16 @@ function Read-YamlBlockNode {
                 ))
         }
         $first = $firstSource
-        $leading = $first.Length - $first.TrimStart().Length
-        $first = $first.TrimStart()
+        $leading = $first.Length - $first.TrimStart(' ', "`t").Length
+        $first = $first.TrimStart(' ', "`t")
         return Read-YamlBlockSequence -Context $Context -Indent $contentColumn -Depth $Depth -Tag $tag `
             -HasUnknownTag $unknownTag -Anchor $anchor -FirstItemText $first `
             -FirstItemColumn ($contentColumn + 1 + $leading)
     }
 
-    if ((Find-YamlMappingColon -Text $rest) -ge 0 -or
-        (Test-YamlIndicator -Text $rest -Indicator '?')) {
+    if (-not $DisallowCompactMapping -and (
+            (Find-YamlMappingColon -Text $rest -AllowAnchorFallback) -ge 0 -or
+            (Test-YamlIndicator -Text $rest -Indicator '?'))) {
         return Read-YamlBlockMapping -Context $Context -Indent $contentColumn -Depth $Depth -Tag $tag `
             -HasUnknownTag $unknownTag -Anchor $anchor -FirstText $rest -FirstColumn $contentColumn
     }

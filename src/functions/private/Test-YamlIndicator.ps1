@@ -15,8 +15,14 @@ function Test-YamlIndicator {
         [string] $Indicator
     )
 
-    $separators = if ($Indicator -eq '-') { @(' ', "`t") } else { @(' ') }
-    return $Text.Length -gt 0 -and $Text[0] -eq $Indicator[0] -and (
-        $Text.Length -eq 1 -or $Text[1] -in $separators
-    )
+    if ($Text.Length -eq 0 -or -not $Text[0].Equals($Indicator[0])) {
+        return $false
+    }
+    if ($Text.Length -eq 1) {
+        return $true
+    }
+    if ($Indicator.Equals('-', [System.StringComparison]::Ordinal)) {
+        return Test-YamlWhiteSpace -Character $Text[1]
+    }
+    return $Text[1].Equals([char] ' ')
 }

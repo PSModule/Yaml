@@ -8,7 +8,9 @@ function Find-YamlMappingColon {
     param (
         [Parameter(Mandatory)]
         [AllowEmptyString()]
-        [string] $Text
+        [string] $Text,
+
+        [switch] $AllowAnchorFallback
     )
 
     if ($Text.IndexOf(':') -lt 0) {
@@ -19,6 +21,7 @@ function Find-YamlMappingColon {
     $singleQuoted = $false
     $doubleQuoted = $false
     $atNodeStart = $true
+    $anchorColonCandidate = -1
     for ($index = 0; $index -lt $Text.Length; $index++) {
         $character = $Text[$index]
         if ($doubleQuoted) {
@@ -39,12 +42,17 @@ function Find-YamlMappingColon {
             }
             continue
         }
-        if ($atNodeStart -and [char]::IsWhiteSpace($character)) {
+        if ($atNodeStart -and (Test-YamlWhiteSpace -Character $character)) {
             continue
         }
         if ($atNodeStart -and $character -eq '&') {
             $index++
-            while ($index -lt $Text.Length -and -not [char]::IsWhiteSpace($Text[$index])) {
+            while ($index -lt $Text.Length -and
+                -not (Test-YamlWhiteSpace -Character $Text[$index]) -and
+                $Text[$index] -notin @(',', '[', ']', '{', '}')) {
+                if (Test-YamlMappingValueIndicator -Text $Text -Index $index) {
+                    $anchorColonCandidate = $index
+                }
                 $index++
             }
             $index--
@@ -52,7 +60,9 @@ function Find-YamlMappingColon {
         }
         if ($atNodeStart -and $character -eq '*') {
             $index++
-            while ($index -lt $Text.Length -and -not [char]::IsWhiteSpace($Text[$index])) {
+            while ($index -lt $Text.Length -and
+                -not (Test-YamlWhiteSpace -Character $Text[$index]) -and
+                $Text[$index] -notin @(',', '[', ']', '{', '}')) {
                 $index++
             }
             $index--
@@ -67,7 +77,7 @@ function Find-YamlMappingColon {
             } else {
                 $index++
                 while ($index -lt $Text.Length -and
-                    -not [char]::IsWhiteSpace($Text[$index]) -and
+                    -not (Test-YamlWhiteSpace -Character $Text[$index]) -and
                     $Text[$index] -notin @('[', ']', '{', '}', ',')) {
                     $index++
                 }
@@ -94,18 +104,24 @@ function Find-YamlMappingColon {
             ':' {
                 if ($flowDepth -eq 0) {
                     $nextIsSeparator = $index + 1 -ge $Text.Length
-                    $nextIsSeparator = $nextIsSeparator -or [char]::IsWhiteSpace($Text[$index + 1])
+                    $nextIsSeparator = $nextIsSeparator -or
+                    (Test-YamlWhiteSpace -Character $Text[$index + 1])
                     if ($nextIsSeparator) {
                         return $index
                     }
                 }
             }
             '#' {
-                if ($flowDepth -eq 0 -and ($index -eq 0 -or [char]::IsWhiteSpace($Text[$index - 1]))) {
+                if ($flowDepth -eq 0 -and (
+                        $index -eq 0 -or (Test-YamlWhiteSpace -Character $Text[$index - 1])
+                    )) {
                     return -1
                 }
             }
         }
+    }
+    if ($AllowAnchorFallback) {
+        return $anchorColonCandidate
     }
     return -1
 }

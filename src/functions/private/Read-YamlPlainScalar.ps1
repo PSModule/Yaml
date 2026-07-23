@@ -35,9 +35,8 @@ function Read-YamlPlainScalar {
     $start = New-YamlMark -Index ($Context.LineStarts[$startLine] + $FirstColumn) -Line $startLine `
         -Column $FirstColumn
     $parts = [System.Collections.Generic.List[object]]::new()
-    $firstCommentMatch = [regex]::Match($FirstText, '(?<!\S)#')
-    $firstComment = if ($firstCommentMatch.Success) { $firstCommentMatch.Index } else { -1 }
-    $firstValue = (Get-YamlContentWithoutComment -Text $FirstText).Trim()
+    $firstComment = Find-YamlCommentStart -Text $FirstText
+    $firstValue = (Get-YamlContentWithoutComment -Text $FirstText).Trim(' ', "`t")
     $firstCharacter = if ($firstValue.Length -gt 0) { $firstValue[0] } else { [char] 0 }
     $forbiddenFirst = $firstCharacter -in @(
         ',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', "'", '"', '%', '@', '`'
@@ -45,7 +44,7 @@ function Read-YamlPlainScalar {
     $conditionalIndicator = $firstCharacter -in @('-', '?', ':')
     if ($forbiddenFirst -or (
             $conditionalIndicator -and (
-                $firstValue.Length -eq 1 -or [char]::IsWhiteSpace($firstValue[1])
+                $firstValue.Length -eq 1 -or (Test-YamlWhiteSpace -Character $firstValue[1])
             )
         )) {
         throw (New-YamlException -Start $start -End $start -ErrorId 'YamlInvalidPlainScalar' -Message (
@@ -86,13 +85,12 @@ function Read-YamlPlainScalar {
             break
         }
         $sourceContent = $line.Substring($indent)
-        $commentMatch = [regex]::Match($sourceContent, '(?<!\S)#')
-        $comment = if ($commentMatch.Success) { $commentMatch.Index } else { -1 }
+        $comment = Find-YamlCommentStart -Text $sourceContent
         $content = Get-YamlContentWithoutComment -Text $sourceContent
         if ((Find-YamlMappingColon -Text $content) -ge 0) {
             break
         }
-        $trimmedContent = $content.Trim()
+        $trimmedContent = $content.Trim(' ', "`t")
         $separatorLength = if ($pendingBreaks -gt 0) { $pendingBreaks } else { 1 }
         if ($decodedLength + $separatorLength + $trimmedContent.Length -gt
             $Context.MaxScalarLength) {

@@ -19,7 +19,8 @@ function Test-YamlTagUriText {
 
     for ($index = 0; $index -lt $Text.Length; $index++) {
         $character = $Text[$index]
-        if ([char]::IsWhiteSpace($character) -or [char]::IsControl($character) -or
+        if ((Test-YamlWhiteSpace -Character $character) -or $character -ceq "`n" -or
+            [char]::IsControl($character) -or
             $character -in @('<', '>', '{', '}')) {
             return $false
         }

@@ -73,9 +73,10 @@ function Skip-YamlFlowTrivia {
             $indent = $Cursor.Index - $lineStart
             if ($indent -eq 0 -and $Cursor.Index + 3 -le $Context.Text.Length) {
                 $marker = $Context.Text.Substring($Cursor.Index, 3)
-                if ($marker -in @('---', '...') -and
+                if ($marker -cin @('---', '...') -and
                     ($Cursor.Index + 3 -eq $Context.Text.Length -or
-                    [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 3]))) {
+                    (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index + 3]) -or
+                    $Context.Text[$Cursor.Index + 3] -ceq "`n")) {
                     $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column 0
                     throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidFlowCollection' -Message (
                             'A document marker cannot occur inside a flow collection.'

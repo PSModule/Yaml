@@ -71,7 +71,7 @@ function Read-YamlDirectiveBlock {
             }
             $tagHandles[$handle] = $prefix
         } elseif ($directive -cnotmatch (
-                '^%[A-Za-z0-9]+(?:[ \t]+[^#\s][^#]*?)?(?:[ \t]+#.*)?$'
+                '^%[A-Za-z0-9]+(?:[ \t]+[^# \t][^#]*?)?(?:[ \t]+#.*)?$'
             )) {
             throw (New-YamlException -Start $mark -End $mark `
                     -ErrorId 'YamlInvalidDirective' -Message (

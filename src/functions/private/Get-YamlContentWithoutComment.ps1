@@ -11,9 +11,9 @@ function Get-YamlContentWithoutComment {
         [string] $Text
     )
 
-    $comment = [regex]::Match($Text, '(?<!\S)#')
-    if ($comment.Success) {
-        return $Text.Substring(0, $comment.Index).TrimEnd()
+    $comment = Find-YamlCommentStart -Text $Text
+    if ($comment -ge 0) {
+        return $Text.Substring(0, $comment).TrimEnd(' ', "`t")
     }
-    return $Text.TrimEnd()
+    return $Text.TrimEnd(' ', "`t")
 }

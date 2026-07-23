@@ -77,10 +77,10 @@ function Read-YamlBlockMapping {
         $isExplicit = Test-YamlIndicator -Text $content -Indicator '?'
         if ($isExplicit) {
             $afterQuestion = $content.Substring(1)
-            $leading = $afterQuestion.Length - $afterQuestion.TrimStart().Length
-            $keyText = $afterQuestion.TrimStart()
+            $leading = $afterQuestion.Length - $afterQuestion.TrimStart(' ', "`t").Length
+            $keyText = $afterQuestion.TrimStart(' ', "`t")
             $keyColumn = $contentColumn + 1 + $leading
-            if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $keyText))) {
+            if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $keyText))) {
                 $Context.LineIndex++
                 Skip-YamlBlockTrivia -Context $Context
                 if ($Context.LineIndex -ge $Context.Lines.Count) {
@@ -104,9 +104,12 @@ function Read-YamlBlockMapping {
                     }
                 }
             } elseif (Test-YamlIndicator -Text $keyText -Indicator '-') {
-                $firstItem = $keyText.Substring(1).TrimStart()
+                $firstItem = $keyText.Substring(1).TrimStart(' ', "`t")
                 $dashColumn = $keyColumn
-                $itemColumn = $dashColumn + 1 + ($keyText.Substring(1).Length - $keyText.Substring(1).TrimStart().Length)
+                $itemColumn = $dashColumn + 1 + (
+                    $keyText.Substring(1).Length -
+                    $keyText.Substring(1).TrimStart(' ', "`t").Length
+                )
                 $key = Read-YamlBlockSequence -Context $Context -Indent $dashColumn -Depth ($Depth + 1) `
                     -FirstItemText $firstItem -FirstItemColumn $itemColumn
             } else {
@@ -130,10 +133,10 @@ function Read-YamlBlockMapping {
             if ($valueIndent -eq $Indent -and
                 (Test-YamlIndicator -Text $valueContent -Indicator ':')) {
                 $valueText = $valueContent.Substring(1)
-                $leading = $valueText.Length - $valueText.TrimStart().Length
-                $valueText = $valueText.TrimStart()
+                $leading = $valueText.Length - $valueText.TrimStart(' ', "`t").Length
+                $valueText = $valueText.TrimStart(' ', "`t")
                 $valueColumn = $Indent + 1 + $leading
-                if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $valueText))) {
+                if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $valueText))) {
                     $valueLineNumber = $Context.LineIndex
                     $Context.LineIndex++
                     Skip-YamlBlockTrivia -Context $Context
@@ -171,7 +174,7 @@ function Read-YamlBlockMapping {
             continue
         }
 
-        $colon = Find-YamlMappingColon -Text $content
+        $colon = Find-YamlMappingColon -Text $content -AllowAnchorFallback
         if ($colon -lt 0) {
             $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn) `
                 -Line $lineNumber -Column $contentColumn
@@ -192,17 +195,17 @@ function Read-YamlBlockMapping {
                 -Line $lineNumber -Column $contentColumn
             $key = New-YamlEmptyScalar -Context $Context -Depth ($Depth + 1) -Mark $mark
         } else {
-            $keyText = $content.Substring(0, $colon).TrimEnd()
+            $keyText = $content.Substring(0, $colon).TrimEnd(' ', "`t")
             $key = Read-YamlBlockKey -Context $Context -Text $keyText -Line $lineNumber `
                 -Column $contentColumn -Depth ($Depth + 1)
         }
 
         $valueStart = $colon + 1
         $valueSource = $content.Substring($valueStart)
-        $leading = $valueSource.Length - $valueSource.TrimStart().Length
-        $valueText = $valueSource.TrimStart()
+        $leading = $valueSource.Length - $valueSource.TrimStart(' ', "`t").Length
+        $valueText = $valueSource.TrimStart(' ', "`t")
         $valueColumn = $contentColumn + $valueStart + $leading
-        if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $valueText))) {
+        if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $valueText))) {
             $Context.LineIndex = $lineNumber + 1
             Skip-YamlBlockTrivia -Context $Context
             if ($Context.LineIndex -lt $Context.Lines.Count) {
@@ -242,7 +245,8 @@ function Read-YamlBlockMapping {
             }
             $Context.LineIndex = $lineNumber
             $value = Read-YamlBlockNode -Context $Context -ParentIndent $Indent -Depth ($Depth + 1) `
-                -Segment $valueText -SegmentColumn $valueColumn -AllowIndentlessSequence
+                -Segment $valueText -SegmentColumn $valueColumn -AllowIndentlessSequence `
+                -DisallowCompactMapping
         }
         $node.Entries.Add([pscustomobject]@{ Key = $key; Value = $value })
     }

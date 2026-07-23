@@ -22,7 +22,9 @@ function Read-YamlFlowNode {
         [bool] $PendingUnknownTag = $false,
 
         [AllowEmptyString()]
-        [string] $PendingAnchor = ''
+        [string] $PendingAnchor = '',
+
+        [switch] $InFlowCollection
     )
 
     Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
@@ -52,7 +54,8 @@ function Read-YamlFlowNode {
                 Move-YamlCursor -Cursor $Cursor -Context $Context
             } else {
                 while ($Cursor.Index -lt $Context.Text.Length -and
-                    -not [char]::IsWhiteSpace($Context.Text[$Cursor.Index]) -and
+                    -not (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index]) -and
+                    $Context.Text[$Cursor.Index] -cne "`n" -and
                     $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}')) {
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                 }
@@ -79,8 +82,11 @@ function Read-YamlFlowNode {
             Move-YamlCursor -Cursor $Cursor -Context $Context
             $anchorStart = $Cursor.Index
             while ($Cursor.Index -lt $Context.Text.Length -and
-                -not [char]::IsWhiteSpace($Context.Text[$Cursor.Index]) -and
-                $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}')) {
+                -not (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index]) -and
+                $Context.Text[$Cursor.Index] -cne "`n" -and
+                $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}') -and
+                -not ($InFlowCollection -and
+                    (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow))) {
                 Move-YamlCursor -Cursor $Cursor -Context $Context
             }
             $anchor = $Context.Text.Substring($anchorStart, $Cursor.Index - $anchorStart)
@@ -123,8 +129,11 @@ function Read-YamlFlowNode {
         Move-YamlCursor -Cursor $Cursor -Context $Context
         $aliasStart = $Cursor.Index
         while ($Cursor.Index -lt $Context.Text.Length -and
-            -not [char]::IsWhiteSpace($Context.Text[$Cursor.Index]) -and
-            $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}')) {
+            -not (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index]) -and
+            $Context.Text[$Cursor.Index] -cne "`n" -and
+            $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}') -and
+            -not ($InFlowCollection -and
+                (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow))) {
             Move-YamlCursor -Cursor $Cursor -Context $Context
         }
         $alias = $Context.Text.Substring($aliasStart, $Cursor.Index - $aliasStart)
@@ -159,24 +168,22 @@ function Read-YamlFlowNode {
                 $explicitPair = $false
                 if ($Context.Text[$Cursor.Index] -eq '?' -and
                     ($Cursor.Index + 1 -ge $Context.Text.Length -or
-                    [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 1]))) {
+                    (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index + 1]) -or
+                    $Context.Text[$Cursor.Index + 1] -ceq "`n")) {
                     $explicitPair = $true
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                     Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
                 }
                 if ($Cursor.Index -lt $Context.Text.Length -and
-                    $Context.Text[$Cursor.Index] -eq ':' -and (
-                        $Cursor.Index + 1 -ge $Context.Text.Length -or
-                        [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 1]) -or
-                        $Context.Text[$Cursor.Index + 1] -in @(',', ']', '}')
-                    )) {
+                    (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow)) {
                     $itemMark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
                     $item = New-YamlSyntaxNode -Context $Context -Kind Scalar -Depth ($Depth + 1) `
                         -Start $itemMark -End $itemMark
                     $item.Value = ''
                     $item.IsPlainImplicit = $true
                 } else {
-                    $item = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1)
+                    $item = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1) `
+                        -InFlowCollection
                 }
                 $itemStartLine = $item.Start.Line
                 Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
@@ -202,7 +209,8 @@ function Read-YamlFlowNode {
                         $value.Value = ''
                         $value.IsPlainImplicit = $true
                     } else {
-                        $value = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 2)
+                        $value = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 2) `
+                            -InFlowCollection
                     }
                     $pair.Entries.Add([pscustomobject]@{ Key = $item; Value = $value })
                     $item = $pair
@@ -236,7 +244,8 @@ function Read-YamlFlowNode {
                 $explicit = $false
                 if ($Context.Text[$Cursor.Index] -eq '?' -and
                     ($Cursor.Index + 1 -ge $Context.Text.Length -or
-                    [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 1]))) {
+                    (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index + 1]) -or
+                    $Context.Text[$Cursor.Index + 1] -ceq "`n")) {
                     $explicit = $true
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                     Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
@@ -255,7 +264,8 @@ function Read-YamlFlowNode {
                         $key.Value = ''
                         $key.IsPlainImplicit = $true
                     } else {
-                        $key = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1)
+                        $key = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1) `
+                            -InFlowCollection
                     }
                 }
                 Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
@@ -298,7 +308,8 @@ function Read-YamlFlowNode {
                         $value.Value = ''
                         $value.IsPlainImplicit = $true
                     } else {
-                        $value = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1)
+                        $value = Read-YamlFlowNode -Cursor $Cursor -Context $Context -Depth ($Depth + 1) `
+                            -InFlowCollection
                     }
                 }
                 $node.Entries.Add([pscustomobject]@{ Key = $key; Value = $value })
@@ -462,9 +473,10 @@ function Read-YamlFlowNode {
                 }
                 if ($Cursor.Column -eq 0 -and $Cursor.Index + 3 -le $Context.Text.Length) {
                     $marker = $Context.Text.Substring($Cursor.Index, 3)
-                    if ($marker -in @('---', '...') -and
+                    if ($marker -cin @('---', '...') -and
                         ($Cursor.Index + 3 -eq $Context.Text.Length -or
-                        [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 3]))) {
+                        (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index + 3]) -or
+                        $Context.Text[$Cursor.Index + 3] -ceq "`n")) {
                         $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column 0
                         throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidQuotedScalar' -Message (
                                 'A document marker cannot occur inside a multiline quoted scalar.'
@@ -513,13 +525,15 @@ function Read-YamlFlowNode {
     }
 
     $builder = [System.Text.StringBuilder]::new()
-    $pendingSpace = $false
+    $pendingWhiteSpace = [System.Text.StringBuilder]::new()
+    $pendingBreaks = 0
     $lastContentLine = $Cursor.Line
     $firstPlainCharacter = $Context.Text[$Cursor.Index]
     if ($firstPlainCharacter -in @(',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', "'", '"', '%', '@', '`') -or
         ($firstPlainCharacter -in @('-', '?', ':') -and (
             $Cursor.Index + 1 -ge $Context.Text.Length -or
-            [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 1]) -or
+            (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index + 1]) -or
+            $Context.Text[$Cursor.Index + 1] -ceq "`n" -or
             $Context.Text[$Cursor.Index + 1] -in @(',', '[', ']', '{', '}')
         ))) {
         throw (New-YamlException -Start $start -End $start -ErrorId 'YamlInvalidPlainScalar' -Message (
@@ -531,46 +545,58 @@ function Read-YamlFlowNode {
         if ($character -in @(',', '[', ']', '{', '}')) {
             break
         }
-        if ($character -eq ':' -and (
-                $Cursor.Index + 1 -ge $Context.Text.Length -or
-                [char]::IsWhiteSpace($Context.Text[$Cursor.Index + 1]) -or
-                $Context.Text[$Cursor.Index + 1] -in @(',', ']', '}')
-            )) {
+        if ($InFlowCollection -and
+            (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow)) {
             break
         }
         if ($character -eq '#' -and
-            ($Cursor.Index -eq 0 -or [char]::IsWhiteSpace($Context.Text[$Cursor.Index - 1]))) {
+            ($Cursor.Index -eq 0 -or
+            (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index - 1]) -or
+            $Context.Text[$Cursor.Index - 1] -ceq "`n")) {
             break
         }
-        if ([char]::IsWhiteSpace($character)) {
-            $pendingSpace = $true
+        if (Test-YamlWhiteSpace -Character $character) {
+            [void] $pendingWhiteSpace.Append($character)
             Move-YamlCursor -Cursor $Cursor -Context $Context
-            if ($character -eq "`n") {
+            continue
+        }
+        if ($character -eq "`n") {
+            $pendingWhiteSpace.Clear() | Out-Null
+            $pendingBreaks = 0
+            while ($Cursor.Index -lt $Context.Text.Length -and
+                $Context.Text[$Cursor.Index] -ceq "`n") {
+                $pendingBreaks++
+                Move-YamlCursor -Cursor $Cursor -Context $Context
                 $indentSpaces = 0
                 while ($Cursor.Index -lt $Context.Text.Length -and
-                    $Context.Text[$Cursor.Index] -eq ' ') {
+                    $Context.Text[$Cursor.Index] -ceq ' ') {
                     $indentSpaces++
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                 }
                 while ($Cursor.Index -lt $Context.Text.Length -and
-                    $Context.Text[$Cursor.Index] -eq "`t") {
+                    $Context.Text[$Cursor.Index] -ceq "`t") {
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                 }
-                if ($Cursor.Index -lt $Context.Text.Length -and
-                    $Context.Text[$Cursor.Index] -notin @("`n", '#', ']', '}') -and
-                    $indentSpaces -le $Cursor.ParentIndent) {
-                    $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
-                    throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidFlowIndentation' -Message (
-                            'A multiline flow scalar must be indented beyond its surrounding block context.'
-                        ))
-                }
+            }
+            if ($Cursor.Index -lt $Context.Text.Length -and
+                $Context.Text[$Cursor.Index] -notin @("`n", '#', ']', '}') -and
+                $indentSpaces -le $Cursor.ParentIndent) {
+                $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
+                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidFlowIndentation' -Message (
+                        'A multiline flow scalar must be indented beyond its surrounding block context.'
+                    ))
             }
             continue
         }
-        if ($pendingSpace -and $builder.Length -gt 0) {
-            [void] $builder.Append(' ')
+        if ($pendingBreaks -gt 0 -and $builder.Length -gt 0) {
+            [void] $builder.Append(
+                $(if ($pendingBreaks -eq 1) { ' ' } else { "`n" * ($pendingBreaks - 1) })
+            )
+        } elseif ($pendingWhiteSpace.Length -gt 0 -and $builder.Length -gt 0) {
+            [void] $builder.Append($pendingWhiteSpace)
         }
-        $pendingSpace = $false
+        $pendingBreaks = 0
+        $pendingWhiteSpace.Clear() | Out-Null
         [void] $builder.Append($character)
         if ($builder.Length -gt $Context.MaxScalarLength) {
             throw (New-YamlException -Start $start -End $start -ErrorId 'YamlScalarLimitExceeded' -Message (
@@ -580,7 +606,7 @@ function Read-YamlFlowNode {
         $lastContentLine = $Cursor.Line
         Move-YamlCursor -Cursor $Cursor -Context $Context
     }
-    $value = $builder.ToString().TrimEnd()
+    $value = $builder.ToString().TrimEnd(' ', "`t")
     if ([string]::IsNullOrEmpty($value)) {
         throw (New-YamlException -Start $start -End $start -ErrorId 'YamlExpectedNode' -Message (
                 'A YAML node was expected.'

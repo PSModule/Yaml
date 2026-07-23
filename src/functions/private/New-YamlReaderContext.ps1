@@ -36,8 +36,9 @@ function New-YamlReaderContext {
         [int] $MaxNumericLength
     )
 
-    Assert-YamlText -Yaml $Yaml
     $text = $Yaml.Replace("`r`n", "`n").Replace("`r", "`n")
+    $text = ConvertFrom-YamlByteOrderMark -Text $text
+    Assert-YamlText -Yaml $text
     $lines = [System.Text.RegularExpressions.Regex]::Split($text, "`n")
     $lineStarts = [int[]]::new($lines.Count)
     $offset = 0

@@ -65,7 +65,7 @@ function Read-YamlBlockKey {
     $first = $rest[0]
     if ($first -in @(',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', "'", '"', '%', '@', '`') -or
         ($first -in @('-', '?', ':') -and (
-            $rest.Length -gt 1 -and [char]::IsWhiteSpace($rest[1])
+            $rest.Length -gt 1 -and (Test-YamlWhiteSpace -Character $rest[1])
         ))) {
         throw (New-YamlException -Start $start -End $start -ErrorId 'YamlInvalidPlainScalar' -Message (
                 'The first character is not allowed in a YAML plain scalar.'
@@ -82,7 +82,7 @@ function Read-YamlBlockKey {
     $node = New-YamlSyntaxNode -Context $Context -Kind Scalar -Depth $Depth -Start $start -End $end
     Set-YamlParsedNodeProperty -Node $node -Tag $properties.Tag `
         -HasUnknownTag $properties.HasUnknownTag -Anchor $properties.Anchor -Context $Context
-    $node.Value = $rest.TrimEnd()
+    $node.Value = $rest.TrimEnd(' ', "`t")
     $node.Style = 'Plain'
     $node.IsPlainImplicit = [string]::IsNullOrEmpty($properties.Tag) -and
     -not $properties.HasUnknownTag

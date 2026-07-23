@@ -107,7 +107,7 @@ function Resolve-YamlScalar {
         }
     } elseif ($standardTag -ceq 'binary') {
         try {
-            $resolved = [System.Convert]::FromBase64String(($value -replace '\s', ''))
+            $resolved = [System.Convert]::FromBase64String(($value -replace '[ \t\n]', ''))
         } catch [System.FormatException] {
             throw (New-YamlException -Start $Node.Start -End $Node.End -ErrorId 'YamlInvalidBinary' -Message (
                     "The value for tag 'tag:yaml.org,2002:binary' is not valid Base64."
@@ -135,7 +135,7 @@ function Resolve-YamlScalar {
             )) {
             $resolved = [datetime]::SpecifyKind($date, [System.DateTimeKind]::Utc)
         } else {
-            $normalized = $value -replace '\s+([+-]\d{1,2}(?::?\d{2})?)$', '$1'
+            $normalized = $value -replace '[ \t]+([+-]\d{1,2}(?::?\d{2})?)$', '$1'
             if ($normalized -match '([+-])(\d{1,2})(?::?(\d{2}))?$') {
                 $minutes = if ($Matches[3]) { $Matches[3] } else { '00' }
                 $suffix = '{0}{1}:{2}' -f $Matches[1], $Matches[2].PadLeft(2, '0'), $minutes

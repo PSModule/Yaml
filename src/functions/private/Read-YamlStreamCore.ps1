@@ -58,7 +58,7 @@ function Read-YamlStreamCore {
         }
         if ($lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
             $suffix = Get-YamlContentWithoutComment -Text $lines[$context.LineIndex].Substring(3)
-            if ($suffix.Trim().Length -gt 0) {
+            if ($suffix.Trim(' ', "`t").Length -gt 0) {
                 $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
                     -Line $context.LineIndex -Column 3
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
@@ -105,10 +105,10 @@ function Read-YamlStreamCore {
         )
         if ($explicitStart) {
             $afterMarker = $lineText.Substring(3)
-            $leading = $afterMarker.Length - $afterMarker.TrimStart().Length
-            $segment = $afterMarker.TrimStart()
+            $leading = $afterMarker.Length - $afterMarker.TrimStart(' ', "`t").Length
+            $segment = $afterMarker.TrimStart(' ', "`t")
             $segmentColumn = 3 + $leading
-            if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $segment))) {
+            if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $segment))) {
                 $markerLine = $context.LineIndex
                 $context.LineIndex++
                 Skip-YamlBlockTrivia -Context $context
@@ -121,7 +121,7 @@ function Read-YamlStreamCore {
                 }
             } else {
                 if ($segment[0] -in @('!', '&') -and
-                    (Find-YamlMappingColon -Text $segment) -ge 0) {
+                    (Find-YamlMappingColon -Text $segment -AllowAnchorFallback) -ge 0) {
                     $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + $segmentColumn) `
                         -Line $context.LineIndex -Column $segmentColumn
                     throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentStart' -Message (
@@ -129,15 +129,15 @@ function Read-YamlStreamCore {
                         ))
                 }
                 if (-not (Test-YamlIndicator -Text $segment -Indicator '-') -and
-                    ((Find-YamlMappingColon -Text $segment) -ge 0 -or
+                    ((Find-YamlMappingColon -Text $segment -AllowAnchorFallback) -ge 0 -or
                     (Test-YamlIndicator -Text $segment -Indicator '?'))) {
                     $document = Read-YamlBlockMapping -Context $context -Indent 0 -Depth 1 `
                         -FirstText $segment -FirstColumn $segmentColumn
                 } elseif (Test-YamlIndicator -Text $segment -Indicator '-') {
                     $firstItem = $segment.Substring(1)
-                    $leading = $firstItem.Length - $firstItem.TrimStart().Length
+                    $leading = $firstItem.Length - $firstItem.TrimStart(' ', "`t").Length
                     $document = Read-YamlBlockSequence -Context $context -Indent 0 -Depth 1 `
-                        -FirstItemText $firstItem.TrimStart() `
+                        -FirstItemText $firstItem.TrimStart(' ', "`t") `
                         -FirstItemColumn ($segmentColumn + 1 + $leading)
                 } else {
                     $document = Read-YamlBlockNode -Context $context -ParentIndent -1 -Depth 1 `
@@ -168,7 +168,8 @@ function Read-YamlStreamCore {
             $lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
             $explicitEnd = $true
             $endLine = $lines[$context.LineIndex]
-            if ((Get-YamlContentWithoutComment -Text $endLine.Substring(3)).Trim().Length -gt 0) {
+            if ((Get-YamlContentWithoutComment -Text $endLine.Substring(3)).
+                Trim(' ', "`t").Length -gt 0) {
                 $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
                     -Line $context.LineIndex -Column 3
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
@@ -181,7 +182,7 @@ function Read-YamlStreamCore {
         }
         if (-not $explicitEnd -and $context.LineIndex -lt $lines.Count -and
             $lines[$context.LineIndex] -notmatch '^---(?:[ \t]|$)' -and
-            $lines[$context.LineIndex].Trim().Length -gt 0) {
+            $lines[$context.LineIndex].Trim(' ', "`t").Length -gt 0) {
             $mark = New-YamlMark -Index $lineStarts[$context.LineIndex] -Line $context.LineIndex -Column 0
             throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidStream' -Message (
                     'Unexpected content remains after a YAML document.'

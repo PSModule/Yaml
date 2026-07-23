@@ -137,6 +137,22 @@ folded: >
             , $result | Should -BeOfType [object[]]
             $result | Should -Be @('one', 'two')
         }
+
+        It 'treats only YAML s-white as structural whitespace' {
+            $nbsp = [char] 0x00A0
+
+            ("key:${nbsp}value" | ConvertFrom-Yaml) | Should -Be "key:${nbsp}value"
+            ("-${nbsp}item" | ConvertFrom-Yaml) | Should -Be "-${nbsp}item"
+
+            $flow = "[foo${nbsp}bar]" | ConvertFrom-Yaml -NoEnumerate
+            $flow | Should -Be @("foo${nbsp}bar")
+        }
+
+        It 'preserves flow scalar spaces and folds flow line breaks' {
+            $result = "[foo  bar, foo`n`n  bar]" | ConvertFrom-Yaml -NoEnumerate
+
+            $result | Should -Be @('foo  bar', "foo`nbar")
+        }
     }
 
     Context 'Streams and pipeline input' {
@@ -156,9 +172,33 @@ folded: >
             $result[0].name | Should -Be 'first'
             $result[1].name | Should -Be 'second'
         }
+
+        It 'consumes byte order marks only at legal document boundaries' {
+            $bom = [char] 0xFEFF
+            $documents = @(
+                "${bom}%YAML 1.2`n---`none`n...`n${bom}---`ntwo" |
+                    ConvertFrom-Yaml
+            )
+
+            $documents | Should -Be @('one', 'two')
+            ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
+            ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
+            ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
+        }
     }
 
     Context 'Tags, anchors, and aliases' {
+        It 'stops anchor and alias names before mapping indicators' {
+            $emptyKey = '&a: value' | ConvertFrom-Yaml -AsHashtable
+            $aliasedKey = '{anchor: &a foo, *a: value}' |
+                ConvertFrom-Yaml -AsHashtable
+
+            $emptyKey.Count | Should -Be 1
+            $emptyKey[[System.DBNull]::Value] | Should -Be 'value'
+            @($aliasedKey.Keys) | Should -Be @('anchor', 'foo')
+            @($aliasedKey.Values) | Should -Be @('foo', 'value')
+        }
+
         It 'constructs explicit standard scalar tags safely' {
             $result = @'
 text: !!str 42
