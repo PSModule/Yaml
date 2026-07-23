@@ -213,6 +213,8 @@ folded: >
             ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
             ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
             ("---`none`n...`n${bom}# comment`ntwo" | Test-Yaml) | Should -BeFalse
+            ('"foo' + $bom + 'bar"' | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
+            ("'foo${bom}bar'" | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
         }
     }
 

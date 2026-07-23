@@ -32,14 +32,7 @@ function ConvertFrom-YamlByteOrderMark {
             continue
         }
 
-        $before = $Text.Substring(0, $index)
-        $line = ([regex]::Matches($before, "`n")).Count
-        $lastBreak = $before.LastIndexOf("`n", [System.StringComparison]::Ordinal)
-        $column = if ($lastBreak -lt 0) { $before.Length } else { $before.Length - $lastBreak - 1 }
-        $mark = New-YamlMark -Index $index -Line $line -Column $column
-        throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidByteOrderMark' -Message (
-                'A YAML byte order mark is only allowed at the start of the stream or a document prefix.'
-            ))
+        [void] $builder.Append($Text[$index])
     }
 
     return $builder.ToString()

@@ -22,6 +22,7 @@ function Resolve-YamlTag {
             ))
     }
 
+    $isNonSpecific = $Token.Equals('!', [System.StringComparison]::Ordinal)
     if ($Token.StartsWith('!<', [System.StringComparison]::Ordinal)) {
         if (-not $Token.EndsWith('>', [System.StringComparison]::Ordinal) -or $Token.Length -lt 4) {
             throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
@@ -67,7 +68,11 @@ function Resolve-YamlTag {
         }
     }
 
-    $expanded = ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token
+    $expanded = if ($isNonSpecific) {
+        ''
+    } else {
+        ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token
+    }
     $expandedLength = $expanded.Length
     if ($expandedLength -gt $Context.MaxTagLength) {
         throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlTagLimitExceeded' -Message (
@@ -98,6 +103,6 @@ function Resolve-YamlTag {
 
     [pscustomobject]@{
         Tag       = $expanded
-        IsUnknown = -not $known
+        IsUnknown = $isNonSpecific -or -not $known
     }
 }

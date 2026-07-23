@@ -37,6 +37,7 @@ function Read-YamlPlainScalar {
     $parts = [System.Collections.Generic.List[object]]::new()
     $firstComment = Find-YamlCommentStart -Text $FirstText
     $firstValue = (Get-YamlContentWithoutComment -Text $FirstText).Trim(' ', "`t")
+    Assert-YamlNoByteOrderMark -Text $firstValue -Mark $start
     $firstCharacter = if ($firstValue.Length -gt 0) { $firstValue[0] } else { [char] 0 }
     $forbiddenFirst = $firstCharacter -in @(
         ',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', "'", '"', '%', '@', '`'
@@ -91,6 +92,7 @@ function Read-YamlPlainScalar {
             break
         }
         $trimmedContent = $content.Trim(' ', "`t")
+        Assert-YamlNoByteOrderMark -Text $trimmedContent -Mark $start
         $separatorLength = if ($pendingBreaks -gt 0) { $pendingBreaks } else { 1 }
         if ($decodedLength + $separatorLength + $trimmedContent.Length -gt
             $Context.MaxScalarLength) {

@@ -67,11 +67,16 @@ Describe 'Test-Yaml' {
                 Should -Be ($length -le 1024)
         }
 
+        ((('k' * 1023) + ' : value') | Test-Yaml) | Should -BeTrue
+        ((('k' * 1024) + ' : value') | Test-Yaml) | Should -BeFalse
+
     }
 
     It 'resolves non-specific tags before comparing representation keys' {
         ("! x: one`n!!str x: two" | Test-Yaml) | Should -BeFalse
         ("? ! [x]`n: one`n? !!seq [x]`n: two" | Test-Yaml) | Should -BeFalse
+        ("! x: one`n!<!> x: two" | Test-Yaml) | Should -BeTrue
+        ("!<!> x: one`n!<!> x: two" | Test-Yaml) | Should -BeFalse
     }
 
     It 'accepts multiline keys in flow mappings' {

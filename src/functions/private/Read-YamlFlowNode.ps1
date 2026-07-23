@@ -90,6 +90,7 @@ function Read-YamlFlowNode {
                 Move-YamlCursor -Cursor $Cursor -Context $Context
             }
             $anchor = $Context.Text.Substring($anchorStart, $Cursor.Index - $anchorStart)
+            Assert-YamlNoByteOrderMark -Text $anchor -Mark $start
             if ([string]::IsNullOrEmpty($anchor)) {
                 throw (New-YamlException -Start $start -End $start -ErrorId 'YamlInvalidAnchor' -Message (
                         'A YAML anchor name is missing.'
@@ -137,6 +138,7 @@ function Read-YamlFlowNode {
             Move-YamlCursor -Cursor $Cursor -Context $Context
         }
         $alias = $Context.Text.Substring($aliasStart, $Cursor.Index - $aliasStart)
+        Assert-YamlNoByteOrderMark -Text $alias -Mark $start
         $Context.AliasCount++
         if ($Context.AliasCount -gt $Context.MaxAliases) {
             throw (New-YamlException -Start $start -End $start -ErrorId 'YamlAliasLimitExceeded' -Message (
@@ -544,6 +546,12 @@ function Read-YamlFlowNode {
     }
     while ($Cursor.Index -lt $Context.Text.Length) {
         $character = $Context.Text[$Cursor.Index]
+        if ($character -ceq [char] 0xFEFF) {
+            $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
+            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidByteOrderMark' -Message (
+                    'A raw YAML byte order mark is only allowed in a quoted scalar or document prefix.'
+                ))
+        }
         if ($character -in @(',', '[', ']', '{', '}')) {
             break
         }

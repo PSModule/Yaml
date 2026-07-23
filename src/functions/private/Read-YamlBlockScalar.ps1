@@ -97,6 +97,7 @@ function Read-YamlBlockScalar {
     $decodedLength = 0
     while ($Context.LineIndex -lt $Context.Lines.Count) {
         $line = $Context.Lines[$Context.LineIndex]
+        Assert-YamlNoByteOrderMark -Text $line -Mark $start
         if ($line -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
             break
         }

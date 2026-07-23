@@ -171,6 +171,15 @@ Describe 'ConvertTo-Yaml' {
             $result['multiline'] | Should -Be $inputObject.multiline
         }
 
+        It 'escapes byte order marks as quoted scalar content' {
+            $value = "foo$([char] 0xFEFF)bar"
+
+            $yaml = ConvertTo-Yaml -InputObject $value
+
+            $yaml.TrimEnd("`n") | Should -Be '"foo\uFEFFbar"'
+            ($yaml | ConvertFrom-Yaml) | Should -Be $value
+        }
+
         It 'emits only valid YAML characters and rejects malformed UTF-16 input' {
             $noncharacters = ([string] [char] 0xFFFE) + [char] 0xFFFF
             $yaml = ConvertTo-Yaml -InputObject $noncharacters

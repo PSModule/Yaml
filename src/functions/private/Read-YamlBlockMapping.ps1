@@ -191,7 +191,8 @@ function Read-YamlBlockMapping {
             $key = Read-YamlBlockKey -Context $Context -Text $keyText -Line $lineNumber `
                 -Column $contentColumn -Depth ($Depth + 1)
         }
-        if ($colon -gt 0 -and (Get-YamlRuneCount -Text $keyText) -gt 1024) {
+        if ($colon -gt 0 -and
+            (Get-YamlRuneCount -Text $content.Substring(0, $colon)) -gt 1024) {
             $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn + $colon) `
                 -Line $lineNumber -Column ($contentColumn + $colon)
             throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidImplicitKey' -Message (

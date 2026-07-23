@@ -50,7 +50,7 @@ function ConvertTo-YamlQuotedText {
             [void] $builder.Append('\"')
         } elseif ($code -eq 92) {
             [void] $builder.Append('\\')
-        } elseif ($code -lt 0x20 -or $code -eq 0x7F -or
+        } elseif ($code -lt 0x20 -or $code -eq 0x7F -or $code -eq 0xFEFF -or
             $code -eq 0xFFFE -or $code -eq 0xFFFF -or
             ($code -ge 0x80 -and $code -le 0x9F)) {
             [void] $builder.Append(('\u{0:X4}' -f $code))

@@ -14,8 +14,7 @@ function Get-YamlEffectiveTag {
         [object] $Value
     )
 
-    if (-not [string]::IsNullOrEmpty($Node.Tag) -and
-        -not $Node.Tag.Equals('!', [System.StringComparison]::Ordinal)) {
+    if (-not [string]::IsNullOrEmpty($Node.Tag)) {
         return $Node.Tag
     }
     if ($Node.Kind.Equals('Sequence', [System.StringComparison]::Ordinal)) {
@@ -24,7 +23,7 @@ function Get-YamlEffectiveTag {
     if ($Node.Kind.Equals('Mapping', [System.StringComparison]::Ordinal)) {
         return 'tag:yaml.org,2002:map'
     }
-    if ($Node.Tag.Equals('!', [System.StringComparison]::Ordinal)) {
+    if ($Node.HasUnknownTag) {
         return 'tag:yaml.org,2002:str'
     }
 

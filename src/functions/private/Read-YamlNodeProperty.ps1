@@ -84,6 +84,10 @@ function Read-YamlNodeProperty {
                 $position++
             }
             $anchor = $Text.Substring($start, $position - $start)
+            Assert-YamlNoByteOrderMark -Text $anchor -Mark (
+                New-YamlMark -Index ($Context.LineStarts[$Line] + $Column + $start) -Line $Line `
+                    -Column ($Column + $start)
+            )
             if ([string]::IsNullOrEmpty($anchor) -or $anchor.IndexOfAny(@('[', ']', '{', '}', ',')) -ge 0) {
                 $mark = New-YamlMark -Index ($Context.LineStarts[$Line] + $Column + $start - 1) -Line $Line `
                     -Column ($Column + $start - 1)

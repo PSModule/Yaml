@@ -62,6 +62,7 @@ function Read-YamlBlockKey {
         return $node
     }
 
+    Assert-YamlNoByteOrderMark -Text $rest -Mark $start
     $first = $rest[0]
     if ($first -in @(',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', "'", '"', '%', '@', '`') -or
         ($first -in @('-', '?', ':') -and (
