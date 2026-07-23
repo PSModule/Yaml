@@ -211,6 +211,57 @@ Describe 'ConvertTo-Yaml' {
             [Text.Encoding]::UTF8.GetString($result['binary']) | Should -Be 'hello'
         }
 
+        It 'serializes every representable DateTimeOffset boundary stably' {
+            $values = @(
+                [datetimeoffset]::MinValue
+                [datetimeoffset]::MaxValue
+                [datetimeoffset]::new(
+                    [datetime]::new(1, 1, 1, 14, 0, 0),
+                    [timespan]::FromHours(14)
+                )
+                [datetimeoffset]::new(
+                    [datetime]::new(9999, 12, 31, 9, 59, 59, 999).AddTicks(9999),
+                    [timespan]::FromHours(-14)
+                )
+            )
+
+            foreach ($value in $values) {
+                $yaml = ConvertTo-Yaml -InputObject $value
+                $roundTrip = $yaml | ConvertFrom-Yaml
+
+                ($yaml | Test-Yaml) | Should -BeTrue
+                $roundTrip.UtcTicks | Should -Be $value.UtcTicks
+            }
+        }
+
+        It 'classifies unrepresentable local DateTime boundaries' {
+            $errors = [System.Collections.Generic.List[object]]::new()
+            $successes = 0
+            foreach ($value in @(
+                    [datetime]::SpecifyKind([datetime]::MinValue, [DateTimeKind]::Local)
+                    [datetime]::SpecifyKind([datetime]::MaxValue, [DateTimeKind]::Local)
+                )) {
+                try {
+                    $yaml = ConvertTo-Yaml -InputObject $value
+                    ($yaml | Test-Yaml) | Should -BeTrue
+                    $successes++
+                } catch {
+                    $errors.Add($_)
+                }
+            }
+
+            ($successes + $errors.Count) | Should -Be 2
+            if ([TimeZoneInfo]::Local.BaseUtcOffset -ne [timespan]::Zero) {
+                $errors.Count | Should -BeGreaterThan 0
+            }
+            foreach ($serializationError in $errors) {
+                $serializationError.FullyQualifiedErrorId |
+                    Should -Be 'YamlTimestampSerializationFailed,ConvertTo-Yaml'
+                $serializationError.Exception.Message |
+                    Should -Be 'The timestamp cannot be represented with its local or explicit UTC offset.'
+            }
+        }
+
         It 'emits aliases for repeated byte arrays and preserves their identity' {
             $bytes = [Text.Encoding]::UTF8.GetBytes('hello')
             $inputObject = [ordered]@{ first = $bytes; second = $bytes }

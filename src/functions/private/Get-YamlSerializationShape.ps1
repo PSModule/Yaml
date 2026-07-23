@@ -162,29 +162,14 @@ function Get-YamlSerializationShape {
     }
     if (-not $isPropertyBag -and $Value -is [datetimeoffset]) {
         $scalar.Tag = 'tag:yaml.org,2002:timestamp'
-        $scalar.Value = $Value.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
+        $scalar.Value = ConvertTo-YamlTimestampText -Value $Value
         $scalar.Style = 'DoubleQuoted'
         Confirm-YamlScalarLength -Node $scalar -State $State
         return [pscustomobject]@{ Kind = 'Scalar'; Node = $scalar; Values = $null }
     }
     if (-not $isPropertyBag -and $Value -is [datetime]) {
         $scalar.Tag = 'tag:yaml.org,2002:timestamp'
-        if ($Value.Kind -eq [System.DateTimeKind]::Local) {
-            $scalar.Value = ([datetimeoffset] $Value).ToString(
-                'o',
-                [System.Globalization.CultureInfo]::InvariantCulture
-            )
-        } else {
-            $utc = if ($Value.Kind -eq [System.DateTimeKind]::Utc) {
-                $Value
-            } else {
-                [datetime]::SpecifyKind($Value, [System.DateTimeKind]::Utc)
-            }
-            $scalar.Value = $utc.ToString(
-                "yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'",
-                [System.Globalization.CultureInfo]::InvariantCulture
-            )
-        }
+        $scalar.Value = ConvertTo-YamlTimestampText -Value $Value
         $scalar.Style = 'DoubleQuoted'
         Confirm-YamlScalarLength -Node $scalar -State $State
         return [pscustomobject]@{ Kind = 'Scalar'; Node = $scalar; Values = $null }
