@@ -48,12 +48,18 @@ Describe 'Released yaml-test-suite corpus accounting' {
     }
 
     It 'accounts for parser representation/event comparisons' {
-        @($suiteResults | Where-Object EventResult -EQ 'Pass').Count | Should -Be 181
+        @($suiteResults | Where-Object EventResult -EQ 'Pass').Count | Should -Be 307
         @($suiteResults | Where-Object EventResult -EQ 'PolicyDifference').Count |
-            Should -Be 14
-        @($suiteResults | Where-Object EventResult -EQ 'Fail').Count | Should -Be 113
+            Should -Be 1
+        @($suiteResults | Where-Object EventResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object EventResult -EQ 'NotApplicable').Count |
             Should -Be 94
+        @(
+            $suiteResults |
+                Where-Object EventResult -EQ 'PolicyDifference' |
+                Select-Object -ExpandProperty Case |
+                Sort-Object
+        ) | Should -Be @('6CK3')
     }
 
     It 'accounts for JSON construction comparisons' {
@@ -66,19 +72,19 @@ Describe 'Released yaml-test-suite corpus accounting' {
     }
 
     It 'accounts for out.yaml representation comparisons' {
-        @($suiteResults | Where-Object OutYamlResult -EQ 'Pass').Count | Should -Be 240
+        @($suiteResults | Where-Object OutYamlResult -EQ 'Pass').Count | Should -Be 241
         @($suiteResults | Where-Object OutYamlResult -EQ 'PolicyDifference').Count |
             Should -Be 0
         @($suiteResults | Where-Object OutYamlResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object OutYamlResult -EQ 'NotApplicable').Count |
-            Should -Be 162
+            Should -Be 161
     }
 
     It 'accounts for emitter and round-trip comparisons' {
-        @($suiteResults | Where-Object EmitResult -EQ 'Pass').Count | Should -Be 232
+        @($suiteResults | Where-Object EmitResult -EQ 'Pass').Count | Should -Be 306
         @($suiteResults | Where-Object EmitResult -EQ 'PolicyDifference').Count |
-            Should -Be 12
-        @($suiteResults | Where-Object EmitResult -EQ 'Fail').Count | Should -Be 62
+            Should -Be 0
+        @($suiteResults | Where-Object EmitResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object EmitResult -EQ 'NotApplicable').Count |
             Should -Be 96
     }

@@ -40,12 +40,12 @@ function ConvertFrom-YamlNode {
             $frame.Node = $effective
 
             if ($effective.Kind -eq 'Scalar') {
-                $frame.Holder.Value = (Resolve-YamlScalar -Node $effective).Value
+                $frame.Holder.PSObject.Properties['Value'].Value = (Resolve-YamlScalar -Node $effective).Value
                 [void] $stack.Pop()
                 continue
             }
             if ($Cache.ContainsKey($effective.Id)) {
-                $frame.Holder.Value = $Cache[$effective.Id]
+                $frame.Holder.PSObject.Properties['Value'].Value = $Cache[$effective.Id]
                 [void] $stack.Pop()
                 continue
             }
@@ -70,7 +70,7 @@ function ConvertFrom-YamlNode {
                 $frame.State = 'PropertyKey'
             }
             $Cache[$effective.Id] = $frame.Result
-            $frame.Holder.Value = $frame.Result
+            $frame.Holder.PSObject.Properties['Value'].Value = $frame.Result
             continue
         }
 
@@ -96,7 +96,7 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'SequenceValue') {
-            $frame.Result[$frame.Index] = $frame.Child.Value
+            $frame.Result[$frame.Index] = $frame.Child.PSObject.Properties['Value'].Value
             $frame.Index++
             $frame.State = 'Sequence'
             continue
@@ -128,10 +128,11 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'OmapKeyValue') {
-            $frame.Key = if ($null -eq $frame.Child.Value) {
-                [System.DBNull]::Value
+            $keyValue = $frame.Child.PSObject.Properties['Value'].Value
+            if ([object]::ReferenceEquals($keyValue, $null)) {
+                $frame.Key = [System.DBNull]::Value
             } else {
-                $frame.Child.Value
+                $frame.Key = $keyValue
             }
             $entryNode = $frame.Node.Items[$frame.Index]
             while ($entryNode.Kind -eq 'Alias') {
@@ -153,7 +154,7 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'OmapValue') {
-            $frame.Result.Add($frame.Key, $frame.Child.Value)
+            $frame.Result.Add($frame.Key, $frame.Child.PSObject.Properties['Value'].Value)
             $frame.Index++
             $frame.State = 'OmapKey'
             continue
@@ -180,10 +181,11 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'DictionaryKeyValue') {
-            $frame.Key = if ($null -eq $frame.Child.Value) {
-                [System.DBNull]::Value
+            $keyValue = $frame.Child.PSObject.Properties['Value'].Value
+            if ([object]::ReferenceEquals($keyValue, $null)) {
+                $frame.Key = [System.DBNull]::Value
             } else {
-                $frame.Child.Value
+                $frame.Key = $keyValue
             }
             if ($frame.Node.Tag -ceq 'tag:yaml.org,2002:set') {
                 $frame.Result.Add($frame.Key, $null)
@@ -207,7 +209,7 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'DictionaryValue') {
-            $frame.Result.Add($frame.Key, $frame.Child.Value)
+            $frame.Result.Add($frame.Key, $frame.Child.PSObject.Properties['Value'].Value)
             $frame.Index++
             $frame.State = 'DictionaryKey'
             continue
@@ -234,7 +236,7 @@ function ConvertFrom-YamlNode {
             continue
         }
         if ($frame.State -eq 'PropertyKeyValue') {
-            $frame.Key = $frame.Child.Value
+            $frame.Key = $frame.Child.PSObject.Properties['Value'].Value
             if ($frame.Key -isnot [string] -or [string]::IsNullOrEmpty($frame.Key)) {
                 $keyNode = $frame.Node.Entries[$frame.Index].Key
                 throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
@@ -268,7 +270,7 @@ function ConvertFrom-YamlNode {
             $frame.Result.PSObject.Properties.Add(
                 [System.Management.Automation.PSNoteProperty]::new(
                     [string] $frame.Key,
-                    $frame.Child.Value
+                    $frame.Child.PSObject.Properties['Value'].Value
                 )
             )
             $frame.Index++
@@ -276,5 +278,5 @@ function ConvertFrom-YamlNode {
         }
     }
 
-    New-YamlValueBox -Value $root.Value
+    New-YamlValueBox -Value $root.PSObject.Properties['Value'].Value
 }

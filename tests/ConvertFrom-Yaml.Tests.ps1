@@ -254,6 +254,22 @@ copy: *source
             $entry.Value | Should -Be 'value'
         }
 
+        It 'preserves empty sequence keys inside nested complex mapping keys' {
+            $result = '? []: x' | ConvertFrom-Yaml -AsHashtable
+            $result.Count | Should -Be 1
+            $outerKey = @($result.Keys)[0]
+            $outerValue = $result[$outerKey]
+
+            $outerKey | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+            $outerKey.Count | Should -Be 1
+            $innerEntry = $outerKey.GetEnumerator() | Select-Object -First 1
+            $innerKey = $innerEntry.Key
+            , $innerKey | Should -BeOfType [object[]]
+            $innerKey.Count | Should -Be 0
+            $innerEntry.Value | Should -Be 'x'
+            $outerValue | Should -BeNullOrEmpty
+        }
+
         It 'matches standard tags ordinally and treats case variants as unknown' {
             $result = "integer: !!INT 12`nset: !!SET {one: null}" |
                 ConvertFrom-Yaml -AsHashtable
