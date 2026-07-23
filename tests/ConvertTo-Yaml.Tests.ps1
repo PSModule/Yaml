@@ -261,6 +261,53 @@ Describe 'ConvertTo-Yaml' {
             $enumerator.Value | Should -Be 'value'
         }
 
+        It 'uses explicit keys when scalar keys exceed 1024 Unicode values' {
+            $atLimit = [System.Collections.Specialized.OrderedDictionary]::new()
+            $atLimit.Add(('x' * 1024), 'value')
+            $overLimit = [System.Collections.Specialized.OrderedDictionary]::new()
+            $overLimit.Add(('😀' * 1025), [ordered]@{ nested = 'value' })
+
+            $atLimitYaml = ConvertTo-Yaml -InputObject $atLimit
+            $overLimitYaml = ConvertTo-Yaml -InputObject $overLimit
+            $roundTrip = $overLimitYaml | ConvertFrom-Yaml -AsHashtable
+
+            $atLimitYaml | Should -Not -Match '^\? '
+            $overLimitYaml | Should -Match '^\? '
+            $overLimitYaml | Should -Match '(?m)^: $'
+            ($overLimitYaml | Test-Yaml) | Should -BeTrue
+            $roundTrip.Contains(('😀' * 1025)) | Should -BeTrue
+            $roundTrip[('😀' * 1025)]['nested'] | Should -Be 'value'
+        }
+
+        It 'uses explicit keys when rendered collection keys exceed 1024 values' {
+            $dictionary = [System.Collections.Specialized.OrderedDictionary]::new()
+            $key = [object[]] (0..299)
+            $dictionary.Add($key, 'value')
+
+            $yaml = ConvertTo-Yaml -InputObject $dictionary
+            $roundTrip = $yaml | ConvertFrom-Yaml -AsHashtable
+            $enumerator = $roundTrip.GetEnumerator()
+            $null = $enumerator.MoveNext()
+
+            $yaml | Should -Match '^\? \['
+            ($yaml | Test-Yaml) | Should -BeTrue
+            $enumerator.Key | Should -Be $key
+            $enumerator.Value | Should -Be 'value'
+        }
+
+        It 'uses explicit keys inside flow-rendered complex keys' {
+            $innerKey = [System.Collections.Specialized.OrderedDictionary]::new()
+            $innerKey.Add(('x' * 1025), 'inner')
+            $dictionary = [System.Collections.Specialized.OrderedDictionary]::new()
+            $dictionary.Add($innerKey, 'outer')
+
+            $yaml = ConvertTo-Yaml -InputObject $dictionary
+
+            $yaml | Should -Match '\{\? '
+            ($yaml | Test-Yaml) | Should -BeTrue
+            { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Not -Throw
+        }
+
         It 'rejects dictionary keys that normalize to the same YAML value' {
             $dictionary = [System.Collections.Specialized.OrderedDictionary]::new()
             $dictionary.Add([int] 1, 'int')

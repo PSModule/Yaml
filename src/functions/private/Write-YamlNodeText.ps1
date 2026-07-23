@@ -45,12 +45,20 @@ function Write-YamlNodeText {
         if ($task.Type -eq 'Entry') {
             $keyText = ConvertTo-YamlFlowText -Node $task.Entry.Key `
                 -EmittedReferences $EmittedReferences
+            $explicitKey = (
+                Get-YamlEmissionImplicitKeyLength -Node $task.Entry.Key `
+                    -RenderedText $keyText
+            ) -gt 1024
+            if ($explicitKey) {
+                $spaces = ' ' * ($task.Level * $Indent)
+                [void] $Builder.Append($spaces).Append('? ').Append($keyText).Append("`n")
+            }
             $stack.Push([pscustomobject]@{
                     Type        = 'Node'
                     Node        = $task.Entry.Value
                     Entry       = $null
                     Level       = $task.Level
-                    LeadingText = "$keyText`: "
+                    LeadingText = if ($explicitKey) { ': ' } else { "$keyText`: " }
                 })
             continue
         }
