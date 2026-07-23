@@ -6,8 +6,8 @@ function Test-Yaml {
         .DESCRIPTION
         Parses a YAML stream, checks unique mapping keys, validates standard
         tags, and applies the same resource limits as ConvertFrom-Yaml. It
-        returns false only for YamlDotNet YAML exceptions. Unexpected runtime
-        failures are not swallowed.
+        returns false only for module-classified YAML failures. Unexpected
+        runtime failures are not swallowed.
 
         Pipeline strings are joined with a line feed and tested as one stream.
 
@@ -27,6 +27,15 @@ function Test-Yaml {
         Maximum decoded character count for one scalar. The default is
         1048576.
 
+        .PARAMETER MaxTagLength
+        Maximum expanded character count for one tag. The default is 1024.
+
+        .PARAMETER MaxTotalTagLength
+        Maximum cumulative expanded tag characters. The default is 65536.
+
+        .PARAMETER MaxNumericLength
+        Maximum digits in a constructed number. The default is 4096.
+
         .EXAMPLE
         'name: Ada' | Test-Yaml
 
@@ -45,7 +54,7 @@ function Test-Yaml {
         [AllowEmptyString()]
         [string[]] $Yaml,
 
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
         [ValidateRange(1, 2147483647)]
@@ -55,7 +64,16 @@ function Test-Yaml {
         [int] $MaxAliases = 1000,
 
         [ValidateRange(1, 2147483647)]
-        [int] $MaxScalarLength = 1048576
+        [int] $MaxScalarLength = 1048576,
+
+        [ValidateRange(1, 1048576)]
+        [int] $MaxTagLength = 1024,
+
+        [ValidateRange(1, 2147483647)]
+        [int] $MaxTotalTagLength = 65536,
+
+        [ValidateRange(1, 1048576)]
+        [int] $MaxNumericLength = 4096
     )
 
     begin {
@@ -69,9 +87,13 @@ function Test-Yaml {
     end {
         try {
             $null = Read-YamlStream -Yaml ($lines -join "`n") -Depth $Depth -MaxNodes $MaxNodes `
-                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength
+                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength -MaxTagLength $MaxTagLength `
+                -MaxTotalTagLength $MaxTotalTagLength -MaxNumericLength $MaxNumericLength
             $PSCmdlet.WriteObject($true)
-        } catch [YamlDotNet.Core.YamlException] {
+        } catch {
+            if (-not $_.Exception.Data.Contains('IsYamlException')) {
+                throw
+            }
             $PSCmdlet.WriteObject($false)
         }
     }

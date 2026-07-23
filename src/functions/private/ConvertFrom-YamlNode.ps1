@@ -1,10 +1,10 @@
 function ConvertFrom-YamlNode {
     <#
         .SYNOPSIS
-        Projects an internal YAML node graph to PowerShell values.
+        Iteratively projects an internal YAML graph through a value box.
     #>
     [CmdletBinding()]
-    [OutputType([object])]
+    [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
@@ -16,85 +16,265 @@ function ConvertFrom-YamlNode {
         [switch] $AsHashtable
     )
 
-    if ($Node.Kind -eq 'Alias') {
-        Write-Output -InputObject (ConvertFrom-YamlNode -Node $Node.Target -Cache $Cache -AsHashtable:$AsHashtable) -NoEnumerate
-        return
-    }
+    $root = [pscustomobject]@{ Value = $null }
+    $stack = [System.Collections.Generic.Stack[object]]::new()
+    $stack.Push([pscustomobject]@{
+            Node        = $Node
+            Holder      = $root
+            AsHashtable = [bool] $AsHashtable
+            State       = 'Start'
+            Index       = 0
+            Result      = $null
+            Child       = $null
+            Key         = $null
+            Names       = $null
+        })
 
-    if ($Node.Kind -eq 'Scalar') {
-        Write-Output -InputObject (Resolve-YamlScalar -Node $Node) -NoEnumerate
-        return
-    }
-
-    if ($Cache.ContainsKey($Node.Id)) {
-        Write-Output -InputObject ($Cache[$Node.Id]) -NoEnumerate
-        return
-    }
-
-    if ($Node.Kind -eq 'Sequence') {
-        if ($Node.Tag -eq 'tag:yaml.org,2002:omap') {
-            $orderedMap = [System.Collections.Specialized.OrderedDictionary]::new()
-            $Cache[$Node.Id] = $orderedMap
-            foreach ($item in $Node.Items) {
-                $entryMap = ConvertFrom-YamlNode -Node $item -Cache $Cache -AsHashtable
-                $key = @($entryMap.Keys)[0]
-                $orderedMap.Add($key, $entryMap[$key])
+    while ($stack.Count -gt 0) {
+        $frame = $stack.Peek()
+        if ($frame.State -eq 'Start') {
+            $effective = $frame.Node
+            while ($effective.Kind -eq 'Alias') {
+                $effective = $effective.Target
             }
-            Write-Output -InputObject $orderedMap -NoEnumerate
-            return
-        }
+            $frame.Node = $effective
 
-        $isPairs = $Node.Tag -eq 'tag:yaml.org,2002:pairs'
-        $sequence = [object[]]::new($Node.Items.Count)
-        $Cache[$Node.Id] = $sequence
-        for ($index = 0; $index -lt $Node.Items.Count; $index++) {
-            $sequence[$index] = ConvertFrom-YamlNode -Node $Node.Items[$index] -Cache $Cache `
-                -AsHashtable:($AsHashtable -or $isPairs)
-        }
-        Write-Output -InputObject $sequence -NoEnumerate
-        return
-    }
-
-    $isSet = $Node.Tag -eq 'tag:yaml.org,2002:set'
-    if ($AsHashtable -or $isSet) {
-        $dictionary = [System.Collections.Specialized.OrderedDictionary]::new()
-        $Cache[$Node.Id] = $dictionary
-        foreach ($entry in $Node.Entries) {
-            $key = ConvertFrom-YamlNode -Node $entry.Key -Cache $Cache -AsHashtable:$AsHashtable
-            if ($null -eq $key) {
-                $key = [System.DBNull]::Value
+            if ($effective.Kind -eq 'Scalar') {
+                $frame.Holder.Value = (Resolve-YamlScalar -Node $effective).Value
+                [void] $stack.Pop()
+                continue
             }
-            $entryValue = if ($isSet) {
-                $null
+            if ($Cache.ContainsKey($effective.Id)) {
+                $frame.Holder.Value = $Cache[$effective.Id]
+                [void] $stack.Pop()
+                continue
+            }
+
+            if ($effective.Kind -eq 'Sequence') {
+                if ($effective.Tag -ceq 'tag:yaml.org,2002:omap') {
+                    $frame.Result = [System.Collections.Specialized.OrderedDictionary]::new()
+                    $frame.State = 'OmapKey'
+                } else {
+                    $frame.Result = [object[]]::new($effective.Items.Count)
+                    $frame.State = 'Sequence'
+                }
+            } elseif ($frame.AsHashtable -or
+                $effective.Tag -ceq 'tag:yaml.org,2002:set') {
+                $frame.Result = [System.Collections.Specialized.OrderedDictionary]::new()
+                $frame.State = 'DictionaryKey'
             } else {
-                ConvertFrom-YamlNode -Node $entry.Value -Cache $Cache -AsHashtable:$AsHashtable
+                $frame.Result = [pscustomobject]@{}
+                $frame.Names = [System.Collections.Generic.HashSet[string]]::new(
+                    [System.StringComparer]::OrdinalIgnoreCase
+                )
+                $frame.State = 'PropertyKey'
             }
-            $dictionary.Add($key, $entryValue)
+            $Cache[$effective.Id] = $frame.Result
+            $frame.Holder.Value = $frame.Result
+            continue
         }
-        Write-Output -InputObject $dictionary -NoEnumerate
-        return
+
+        if ($frame.State -eq 'Sequence') {
+            if ($frame.Index -ge $frame.Node.Items.Count) {
+                [void] $stack.Pop()
+                continue
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'SequenceValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $frame.Node.Items[$frame.Index]
+                    Holder      = $frame.Child
+                    AsHashtable = $frame.AsHashtable -or
+                    $frame.Node.Tag -ceq 'tag:yaml.org,2002:pairs'
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'SequenceValue') {
+            $frame.Result[$frame.Index] = $frame.Child.Value
+            $frame.Index++
+            $frame.State = 'Sequence'
+            continue
+        }
+
+        if ($frame.State -eq 'OmapKey') {
+            if ($frame.Index -ge $frame.Node.Items.Count) {
+                [void] $stack.Pop()
+                continue
+            }
+            $entryNode = $frame.Node.Items[$frame.Index]
+            while ($entryNode.Kind -eq 'Alias') {
+                $entryNode = $entryNode.Target
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.Key = $entryNode
+            $frame.State = 'OmapKeyValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $entryNode.Entries[0].Key
+                    Holder      = $frame.Child
+                    AsHashtable = $true
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'OmapKeyValue') {
+            $frame.Key = if ($null -eq $frame.Child.Value) {
+                [System.DBNull]::Value
+            } else {
+                $frame.Child.Value
+            }
+            $entryNode = $frame.Node.Items[$frame.Index]
+            while ($entryNode.Kind -eq 'Alias') {
+                $entryNode = $entryNode.Target
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'OmapValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $entryNode.Entries[0].Value
+                    Holder      = $frame.Child
+                    AsHashtable = $true
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'OmapValue') {
+            $frame.Result.Add($frame.Key, $frame.Child.Value)
+            $frame.Index++
+            $frame.State = 'OmapKey'
+            continue
+        }
+
+        if ($frame.State -eq 'DictionaryKey') {
+            if ($frame.Index -ge $frame.Node.Entries.Count) {
+                [void] $stack.Pop()
+                continue
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'DictionaryKeyValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $frame.Node.Entries[$frame.Index].Key
+                    Holder      = $frame.Child
+                    AsHashtable = $frame.AsHashtable
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'DictionaryKeyValue') {
+            $frame.Key = if ($null -eq $frame.Child.Value) {
+                [System.DBNull]::Value
+            } else {
+                $frame.Child.Value
+            }
+            if ($frame.Node.Tag -ceq 'tag:yaml.org,2002:set') {
+                $frame.Result.Add($frame.Key, $null)
+                $frame.Index++
+                $frame.State = 'DictionaryKey'
+                continue
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'DictionaryValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $frame.Node.Entries[$frame.Index].Value
+                    Holder      = $frame.Child
+                    AsHashtable = $frame.AsHashtable
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'DictionaryValue') {
+            $frame.Result.Add($frame.Key, $frame.Child.Value)
+            $frame.Index++
+            $frame.State = 'DictionaryKey'
+            continue
+        }
+
+        if ($frame.State -eq 'PropertyKey') {
+            if ($frame.Index -ge $frame.Node.Entries.Count) {
+                [void] $stack.Pop()
+                continue
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'PropertyKeyValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $frame.Node.Entries[$frame.Index].Key
+                    Holder      = $frame.Child
+                    AsHashtable = $false
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'PropertyKeyValue') {
+            $frame.Key = $frame.Child.Value
+            if ($frame.Key -isnot [string] -or [string]::IsNullOrEmpty($frame.Key)) {
+                $keyNode = $frame.Node.Entries[$frame.Index].Key
+                throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
+                        -ErrorId 'YamlMappingKeyNotString' -Message (
+                        'This mapping key cannot be represented as a PSCustomObject property. Use -AsHashtable.'
+                    ))
+            }
+            if (-not $frame.Names.Add($frame.Key)) {
+                $keyNode = $frame.Node.Entries[$frame.Index].Key
+                throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
+                        -ErrorId 'YamlPropertyNameCollision' -Message (
+                        "The mapping keys contain a case-insensitive property collision for '$($frame.Key)'. Use -AsHashtable."
+                    ))
+            }
+            $frame.Child = [pscustomobject]@{ Value = $null }
+            $frame.State = 'PropertyValue'
+            $stack.Push([pscustomobject]@{
+                    Node        = $frame.Node.Entries[$frame.Index].Value
+                    Holder      = $frame.Child
+                    AsHashtable = $false
+                    State       = 'Start'
+                    Index       = 0
+                    Result      = $null
+                    Child       = $null
+                    Key         = $null
+                    Names       = $null
+                })
+            continue
+        }
+        if ($frame.State -eq 'PropertyValue') {
+            $frame.Result.PSObject.Properties.Add(
+                [System.Management.Automation.PSNoteProperty]::new(
+                    [string] $frame.Key,
+                    $frame.Child.Value
+                )
+            )
+            $frame.Index++
+            $frame.State = 'PropertyKey'
+        }
     }
 
-    $result = [pscustomobject]@{}
-    $Cache[$Node.Id] = $result
-    $propertyNames = [System.Collections.Generic.HashSet[string]]::new(
-        [System.StringComparer]::OrdinalIgnoreCase
-    )
-    foreach ($entry in $Node.Entries) {
-        $key = ConvertFrom-YamlNode -Node $entry.Key -Cache $Cache
-        if ($key -isnot [string] -or [string]::IsNullOrEmpty($key)) {
-            throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End -ErrorId 'YamlMappingKeyNotString' -Message (
-                    'This mapping key cannot be represented as a PSCustomObject property. Use -AsHashtable.'
-                ))
-        }
-        if (-not $propertyNames.Add($key)) {
-            throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End -ErrorId 'YamlPropertyNameCollision' -Message (
-                    "The mapping keys contain a case-insensitive property collision for '$key'. Use -AsHashtable."
-                ))
-        }
-        $entryValue = ConvertFrom-YamlNode -Node $entry.Value -Cache $Cache
-        $property = [System.Management.Automation.PSNoteProperty]::new($key, $entryValue)
-        $result.PSObject.Properties.Add($property)
-    }
-    Write-Output -InputObject $result -NoEnumerate
+    New-YamlValueBox -Value $root.Value
 }

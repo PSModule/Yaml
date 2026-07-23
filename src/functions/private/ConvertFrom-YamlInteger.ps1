@@ -29,24 +29,35 @@ function ConvertFrom-YamlInteger {
         $digits = $digits.Substring(2)
     }
 
-    $result = [System.Numerics.BigInteger]::Zero
-    foreach ($character in $digits.ToCharArray()) {
-        if ($character -ge [char] '0' -and $character -le [char] '9') {
-            $digit = [int] $character - [int] [char] '0'
-        } else {
-            $digit = 10 + ([int] [char]::ToUpperInvariant($character) - [int] [char] 'A')
+    if ($base -eq 10) {
+        $signedDigits = if ($sign -lt 0) { "-$digits" } else { $digits }
+        $result = [System.Numerics.BigInteger]::Zero
+        if (-not [System.Numerics.BigInteger]::TryParse(
+                $signedDigits,
+                [System.Globalization.NumberStyles]::Integer,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [ref] $result
+            )) {
+            throw [System.FormatException]::new("The YAML integer '$Value' is invalid.")
         }
-        $result = ($result * $base) + $digit
+    } else {
+        $result = [System.Numerics.BigInteger]::Zero
+        foreach ($character in $digits.ToCharArray()) {
+            if ($character -ge [char] '0' -and $character -le [char] '9') {
+                $digit = [int] $character - [int] [char] '0'
+            } else {
+                $digit = 10 + ([int] [char]::ToUpperInvariant($character) - [int] [char] 'A')
+            }
+            $result = ($result * $base) + $digit
+        }
+        $result *= $sign
     }
-    $result *= $sign
 
     if ($result -ge [int]::MinValue -and $result -le [int]::MaxValue) {
-        Write-Output -InputObject ([int] $result) -NoEnumerate
-        return
+        return [int] $result
     }
     if ($result -ge [long]::MinValue -and $result -le [long]::MaxValue) {
-        Write-Output -InputObject ([long] $result) -NoEnumerate
-        return
+        return [long] $result
     }
-    Write-Output -InputObject $result -NoEnumerate
+    return $result
 }

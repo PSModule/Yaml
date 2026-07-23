@@ -18,10 +18,10 @@ function New-YamlNode {
         [string] $Kind,
 
         [Parameter(Mandatory)]
-        [YamlDotNet.Core.Mark] $Start,
+        [pscustomobject] $Start,
 
         [Parameter(Mandatory)]
-        [YamlDotNet.Core.Mark] $End
+        [pscustomobject] $End
     )
 
     $node = [pscustomobject]@{
@@ -29,11 +29,15 @@ function New-YamlNode {
         Id               = $Id
         Kind             = $Kind
         Tag              = ''
+        HasUnknownTag    = $false
         Anchor           = ''
         Value            = $null
-        Style            = $null
+        Style            = 'Plain'
         IsPlainImplicit  = $false
         IsQuotedImplicit = $false
+        ResolutionState  = 0
+        ResolvedValue    = $null
+        MaxNumericLength = 4096
         Items            = [System.Collections.Generic.List[object]]::new()
         Entries          = [System.Collections.Generic.List[object]]::new()
         Target           = $null

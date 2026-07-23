@@ -1,17 +1,17 @@
 function Read-YamlStream {
     <#
         .SYNOPSIS
-        Parses YAML text with a narrow parser-compatibility retry.
+        Parses YAML text without text repair or external parser dependencies.
     #>
     [CmdletBinding()]
-    [OutputType([object[]])]
+    [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Yaml,
 
         [Parameter(Mandatory)]
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, 128)]
         [int] $Depth,
 
         [Parameter(Mandatory)]
@@ -24,41 +24,22 @@ function Read-YamlStream {
 
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
-        [int] $MaxScalarLength
+        [int] $MaxScalarLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 1048576)]
+        [int] $MaxTagLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 2147483647)]
+        [int] $MaxTotalTagLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 1048576)]
+        [int] $MaxNumericLength
     )
 
-    try {
-        Write-Output -InputObject (
-            Read-YamlStreamCore -Yaml $Yaml -Depth $Depth -MaxNodes $MaxNodes `
-                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength
-        ) -NoEnumerate
-    } catch [YamlDotNet.Core.SemanticErrorException] {
-        $compatibleYaml = ConvertTo-YamlParserCompatibleText -Yaml $Yaml
-        if ($compatibleYaml -ceq $Yaml) {
-            throw
-        }
-        Write-Output -InputObject (
-            Read-YamlStreamCore -Yaml $compatibleYaml -Depth $Depth -MaxNodes $MaxNodes `
-                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength
-        ) -NoEnumerate
-    } catch [System.Management.Automation.MethodInvocationException] {
-        if ($_.Exception.InnerException -is [YamlDotNet.Core.SemanticErrorException]) {
-            $compatibleYaml = ConvertTo-YamlParserCompatibleText -Yaml $Yaml
-            if ($compatibleYaml -ceq $Yaml) {
-                throw $_.Exception.InnerException
-            }
-            Write-Output -InputObject (
-                Read-YamlStreamCore -Yaml $compatibleYaml -Depth $Depth -MaxNodes $MaxNodes `
-                    -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength
-            ) -NoEnumerate
-            return
-        }
-        if ($_.Exception.InnerException -isnot [System.InvalidOperationException]) {
-            throw
-        }
-        throw (New-YamlException -Start ([YamlDotNet.Core.Mark]::Empty) `
-                -End ([YamlDotNet.Core.Mark]::Empty) -ErrorId 'YamlInvalidSyntax' -Message (
-                'YamlDotNet entered an invalid parser state while reading malformed YAML.'
-            ))
-    }
+    Read-YamlStreamCore -Yaml $Yaml -Depth $Depth -MaxNodes $MaxNodes -MaxAliases $MaxAliases `
+        -MaxScalarLength $MaxScalarLength -MaxTagLength $MaxTagLength `
+        -MaxTotalTagLength $MaxTotalTagLength -MaxNumericLength $MaxNumericLength
 }

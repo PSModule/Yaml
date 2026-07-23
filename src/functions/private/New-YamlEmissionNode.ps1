@@ -20,7 +20,7 @@ function New-YamlEmissionNode {
         Kind        = $Kind
         Tag         = ''
         Value       = ''
-        Style       = [YamlDotNet.Core.ScalarStyle]::Any
+        Style       = 'Plain'
         Items       = [System.Collections.Generic.List[object]]::new()
         Entries     = [System.Collections.Generic.List[object]]::new()
         ReferenceId = [long] 0

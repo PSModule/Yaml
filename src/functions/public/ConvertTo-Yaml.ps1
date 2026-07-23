@@ -5,8 +5,8 @@ function ConvertTo-Yaml {
 
         .DESCRIPTION
         Normalizes supported PowerShell values into mappings, sequences, and
-        scalars before emitting YAML through YamlDotNet's low-level emitter.
-        PowerShell metadata is not serialized. Repeated acyclic collection
+        scalars before emitting YAML with the module's repository-owned YAML
+        emitter. PowerShell metadata is not serialized. Repeated acyclic
         references use YAML anchors and aliases; cyclic and unsupported values
         terminate with a specific error.
 
@@ -57,7 +57,7 @@ function ConvertTo-Yaml {
         [AllowNull()]
         [object] $InputObject,
 
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
         [ValidateRange(1, 2147483647)]
@@ -87,7 +87,7 @@ function ConvertTo-Yaml {
             }
             $value = [object[]]::new(0)
         } elseif ($values.Count -eq 1) {
-            $value = $values[0]
+            $value = [object] $values[0]
         } else {
             $value = [object[]] $values.ToArray()
         }

@@ -4,10 +4,10 @@ function ConvertFrom-Yaml {
         Converts a YAML stream into PowerShell values.
 
         .DESCRIPTION
-        Parses YAML with YamlDotNet's low-level parser and constructs values
-        with the YAML 1.2 core schema. Mapping keys must be unique. Unknown
-        application tags never activate .NET types and are treated as neutral
-        metadata.
+        Parses YAML with the module's repository-owned YAML 1.2 parser and
+        constructs values with the core schema. Mapping keys must be unique.
+        Unknown application tags never activate .NET types and are treated as
+        neutral metadata.
 
         Pipeline strings are joined with a line feed and parsed as one stream,
         which supports Get-Content. Each YAML document is written separately.
@@ -36,6 +36,16 @@ function ConvertFrom-Yaml {
         Maximum decoded character count for one scalar. The default is
         1048576.
 
+        .PARAMETER MaxTagLength
+        Maximum expanded character count for one tag. The default is 1024.
+
+        .PARAMETER MaxTotalTagLength
+        Maximum cumulative expanded tag characters. The default is 65536.
+
+        .PARAMETER MaxNumericLength
+        Maximum digits in an implicitly or explicitly typed number. The
+        default is 4096.
+
         .EXAMPLE
         'name: Ada' | ConvertFrom-Yaml
 
@@ -63,7 +73,7 @@ function ConvertFrom-Yaml {
 
         [switch] $NoEnumerate,
 
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
         [ValidateRange(1, 2147483647)]
@@ -73,7 +83,16 @@ function ConvertFrom-Yaml {
         [int] $MaxAliases = 1000,
 
         [ValidateRange(1, 2147483647)]
-        [int] $MaxScalarLength = 1048576
+        [int] $MaxScalarLength = 1048576,
+
+        [ValidateRange(1, 1048576)]
+        [int] $MaxTagLength = 1024,
+
+        [ValidateRange(1, 2147483647)]
+        [int] $MaxTotalTagLength = 65536,
+
+        [ValidateRange(1, 1048576)]
+        [int] $MaxNumericLength = 4096
     )
 
     begin {
@@ -87,12 +106,13 @@ function ConvertFrom-Yaml {
     end {
         $yamlText = $lines -join "`n"
         try {
-            $documents = Read-YamlStream -Yaml $yamlText -Depth $Depth -MaxNodes $MaxNodes `
-                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength
-            foreach ($document in $documents) {
-                $value = ConvertFrom-YamlNode -Node $document -AsHashtable:$AsHashtable -Cache (
-                    [System.Collections.Generic.Dictionary[int, object]]::new()
-                )
+            $documentBox = Read-YamlStream -Yaml $yamlText -Depth $Depth -MaxNodes $MaxNodes `
+                -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength -MaxTagLength $MaxTagLength `
+                -MaxTotalTagLength $MaxTotalTagLength -MaxNumericLength $MaxNumericLength
+            foreach ($document in $documentBox.Value) {
+                $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
+                $valueBox = ConvertFrom-YamlNode -Node $document -AsHashtable:$AsHashtable -Cache $cache
+                $value = $valueBox.Value
 
                 $effectiveNode = $document
                 while ($effectiveNode.Kind -eq 'Alias') {
@@ -108,7 +128,10 @@ function ConvertFrom-Yaml {
                     $PSCmdlet.WriteObject($value, $false)
                 }
             }
-        } catch [YamlDotNet.Core.YamlException] {
+        } catch {
+            if (-not $_.Exception.Data.Contains('IsYamlException')) {
+                throw
+            }
             $record = New-YamlErrorRecord -Exception $_.Exception -DefaultErrorId 'YamlInvalidInput' `
                 -Category InvalidData -TargetObject $yamlText
             $PSCmdlet.ThrowTerminatingError($record)

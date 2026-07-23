@@ -8,13 +8,13 @@ function New-YamlException {
         Justification = 'Constructs an in-memory exception without changing system state.'
     )]
     [CmdletBinding()]
-    [OutputType([YamlDotNet.Core.YamlException])]
+    [OutputType([System.FormatException])]
     param (
         [Parameter(Mandatory)]
-        [YamlDotNet.Core.Mark] $Start,
+        [pscustomobject] $Start,
 
         [Parameter(Mandatory)]
-        [YamlDotNet.Core.Mark] $End,
+        [pscustomobject] $End,
 
         [Parameter(Mandatory)]
         [string] $Message,
@@ -23,12 +23,15 @@ function New-YamlException {
         [string] $ErrorId
     )
 
-    $formattedMessage = '{0} Start: {1}. End: {2}.' -f @(
+    $formattedMessage = '{0} Start: line {1}, column {2}. End: line {3}, column {4}.' -f @(
         $Message.TrimEnd('.'),
-        $Start,
-        $End
+        ($Start.Line + 1),
+        ($Start.Column + 1),
+        ($End.Line + 1),
+        ($End.Column + 1)
     )
-    $exception = [YamlDotNet.Core.YamlException]::new($formattedMessage)
+    $exception = [System.FormatException]::new($formattedMessage)
     $exception.Data['YamlErrorId'] = $ErrorId
+    $exception.Data['IsYamlException'] = $true
     Write-Output -InputObject $exception -NoEnumerate
 }

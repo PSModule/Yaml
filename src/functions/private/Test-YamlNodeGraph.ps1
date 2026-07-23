@@ -1,7 +1,7 @@
 function Test-YamlNodeGraph {
     <#
         .SYNOPSIS
-        Validates tags and mapping-key uniqueness in a YAML node graph.
+        Iteratively validates tags and mapping-key uniqueness.
     #>
     [CmdletBinding()]
     param (
@@ -20,123 +20,140 @@ function Test-YamlNodeGraph {
         [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher
     )
 
-    if ($Node.Kind -eq 'Alias') {
-        Test-YamlNodeGraph -Node $Node.Target -Visited $Visited -FingerprintCache $FingerprintCache `
-            -FingerprintHasher $FingerprintHasher
-        return
-    }
-    if (-not $Visited.Add($Node.Id)) {
-        return
-    }
-
-    $scalarTags = @(
-        'tag:yaml.org,2002:binary',
-        'tag:yaml.org,2002:bool',
-        'tag:yaml.org,2002:float',
-        'tag:yaml.org,2002:int',
-        'tag:yaml.org,2002:null',
-        'tag:yaml.org,2002:str',
-        'tag:yaml.org,2002:timestamp'
+    $scalarTags = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
     )
-    $tag = [string] $Node.Tag
-
-    if ($Node.Kind -eq 'Scalar') {
-        if ($tag -in @(
-                'tag:yaml.org,2002:map',
-                'tag:yaml.org,2002:omap',
-                'tag:yaml.org,2002:pairs',
-                'tag:yaml.org,2002:seq',
-                'tag:yaml.org,2002:set'
-            )) {
-            throw (New-YamlException -Start $Node.Start -End $Node.End -ErrorId 'YamlTagKindMismatch' -Message (
-                    "YAML tag '$tag' cannot be applied to a scalar node."
-                ))
-        }
-        $null = Resolve-YamlScalar -Node $Node
-        return
+    foreach ($scalarTag in @('binary', 'bool', 'float', 'int', 'null', 'str', 'timestamp')) {
+        [void] $scalarTags.Add("tag:yaml.org,2002:$scalarTag")
     }
 
-    if ($tag -in $scalarTags) {
-        throw (New-YamlException -Start $Node.Start -End $Node.End -ErrorId 'YamlTagKindMismatch' -Message (
-                "YAML tag '$tag' cannot be applied to a $($Node.Kind.ToLowerInvariant()) node."
-            ))
-    }
-
-    if ($Node.Kind -eq 'Sequence') {
-        if ($tag -in @('tag:yaml.org,2002:map', 'tag:yaml.org,2002:set')) {
-            throw (New-YamlException -Start $Node.Start -End $Node.End -ErrorId 'YamlTagKindMismatch' -Message (
-                    "YAML tag '$tag' requires a mapping node."
-                ))
+    $stack = [System.Collections.Generic.Stack[object]]::new()
+    $stack.Push($Node)
+    while ($stack.Count -gt 0) {
+        $current = $stack.Pop()
+        while ($current.Kind -eq 'Alias') {
+            $current = $current.Target
+        }
+        if (-not $Visited.Add($current.Id)) {
+            continue
         }
 
-        $isPairs = $tag -eq 'tag:yaml.org,2002:pairs'
-        $isOrderedMap = $tag -eq 'tag:yaml.org,2002:omap'
-        $orderedKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-        foreach ($item in $Node.Items) {
-            Test-YamlNodeGraph -Node $item -Visited $Visited -FingerprintCache $FingerprintCache `
-                -FingerprintHasher $FingerprintHasher
-            if ($isPairs -or $isOrderedMap) {
-                $entryNode = $item
-                while ($entryNode.Kind -eq 'Alias') {
-                    $entryNode = $entryNode.Target
-                }
-                if ($entryNode.Kind -ne 'Mapping' -or $entryNode.Entries.Count -ne 1) {
-                    throw (New-YamlException -Start $item.Start -End $item.End -ErrorId 'YamlInvalidTaggedCollection' -Message (
-                            "YAML tag '$tag' requires a sequence of one-entry mappings."
-                        ))
-                }
-                if ($isOrderedMap) {
-                    $keyFingerprint = Get-YamlNodeFingerprint -Node $entryNode.Entries[0].Key -Active (
-                        [System.Collections.Generic.HashSet[int]]::new()
-                    ) -Cache $FingerprintCache -Hasher $FingerprintHasher
-                    if (-not $orderedKeys.Add($keyFingerprint)) {
-                        $keyNode = $entryNode.Entries[0].Key
-                        $exception = New-YamlException -Start $keyNode.Start -End $keyNode.End `
-                            -ErrorId 'YamlDuplicateKey' -Message 'A duplicate key was found in a YAML ordered mapping.'
-                        throw $exception
-                    }
-                }
-            }
-        }
-        return
-    }
-
-    if ($tag -in @(
-            'tag:yaml.org,2002:omap',
-            'tag:yaml.org,2002:pairs',
-            'tag:yaml.org,2002:seq'
-        )) {
-        throw (New-YamlException -Start $Node.Start -End $Node.End -ErrorId 'YamlTagKindMismatch' -Message (
-                "YAML tag '$tag' requires a sequence node."
-            ))
-    }
-
-    $keys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-    foreach ($entry in $Node.Entries) {
-        $fingerprint = Get-YamlNodeFingerprint -Node $entry.Key -Active (
-            [System.Collections.Generic.HashSet[int]]::new()
-        ) -Cache $FingerprintCache -Hasher $FingerprintHasher
-        if (-not $keys.Add($fingerprint)) {
-            throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End -ErrorId 'YamlDuplicateKey' -Message (
-                    'A duplicate mapping key is not allowed.'
-                ))
-        }
-
-        Test-YamlNodeGraph -Node $entry.Key -Visited $Visited -FingerprintCache $FingerprintCache `
-            -FingerprintHasher $FingerprintHasher
-        Test-YamlNodeGraph -Node $entry.Value -Visited $Visited -FingerprintCache $FingerprintCache `
-            -FingerprintHasher $FingerprintHasher
-
-        if ($tag -eq 'tag:yaml.org,2002:set') {
-            $setValue = $entry.Value
-            while ($setValue.Kind -eq 'Alias') {
-                $setValue = $setValue.Target
-            }
-            if ($setValue.Kind -ne 'Scalar' -or $null -ne (Resolve-YamlScalar -Node $setValue)) {
-                throw (New-YamlException -Start $entry.Value.Start -End $entry.Value.End -ErrorId 'YamlInvalidTaggedCollection' -Message (
-                        'Every value in a YAML set must be null.'
+        $tag = [string] $current.Tag
+        if ($current.Kind -eq 'Scalar') {
+            if ($tag -cin @(
+                    'tag:yaml.org,2002:map',
+                    'tag:yaml.org,2002:omap',
+                    'tag:yaml.org,2002:pairs',
+                    'tag:yaml.org,2002:seq',
+                    'tag:yaml.org,2002:set'
+                )) {
+                throw (New-YamlException -Start $current.Start -End $current.End `
+                        -ErrorId 'YamlTagKindMismatch' -Message (
+                        "YAML tag '$tag' cannot be applied to a scalar node."
                     ))
             }
+            $null = Resolve-YamlScalar -Node $current
+            continue
+        }
+
+        if ($scalarTags.Contains($tag)) {
+            throw (New-YamlException -Start $current.Start -End $current.End `
+                    -ErrorId 'YamlTagKindMismatch' -Message (
+                    "YAML tag '$tag' cannot be applied to a $($current.Kind.ToLowerInvariant()) node."
+                ))
+        }
+
+        if ($current.Kind -eq 'Sequence') {
+            if ($tag -ceq 'tag:yaml.org,2002:map' -or
+                $tag -ceq 'tag:yaml.org,2002:set') {
+                throw (New-YamlException -Start $current.Start -End $current.End `
+                        -ErrorId 'YamlTagKindMismatch' -Message (
+                        "YAML tag '$tag' requires a mapping node."
+                    ))
+            }
+
+            $isPairs = $tag -ceq 'tag:yaml.org,2002:pairs'
+            $isOrderedMap = $tag -ceq 'tag:yaml.org,2002:omap'
+            $orderedKeys = [System.Collections.Generic.HashSet[string]]::new(
+                [System.StringComparer]::Ordinal
+            )
+            for ($index = $current.Items.Count - 1; $index -ge 0; $index--) {
+                $item = $current.Items[$index]
+                if ($isPairs -or $isOrderedMap) {
+                    $entryNode = $item
+                    while ($entryNode.Kind -eq 'Alias') {
+                        $entryNode = $entryNode.Target
+                    }
+                    if ($entryNode.Kind -ne 'Mapping' -or $entryNode.Entries.Count -ne 1) {
+                        throw (New-YamlException -Start $item.Start -End $item.End `
+                                -ErrorId 'YamlInvalidTaggedCollection' -Message (
+                                "YAML tag '$tag' requires a sequence of one-entry mappings."
+                            ))
+                    }
+                    if ($isOrderedMap) {
+                        $keyFingerprint = Get-YamlNodeFingerprint `
+                            -Node $entryNode.Entries[0].Key `
+                            -Active ([System.Collections.Generic.HashSet[int]]::new()) `
+                            -Cache $FingerprintCache -Hasher $FingerprintHasher
+                        if (-not $orderedKeys.Add($keyFingerprint)) {
+                            $keyNode = $entryNode.Entries[0].Key
+                            throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
+                                    -ErrorId 'YamlDuplicateKey' -Message (
+                                    'A duplicate key was found in a YAML ordered mapping.'
+                                ))
+                        }
+                    }
+                }
+                $stack.Push($item)
+            }
+            continue
+        }
+
+        if ($tag -cin @(
+                'tag:yaml.org,2002:omap',
+                'tag:yaml.org,2002:pairs',
+                'tag:yaml.org,2002:seq'
+            )) {
+            throw (New-YamlException -Start $current.Start -End $current.End `
+                    -ErrorId 'YamlTagKindMismatch' -Message (
+                    "YAML tag '$tag' requires a sequence node."
+                ))
+        }
+
+        $keys = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::Ordinal
+        )
+        for ($index = $current.Entries.Count - 1; $index -ge 0; $index--) {
+            $entry = $current.Entries[$index]
+            $fingerprint = Get-YamlNodeFingerprint -Node $entry.Key `
+                -Active ([System.Collections.Generic.HashSet[int]]::new()) `
+                -Cache $FingerprintCache -Hasher $FingerprintHasher
+            if (-not $keys.Add($fingerprint)) {
+                throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End `
+                        -ErrorId 'YamlDuplicateKey' -Message (
+                        'A duplicate mapping key is not allowed.'
+                    ))
+            }
+
+            if ($tag -ceq 'tag:yaml.org,2002:set') {
+                $setValue = $entry.Value
+                while ($setValue.Kind -eq 'Alias') {
+                    $setValue = $setValue.Target
+                }
+                $setScalar = if ($setValue.Kind -eq 'Scalar') {
+                    Resolve-YamlScalar -Node $setValue
+                } else {
+                    $null
+                }
+                if ($setValue.Kind -ne 'Scalar' -or $null -ne $setScalar.Value) {
+                    throw (New-YamlException -Start $entry.Value.Start -End $entry.Value.End `
+                            -ErrorId 'YamlInvalidTaggedCollection' -Message (
+                            'Every value in a YAML set must be null.'
+                        ))
+                }
+            }
+            $stack.Push($entry.Value)
+            $stack.Push($entry.Key)
         }
     }
 }

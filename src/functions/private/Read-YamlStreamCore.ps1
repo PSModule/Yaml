@@ -1,17 +1,17 @@
 function Read-YamlStreamCore {
     <#
         .SYNOPSIS
-        Reads and validates all documents in a YAML stream.
+        Reads and validates all documents with the repository-owned YAML parser.
     #>
     [CmdletBinding()]
-    [OutputType([object[]])]
+    [OutputType([pscustomobject])]
     param (
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Yaml,
 
         [Parameter(Mandatory)]
-        [ValidateRange(1, 1024)]
+        [ValidateRange(1, 128)]
         [int] $Depth,
 
         [Parameter(Mandatory)]
@@ -24,67 +24,170 @@ function Read-YamlStreamCore {
 
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
-        [int] $MaxScalarLength
+        [int] $MaxScalarLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 1048576)]
+        [int] $MaxTagLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 2147483647)]
+        [int] $MaxTotalTagLength,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 1048576)]
+        [int] $MaxNumericLength,
+
+        [switch] $SkipGraphValidation
     )
 
-    $parser = [YamlDotNet.Core.Parser]::new([System.IO.StringReader]::new($Yaml))
+    $context = New-YamlReaderContext -Yaml $Yaml -Depth $Depth -MaxNodes $MaxNodes `
+        -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength `
+        -MaxTagLength $MaxTagLength -MaxTotalTagLength $MaxTotalTagLength `
+        -MaxNumericLength $MaxNumericLength
+    $text = $context.Text
+    $lines = $context.Lines
+    $lineStarts = $context.LineStarts
     $documents = [System.Collections.Generic.List[object]]::new()
-    $context = [pscustomobject]@{
-        NextId          = 1
-        NodeCount       = 0
-        AliasCount      = 0
-        MaxDepth        = $Depth
-        MaxNodes        = $MaxNodes
-        MaxAliases      = $MaxAliases
-        MaxScalarLength = $MaxScalarLength
-        Anchors         = $null
-    }
+    $implicitDocumentSeen = $false
 
-    if (-not $parser.MoveNext() -or $parser.Current -isnot [YamlDotNet.Core.Events.StreamStart]) {
-        throw (New-YamlException -Start ([YamlDotNet.Core.Mark]::Empty) -End ([YamlDotNet.Core.Mark]::Empty) -ErrorId 'YamlInvalidStream' -Message (
-                'The input is not a valid YAML stream.'
-            ))
-    }
-    [void] $parser.MoveNext()
-
-    while ($parser.Current -is [YamlDotNet.Core.Events.DocumentStart]) {
-        $context.Anchors = [System.Collections.Generic.Dictionary[string, object]]::new(
-            [System.StringComparer]::Ordinal
-        )
-        if (-not $parser.MoveNext()) {
-            $emptyMark = [YamlDotNet.Core.Mark]::Empty
-            $exception = New-YamlException -Start $emptyMark -End $emptyMark -ErrorId 'YamlUnexpectedEnd' -Message (
-                'The YAML stream ended after a document start.'
-            )
-            throw $exception
+    while ($context.LineIndex -lt $lines.Count) {
+        Skip-YamlBlockTrivia -Context $context
+        if ($context.LineIndex -ge $lines.Count) {
+            break
+        }
+        if ($lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
+            $suffix = Get-YamlContentWithoutComment -Text $lines[$context.LineIndex].Substring(3)
+            if ($suffix.Trim().Length -gt 0) {
+                $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
+                    -Line $context.LineIndex -Column 3
+                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
+                        'Unexpected content follows the document end marker.'
+                    ))
+            }
+            $context.LineIndex++
+            $implicitDocumentSeen = $false
+            continue
         }
 
-        $document = Read-YamlNode -Parser $parser -Context $context -Depth 1
-        if ($parser.Current -isnot [YamlDotNet.Core.Events.DocumentEnd]) {
-            $mark = if ($null -eq $parser.Current) { [YamlDotNet.Core.Mark]::Empty } else { $parser.Current.Start }
-            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocument' -Message (
-                    'The YAML document did not end where expected.'
+        $directives = Read-YamlDirectiveBlock -Context $context
+        $tagHandles = $directives.TagHandles
+        $directiveSeen = $directives.DirectiveSeen
+
+        if ($context.LineIndex -ge $lines.Count) {
+            if ($directiveSeen) {
+                $mark = New-YamlMark -Index $text.Length -Line ([Math]::Max(0, $lines.Count - 1)) -Column 0
+                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlDirectiveWithoutDocument' -Message (
+                        'YAML directives must be followed by an explicit document start marker.'
+                    ))
+            }
+            break
+        }
+
+        $lineText = $lines[$context.LineIndex]
+        $explicitStart = $lineText -match '^---(?:[ \t]|$)'
+        if ($directiveSeen -and -not $explicitStart) {
+            $mark = New-YamlMark -Index $lineStarts[$context.LineIndex] -Line $context.LineIndex -Column 0
+            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlDirectiveWithoutDocument' -Message (
+                    'YAML directives must be followed by an explicit document start marker.'
+                ))
+        }
+        if (-not $explicitStart -and $implicitDocumentSeen) {
+            $mark = New-YamlMark -Index $lineStarts[$context.LineIndex] -Line $context.LineIndex -Column 0
+            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidStream' -Message (
+                    'A second document requires an explicit document start marker.'
                 ))
         }
 
-        $fingerprintHasher = [System.Security.Cryptography.SHA256]::Create()
-        try {
-            Test-YamlNodeGraph -Node $document -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
-                -FingerprintCache ([System.Collections.Generic.Dictionary[int, string]]::new()) `
-                -FingerprintHasher $fingerprintHasher
-        } finally {
-            $fingerprintHasher.Dispose()
+        $context.TagHandles = $tagHandles
+        $context.Anchors = [System.Collections.Generic.Dictionary[string, object]]::new(
+            [System.StringComparer]::Ordinal
+        )
+        if ($explicitStart) {
+            $afterMarker = $lineText.Substring(3)
+            $leading = $afterMarker.Length - $afterMarker.TrimStart().Length
+            $segment = $afterMarker.TrimStart()
+            $segmentColumn = 3 + $leading
+            if ([string]::IsNullOrWhiteSpace((Get-YamlContentWithoutComment -Text $segment))) {
+                $markerLine = $context.LineIndex
+                $context.LineIndex++
+                Skip-YamlBlockTrivia -Context $context
+                if ($context.LineIndex -ge $lines.Count -or
+                    $lines[$context.LineIndex] -match '^(?:---|\.\.\.)(?:[ \t]|$)') {
+                    $mark = New-YamlMark -Index ($lineStarts[$markerLine] + 3) -Line $markerLine -Column 3
+                    $document = New-YamlEmptyScalar -Context $context -Depth 1 -Mark $mark
+                } else {
+                    $document = Read-YamlBlockNode -Context $context -ParentIndent -1 -Depth 1
+                }
+            } else {
+                if ($segment[0] -in @('!', '&') -and
+                    (Find-YamlMappingColon -Text $segment) -ge 0) {
+                    $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + $segmentColumn) `
+                        -Line $context.LineIndex -Column $segmentColumn
+                    throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentStart' -Message (
+                            'Node properties cannot precede a compact block mapping on a document-start line.'
+                        ))
+                }
+                if (-not (Test-YamlIndicator -Text $segment -Indicator '-') -and
+                    ((Find-YamlMappingColon -Text $segment) -ge 0 -or
+                    (Test-YamlIndicator -Text $segment -Indicator '?'))) {
+                    $document = Read-YamlBlockMapping -Context $context -Indent 0 -Depth 1 `
+                        -FirstText $segment -FirstColumn $segmentColumn
+                } elseif (Test-YamlIndicator -Text $segment -Indicator '-') {
+                    $firstItem = $segment.Substring(1)
+                    $leading = $firstItem.Length - $firstItem.TrimStart().Length
+                    $document = Read-YamlBlockSequence -Context $context -Indent 0 -Depth 1 `
+                        -FirstItemText $firstItem.TrimStart() `
+                        -FirstItemColumn ($segmentColumn + 1 + $leading)
+                } else {
+                    $document = Read-YamlBlockNode -Context $context -ParentIndent -1 -Depth 1 `
+                        -Segment $segment -SegmentColumn $segmentColumn
+                }
+            }
+        } else {
+            $implicitDocumentSeen = $true
+            $document = Read-YamlBlockNode -Context $context -ParentIndent -1 -Depth 1
+        }
+
+        $document = ConvertFrom-YamlSyntaxTree -Root $document
+        if (-not $SkipGraphValidation) {
+            $fingerprintHasher = [System.Security.Cryptography.SHA256]::Create()
+            try {
+                Test-YamlNodeGraph -Node $document -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
+                    -FingerprintCache ([System.Collections.Generic.Dictionary[int, string]]::new()) `
+                    -FingerprintHasher $fingerprintHasher
+            } finally {
+                $fingerprintHasher.Dispose()
+            }
         }
         $documents.Add($document)
-        [void] $parser.MoveNext()
+
+        Skip-YamlBlockTrivia -Context $context
+        $explicitEnd = $false
+        if ($context.LineIndex -lt $lines.Count -and
+            $lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
+            $explicitEnd = $true
+            $endLine = $lines[$context.LineIndex]
+            if ((Get-YamlContentWithoutComment -Text $endLine.Substring(3)).Trim().Length -gt 0) {
+                $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
+                    -Line $context.LineIndex -Column 3
+                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
+                        'Unexpected content follows the document end marker.'
+                    ))
+            }
+            $context.LineIndex++
+            Skip-YamlBlockTrivia -Context $context
+            $implicitDocumentSeen = $false
+        }
+        if (-not $explicitEnd -and $context.LineIndex -lt $lines.Count -and
+            $lines[$context.LineIndex] -notmatch '^---(?:[ \t]|$)' -and
+            $lines[$context.LineIndex].Trim().Length -gt 0) {
+            $mark = New-YamlMark -Index $lineStarts[$context.LineIndex] -Line $context.LineIndex -Column 0
+            throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidStream' -Message (
+                    'Unexpected content remains after a YAML document.'
+                ))
+        }
     }
 
-    if ($parser.Current -isnot [YamlDotNet.Core.Events.StreamEnd]) {
-        $mark = if ($null -eq $parser.Current) { [YamlDotNet.Core.Mark]::Empty } else { $parser.Current.Start }
-        throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidStream' -Message (
-                'The YAML stream contains unexpected content.'
-            ))
-    }
-
-    Write-Output -InputObject ([object[]] $documents.ToArray()) -NoEnumerate
+    return New-YamlValueBox -Value ([object[]] $documents.ToArray())
 }

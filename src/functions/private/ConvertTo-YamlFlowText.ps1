@@ -1,7 +1,7 @@
-function Get-YamlNodeFingerprint {
+function ConvertTo-YamlFlowText {
     <#
         .SYNOPSIS
-        Iteratively creates a structural fingerprint for duplicate-key detection.
+        Iteratively renders one emission graph in flow form.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -11,14 +11,7 @@ function Get-YamlNodeFingerprint {
 
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
-        [System.Collections.Generic.HashSet[int]] $Active,
-
-        [Parameter(Mandatory)]
-        [AllowEmptyCollection()]
-        [System.Collections.Generic.Dictionary[int, string]] $Cache,
-
-        [Parameter(Mandatory)]
-        [System.Security.Cryptography.HashAlgorithm] $Hasher
+        [System.Collections.Generic.HashSet[long]] $EmittedReferences
     )
 
     $root = [pscustomobject]@{ Value = '' }
@@ -28,45 +21,42 @@ function Get-YamlNodeFingerprint {
             Holder  = $root
             State   = 'Start'
             Index   = 0
+            Prefix  = ''
             Parts   = $null
             Child   = $null
-            KeyHash = ''
+            KeyText = ''
         })
 
     while ($stack.Count -gt 0) {
         $frame = $stack.Peek()
         if ($frame.State -eq 'Start') {
-            $effective = $frame.Node
-            while ($effective.Kind -eq 'Alias') {
-                $effective = $effective.Target
-            }
-            $frame.Node = $effective
-
-            $cached = ''
-            if ($Cache.TryGetValue($effective.Id, [ref] $cached)) {
-                $frame.Holder.Value = $cached
+            if ($frame.Node.ReferenceId -ne 0 -and
+                $EmittedReferences.Contains($frame.Node.ReferenceId)) {
+                $frame.Holder.Value = "*$($frame.Node.Anchor)"
                 [void] $stack.Pop()
                 continue
             }
-            if (-not $Active.Add($effective.Id)) {
-                throw (New-YamlException -Start $effective.Start -End $effective.End `
-                        -ErrorId 'YamlCyclicMappingKey' -Message (
-                        'A cyclic YAML node cannot be used as a mapping key.'
-                    ))
+            if ($frame.Node.ReferenceId -ne 0) {
+                [void] $EmittedReferences.Add($frame.Node.ReferenceId)
+            }
+            $frame.Prefix = Get-YamlEmissionPrefix -Node $frame.Node
+            if (-not [string]::IsNullOrEmpty($frame.Prefix)) {
+                $frame.Prefix += ' '
             }
 
-            if ($effective.Kind -eq 'Scalar') {
-                $resolved = Resolve-YamlScalar -Node $effective
-                $fingerprint = Get-YamlScalarFingerprint -Value $resolved.Value -Hasher $Hasher
-                $Cache[$effective.Id] = $fingerprint
-                [void] $Active.Remove($effective.Id)
-                $frame.Holder.Value = $fingerprint
+            if ($frame.Node.Kind -eq 'Scalar') {
+                $text = if ($frame.Node.Style -eq 'Plain') {
+                    $frame.Node.Value
+                } else {
+                    ConvertTo-YamlQuotedText -Value $frame.Node.Value
+                }
+                $frame.Holder.Value = $frame.Prefix + $text
                 [void] $stack.Pop()
                 continue
             }
 
             $frame.Parts = [System.Collections.Generic.List[string]]::new()
-            $frame.State = if ($effective.Kind -eq 'Sequence') {
+            $frame.State = if ($frame.Node.Kind -eq 'Sequence') {
                 'Sequence'
             } else {
                 'MappingKey'
@@ -76,19 +66,9 @@ function Get-YamlNodeFingerprint {
 
         if ($frame.State -eq 'Sequence') {
             if ($frame.Index -ge $frame.Node.Items.Count) {
-                $semanticTag = if (
-                    $frame.Node.Tag -ceq 'tag:yaml.org,2002:omap' -or
-                    $frame.Node.Tag -ceq 'tag:yaml.org,2002:pairs'
-                ) {
-                    $frame.Node.Tag
-                } else {
-                    'tag:yaml.org,2002:seq'
-                }
-                $canonical = 'sequence:{0}:{1}' -f $semanticTag, ($frame.Parts -join '|')
-                $fingerprint = Get-YamlFingerprintHash -Value $canonical -Hasher $Hasher
-                $Cache[$frame.Node.Id] = $fingerprint
-                [void] $Active.Remove($frame.Node.Id)
-                $frame.Holder.Value = $fingerprint
+                $frame.Holder.Value = $frame.Prefix + '[{0}]' -f (
+                    $frame.Parts -join ', '
+                )
                 [void] $stack.Pop()
                 continue
             }
@@ -99,9 +79,10 @@ function Get-YamlNodeFingerprint {
                     Holder  = $frame.Child
                     State   = 'Start'
                     Index   = 0
+                    Prefix  = ''
                     Parts   = $null
                     Child   = $null
-                    KeyHash = ''
+                    KeyText = ''
                 })
             continue
         }
@@ -114,17 +95,9 @@ function Get-YamlNodeFingerprint {
 
         if ($frame.State -eq 'MappingKey') {
             if ($frame.Index -ge $frame.Node.Entries.Count) {
-                $frame.Parts.Sort([System.StringComparer]::Ordinal)
-                $mappingTag = if ($frame.Node.Tag -ceq 'tag:yaml.org,2002:set') {
-                    $frame.Node.Tag
-                } else {
-                    'tag:yaml.org,2002:map'
-                }
-                $canonical = 'mapping:{0}:{1}' -f $mappingTag, ($frame.Parts -join '|')
-                $fingerprint = Get-YamlFingerprintHash -Value $canonical -Hasher $Hasher
-                $Cache[$frame.Node.Id] = $fingerprint
-                [void] $Active.Remove($frame.Node.Id)
-                $frame.Holder.Value = $fingerprint
+                $frame.Holder.Value = $frame.Prefix + '{{{0}}}' -f (
+                    $frame.Parts -join ', '
+                )
                 [void] $stack.Pop()
                 continue
             }
@@ -135,14 +108,15 @@ function Get-YamlNodeFingerprint {
                     Holder  = $frame.Child
                     State   = 'Start'
                     Index   = 0
+                    Prefix  = ''
                     Parts   = $null
                     Child   = $null
-                    KeyHash = ''
+                    KeyText = ''
                 })
             continue
         }
         if ($frame.State -eq 'MappingKeyValue') {
-            $frame.KeyHash = $frame.Child.Value
+            $frame.KeyText = $frame.Child.Value
             $frame.Child = [pscustomobject]@{ Value = '' }
             $frame.State = 'MappingValue'
             $stack.Push([pscustomobject]@{
@@ -150,18 +124,15 @@ function Get-YamlNodeFingerprint {
                     Holder  = $frame.Child
                     State   = 'Start'
                     Index   = 0
+                    Prefix  = ''
                     Parts   = $null
                     Child   = $null
-                    KeyHash = ''
+                    KeyText = ''
                 })
             continue
         }
         if ($frame.State -eq 'MappingValue') {
-            $frame.Parts.Add(
-                (Get-YamlFingerprintHash -Value (
-                    "entry:$($frame.KeyHash)=$($frame.Child.Value)"
-                ) -Hasher $Hasher)
-            )
+            $frame.Parts.Add("$($frame.KeyText)`: $($frame.Child.Value)")
             $frame.Index++
             $frame.State = 'MappingKey'
         }
