@@ -13,11 +13,19 @@ param()
 
 BeforeAll {
     $archivePath = Join-Path $PSScriptRoot 'fixtures\yaml-test-suite\yaml-test-suite-data-2022-01-17.zip'
+    $sourcesPath = Join-Path $PSScriptRoot 'fixtures\yaml-test-suite\SOURCES.txt'
     $suitePath = Join-Path $TestDrive 'yaml-test-suite'
     Expand-Archive -LiteralPath $archivePath -DestinationPath $suitePath
+    $suiteRoots = @(
+        Get-ChildItem -LiteralPath $suitePath -Directory
+    )
+    if ($suiteRoots.Count -ne 1) {
+        throw "Expected one release archive root, but found $($suiteRoots.Count)."
+    }
+    $suiteDataPath = $suiteRoots[0].FullName
     $suiteResults = @(
         & (Join-Path $PSScriptRoot 'tools\Invoke-YamlTestSuite.ps1') `
-            -Path $suitePath `
+            -Path $suiteDataPath `
             -CompareJson `
             -CompareEvents `
             -CompareOutYaml `
@@ -28,8 +36,16 @@ BeforeAll {
 Describe 'Released yaml-test-suite corpus accounting' {
     It 'uses the pinned unmodified release archive' {
         (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash |
-            Should -Be 'DCC1F037B13F6C3032D5190C447B6A6EF5560738A4C104F29B4243B0AB8F8029'
+            Should -Be '47C173AFFEB480517B30FB77DC8C76FD48609B9B65DD1C1D3D0D0BAEE48D6AA9'
         $suiteResults.Count | Should -Be 402
+    }
+
+    It 'pins the latest official source and data release attribution' {
+        $sources = Get-Content -LiteralPath $sourcesPath -Raw
+
+        $sources | Should -Match 'Latest source release:\s+v2022-01-17'
+        $sources | Should -Match '45db50aecf9b1520f8258938c88f396e96f30831'
+        $sources | Should -Match '6e6c296ae9c9d2d5c4134b4b64d01b29ac19ff6f'
     }
 
     It 'accounts for syntax recognition and representation-key load policy' {

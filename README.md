@@ -163,9 +163,12 @@ does not fit the data.
 
 ## Conformance corpus
 
-The offline test gate runs the complete released `yaml-test-suite` data corpus
-at commit `6ad3d2c62885d82fc349026c136ef560838fdf3d` (generated from source
-commit `45db50ae`). The pinned archive contains 402 inputs:
+The offline test gate runs the latest official `yaml-test-suite` source release,
+`v2022-01-17`, at commit `45db50aecf9b1520f8258938c88f396e96f30831`.
+Its `data-2022-01-17` export is pinned at commit
+`6e6c296ae9c9d2d5c4134b4b64d01b29ac19ff6f` with archive SHA-256
+`47C173AFFEB480517B30FB77DC8C76FD48609B9B65DD1C1D3D0D0BAEE48D6AA9`.
+The archive contains 402 inputs:
 
 | Surface | Pass | PolicyDifference | Fail | NotApplicable |
 | --- | ---: | ---: | ---: | ---: |
