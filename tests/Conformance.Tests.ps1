@@ -48,18 +48,12 @@ Describe 'Released yaml-test-suite corpus accounting' {
     }
 
     It 'accounts for parser representation/event comparisons' {
-        @($suiteResults | Where-Object EventResult -EQ 'Pass').Count | Should -Be 307
+        @($suiteResults | Where-Object EventResult -EQ 'Pass').Count | Should -Be 308
         @($suiteResults | Where-Object EventResult -EQ 'PolicyDifference').Count |
-            Should -Be 1
+            Should -Be 0
         @($suiteResults | Where-Object EventResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object EventResult -EQ 'NotApplicable').Count |
             Should -Be 94
-        @(
-            $suiteResults |
-                Where-Object EventResult -EQ 'PolicyDifference' |
-                Select-Object -ExpandProperty Case |
-                Sort-Object
-        ) | Should -Be @('6CK3')
     }
 
     It 'accounts for JSON construction comparisons' {
@@ -69,6 +63,12 @@ Describe 'Released yaml-test-suite corpus accounting' {
         @($suiteResults | Where-Object JsonResult -EQ 'Fail').Count | Should -Be 0
         @($suiteResults | Where-Object JsonResult -EQ 'NotApplicable').Count |
             Should -Be 123
+        @(
+            $suiteResults |
+                Where-Object JsonResult -EQ 'PolicyDifference' |
+                Select-Object -ExpandProperty Case |
+                Sort-Object
+        ) | Should -Be @('565N', 'J7PZ')
     }
 
     It 'accounts for out.yaml representation comparisons' {

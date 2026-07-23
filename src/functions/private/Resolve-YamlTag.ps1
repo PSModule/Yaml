@@ -67,7 +67,8 @@ function Resolve-YamlTag {
         }
     }
 
-    $expandedLength = $prefix.Length + $suffix.Length
+    $expanded = ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token
+    $expandedLength = $expanded.Length
     if ($expandedLength -gt $Context.MaxTagLength) {
         throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlTagLimitExceeded' -Message (
                 "A YAML tag exceeds the configured limit of $($Context.MaxTagLength) characters."
@@ -80,7 +81,6 @@ function Resolve-YamlTag {
             ))
     }
 
-    $expanded = $prefix + $suffix
     $known = $expanded -cin @(
         'tag:yaml.org,2002:binary',
         'tag:yaml.org,2002:bool',

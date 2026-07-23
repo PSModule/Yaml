@@ -170,7 +170,8 @@ commit `45db50ae`). The pinned archive contains 402 inputs:
 - all 94 fixtures marked invalid are rejected;
 - 306 of 308 fixtures marked valid are accepted;
 - the other two valid-syntax fixtures, `2JQS` and `X38W`, are deliberately
-  rejected because this module rejects duplicate mapping keys;
+  rejected as a load/composition policy after syntactic recognition because this
+  module rejects duplicate mapping keys in the representation graph;
 - 282 fixtures include `in.json`; three belong to invalid inputs, 277 of the
   279 applicable constructions match exactly, and two use a different
   documented projection policy.

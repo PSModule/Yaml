@@ -363,6 +363,49 @@ date: !!timestamp 2001-12-14
             { $largeInteger | ConvertFrom-Yaml -MaxNumericLength 4096 } | Should -Throw
         }
 
+        It 'decodes percent escapes in expanded tags using UTF-8' {
+            $yaml = @'
+%TAG !e! tag:example.com,2000:app/
+---
+first: !e!tag%21 value
+second: !e!currency%E2%82%AC amount
+'@
+            $representation = Read-YamlStreamCore -Yaml $yaml -Depth 32 -MaxNodes 64 -MaxAliases 16 `
+                -MaxScalarLength 4096 -MaxTagLength 1024 -MaxTotalTagLength 4096 `
+                -MaxNumericLength 64
+
+            $representation.Value.Count | Should -Be 1
+            $entries = $representation.Value[0].Entries
+            $entries.Count | Should -Be 2
+            $entries[0].Value.Tag | Should -Be 'tag:example.com,2000:app/tag!'
+            $entries[1].Value.Tag | Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
+        }
+
+        It 'rejects malformed or non-UTF8 tag percent escapes' {
+            $truncated = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%2 value
+'@
+            $invalidHex = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%ZZ value
+'@
+            $invalidUtf8 = @'
+%TAG !e! tag:example.com,2000:app/
+---
+!e!tag%E2%28%A1 value
+'@
+
+            ($truncated | Test-Yaml) | Should -BeFalse
+            ($invalidHex | Test-Yaml) | Should -BeFalse
+            ($invalidUtf8 | Test-Yaml) | Should -BeFalse
+            { $truncated | ConvertFrom-Yaml } | Should -Throw
+            { $invalidHex | ConvertFrom-Yaml } | Should -Throw
+            { $invalidUtf8 | ConvertFrom-Yaml } | Should -Throw
+        }
+
         It 'bounds expanded-tag storage and rejects huge numerics promptly' {
             $prefix = 'x' * 20000
             $taggedItems = 1..500 | ForEach-Object { '- !e!value item' }
