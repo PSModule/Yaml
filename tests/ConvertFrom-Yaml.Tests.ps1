@@ -187,6 +187,37 @@ mapping: !<tag:example.test,2026:object>
             $result.mapping.name | Should -Be 'safe'
         }
 
+        It 'decodes percent escapes in expanded representation tags' {
+            $escaped = Get-TestYamlRepresentationRoot -Yaml (
+                "%TAG !e! tag:example.com,2000:app/`n--- !e!tag%21 value"
+            )
+            $multibyte = Get-TestYamlRepresentationRoot -Yaml (
+                "%TAG !e! tag:example.com,2000:app/`n--- !e!caf%C3%A9 value"
+            )
+
+            $escaped.Tag | Should -Be 'tag:example.com,2000:app/tag!'
+            $escaped.HasUnknownTag | Should -BeTrue
+            $multibyte.Tag | Should -Be (
+                'tag:example.com,2000:app/caf{0}' -f [char] 0x00E9
+            )
+            $multibyte.HasUnknownTag | Should -BeTrue
+        }
+
+        It 'retains unknown local and global tags before neutral value projection' {
+            $local = Get-TestYamlRepresentationRoot -Yaml '!local value'
+            $global = Get-TestYamlRepresentationRoot -Yaml (
+                '!<tag:example.test,2026:object> value'
+            )
+
+            $local.Tag | Should -Be '!local'
+            $local.HasUnknownTag | Should -BeTrue
+            $global.Tag | Should -Be 'tag:example.test,2026:object'
+            $global.HasUnknownTag | Should -BeTrue
+            ('!local value' | ConvertFrom-Yaml) | Should -Be 'value'
+            ('!<tag:example.test,2026:object> value' | ConvertFrom-Yaml) |
+                Should -Be 'value'
+        }
+
         It 'preserves repeated collection references' {
             $result = @'
 source: &source

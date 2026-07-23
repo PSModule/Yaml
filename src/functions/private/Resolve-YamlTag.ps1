@@ -67,7 +67,19 @@ function Resolve-YamlTag {
         }
     }
 
-    $expandedLength = $prefix.Length + $suffix.Length
+    try {
+        $expanded = ConvertFrom-YamlTagUriText -Text ($prefix + $suffix)
+    } catch [System.FormatException] {
+        throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
+                "The tag token '$Token' contains a malformed URI escape."
+            ))
+    } catch [System.Text.DecoderFallbackException] {
+        throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
+                "The tag token '$Token' contains URI escapes that are not valid UTF-8."
+            ))
+    }
+
+    $expandedLength = $expanded.Length
     if ($expandedLength -gt $Context.MaxTagLength) {
         throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlTagLimitExceeded' -Message (
                 "A YAML tag exceeds the configured limit of $($Context.MaxTagLength) characters."
@@ -80,7 +92,6 @@ function Resolve-YamlTag {
             ))
     }
 
-    $expanded = $prefix + $suffix
     $known = $expanded -cin @(
         'tag:yaml.org,2002:binary',
         'tag:yaml.org,2002:bool',

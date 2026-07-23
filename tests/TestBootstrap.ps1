@@ -51,6 +51,7 @@ function Get-TestYamlFingerprintLength {
         } finally {
             $hasher.Dispose()
         }
+
         @($cache.Values | ForEach-Object Length)
     }
 
@@ -59,4 +60,35 @@ function Get-TestYamlFingerprintLength {
         return @(& $implementation $Yaml)
     }
     return @(& $loadedModule $implementation $Yaml)
+}
+
+function Get-TestYamlRepresentationRoot {
+    <#
+        .SYNOPSIS
+        Returns observable metadata from the root representation node.
+    #>
+    param (
+        [Parameter(Mandatory)]
+        [string] $Yaml
+    )
+
+    $implementation = {
+        param ([string] $YamlText)
+
+        $document = (Read-YamlStreamCore -Yaml $YamlText -Depth 100 -MaxNodes 100 -MaxAliases 100 `
+                -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
+                -MaxNumericLength 4096).Value[0]
+        [pscustomobject]@{
+            Kind          = $document.Kind
+            Tag           = $document.Tag
+            HasUnknownTag = $document.HasUnknownTag
+            Value         = $document.Value
+        }
+    }
+
+    $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
+    if ($null -eq $loadedModule) {
+        return & $implementation $Yaml
+    }
+    return & $loadedModule $implementation $Yaml
 }

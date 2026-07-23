@@ -48,6 +48,17 @@ Describe 'Test-Yaml' {
         ("a: &a value`nb: &b *a" | Test-Yaml) | Should -BeFalse
     }
 
+    It 'rejects malformed or invalid UTF-8 tag URI escapes: <Tag>' -ForEach @(
+        @{ Tag = '!value%' }
+        @{ Tag = '!value%2' }
+        @{ Tag = '!value%GG' }
+        @{ Tag = '!value%C3' }
+        @{ Tag = '!value%C3%28' }
+    ) {
+        ("$Tag value" | Test-Yaml) | Should -BeFalse
+        { "$Tag value" | ConvertFrom-Yaml } | Should -Throw
+    }
+
     It 'recognizes document markers only at column zero' {
         ("key:`n  ---" | Test-Yaml) | Should -BeTrue
         ("key:`n  ..." | Test-Yaml) | Should -BeTrue

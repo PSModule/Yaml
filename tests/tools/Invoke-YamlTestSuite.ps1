@@ -259,10 +259,6 @@ function Get-YamlSuitePolicyReason {
     if ($YamlText -cmatch '!!(?:binary|omap|pairs|set|timestamp)(?:[ \t\r\n,\[\]\{\}]|$)') {
         return 'StandardTagProjectionPolicy'
     }
-    if ($YamlText -cmatch '(?:^|[ \t\r\n\[\]\{\},])!<(?!tag:yaml\.org,2002:)' -or
-        $YamlText -cmatch '(?:^|[ \t\r\n\[\]\{\},])![^\s!<][^\s:,\]\}\{]*') {
-        return 'UnknownTagProjectionPolicy'
-    }
     if (($Expected -match 'unsupported:' -or $Actual -match 'unsupported:')) {
         return 'PowerShellTypePolicy'
     }
