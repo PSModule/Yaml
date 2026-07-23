@@ -65,7 +65,11 @@ function Get-YamlEmissionNodeFingerprint {
                         ResolvedValue    = $null
                         MaxNumericLength = 1048576
                     })
-                $fingerprint = Get-YamlScalarFingerprint -Value $resolved.Value -Hasher $Hasher
+                $valueFingerprint = Get-YamlScalarFingerprint -Value $resolved.Value -Hasher $Hasher
+                $effectiveTag = Get-YamlEffectiveTag -Node $frame.Node -Value $resolved.Value
+                $fingerprint = Get-YamlFingerprintHash -Value (
+                    'scalar:{0}:{1}:{2}' -f $effectiveTag.Length, $effectiveTag, $valueFingerprint
+                ) -Hasher $Hasher
                 if ($hasReferenceId) {
                     $Cache[$frame.Node.ReferenceId] = $fingerprint
                     [void] $Active.Remove($frame.Node.ReferenceId)
@@ -86,8 +90,13 @@ function Get-YamlEmissionNodeFingerprint {
 
         if ($frame.State -eq 'Sequence') {
             if ($frame.Index -ge $frame.Node.Items.Count) {
+                $effectiveTag = Get-YamlEffectiveTag -Node $frame.Node -Value $null
                 $fingerprint = Get-YamlFingerprintHash -Value (
-                    'sequence:{0}' -f ($frame.Parts -join '|')
+                    'sequence:{0}:{1}:{2}' -f @(
+                        $effectiveTag.Length,
+                        $effectiveTag,
+                        ($frame.Parts -join '|')
+                    )
                 ) -Hasher $Hasher
                 if ($frame.Node.ReferenceId -ne 0) {
                     $Cache[$frame.Node.ReferenceId] = $fingerprint
@@ -120,8 +129,13 @@ function Get-YamlEmissionNodeFingerprint {
         if ($frame.State -eq 'MappingKey') {
             if ($frame.Index -ge $frame.Node.Entries.Count) {
                 $frame.Parts.Sort([System.StringComparer]::Ordinal)
+                $effectiveTag = Get-YamlEffectiveTag -Node $frame.Node -Value $null
                 $fingerprint = Get-YamlFingerprintHash -Value (
-                    'mapping:{0}' -f ($frame.Parts -join '|')
+                    'mapping:{0}:{1}:{2}' -f @(
+                        $effectiveTag.Length,
+                        $effectiveTag,
+                        ($frame.Parts -join '|')
+                    )
                 ) -Hasher $Hasher
                 if ($frame.Node.ReferenceId -ne 0) {
                     $Cache[$frame.Node.ReferenceId] = $fingerprint

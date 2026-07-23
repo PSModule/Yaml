@@ -33,7 +33,7 @@ function Read-YamlDirectiveBlock {
         if ($directive -cmatch '^%YAML(?:[ \t]|$)') {
             if ($yamlDirectiveSeen -or $directive -cnotmatch (
                     '^%YAML[ \t]+([0-9]+)\.([0-9]+)(?:[ \t]+#.*)?$'
-                ) -or $Matches[1] -ne '1') {
+                ) -or -not $Matches[1].Equals('1', [System.StringComparison]::Ordinal)) {
                 throw (New-YamlException -Start $mark -End $mark `
                         -ErrorId 'YamlInvalidDirective' -Message (
                         "The YAML directive '$directive' is malformed, duplicated, or requests an unsupported version."
@@ -63,16 +63,15 @@ function Read-YamlDirectiveBlock {
                         "A YAML tag prefix exceeds the configured limit of $($Context.MaxTagLength) characters."
                     ))
             }
-            if ($prefix -ne '!' -and -not (Test-YamlTagUriText -Text $prefix)) {
+            if (-not $prefix.Equals('!', [System.StringComparison]::Ordinal) -and
+                -not (Test-YamlTagUriText -Text $prefix)) {
                 throw (New-YamlException -Start $mark -End $mark `
                         -ErrorId 'YamlInvalidDirective' -Message (
                         "The TAG directive prefix '$prefix' contains invalid URI text."
                     ))
             }
             $tagHandles[$handle] = $prefix
-        } elseif ($directive -cnotmatch (
-                '^%[A-Za-z0-9]+(?:[ \t]+[^# \t][^#]*?)?(?:[ \t]+#.*)?$'
-            )) {
+        } elseif (-not (Test-YamlReservedDirective -Directive $directive)) {
             throw (New-YamlException -Start $mark -End $mark `
                     -ErrorId 'YamlInvalidDirective' -Message (
                     "The directive '$directive' is malformed."

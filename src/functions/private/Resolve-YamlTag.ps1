@@ -48,7 +48,7 @@ function Resolve-YamlTag {
                 $suffix = $Token.Substring($secondBang + 1)
             }
         }
-        if ($Token -eq '!') {
+        if ($Token.Equals('!', [System.StringComparison]::Ordinal)) {
             $prefix = ''
             $suffix = '!'
         } elseif ([string]::IsNullOrEmpty($suffix) -or
@@ -62,7 +62,7 @@ function Resolve-YamlTag {
                     "The tag handle '$handle' was not declared."
                 ))
         }
-        if ($Token -ne '!') {
+        if (-not $Token.Equals('!', [System.StringComparison]::Ordinal)) {
             $prefix = $Context.TagHandles[$handle]
         }
     }

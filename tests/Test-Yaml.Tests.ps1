@@ -71,11 +71,19 @@ Describe 'Test-Yaml' {
     It 'validates tag directives, tag tokens, and alias properties' {
         ("%TAG !! tag:example.com,2000:app/`n---`n!!int value" | Test-Yaml) |
             Should -BeTrue
+        ("%FOO-BAR baz`n---`nvalue" | Test-Yaml) | Should -BeTrue
+        ("%FOO:B alpha-beta p#q`n---`nvalue" | Test-Yaml) | Should -BeTrue
         ("%TAG ! tag:first/`n%TAG ! tag:second/`n---`n!value data" | Test-Yaml) |
             Should -BeFalse
+        ("% FOO baz`n---`nvalue" | Test-Yaml) | Should -BeFalse
+        ("%`n---`nvalue" | Test-Yaml) | Should -BeFalse
         ('!foo%GG value' | Test-Yaml) | Should -BeFalse
+        ('!foo\bar value' | Test-Yaml) | Should -BeFalse
+        ('!<tag:example.test,2026:foo\bar> value' | Test-Yaml) | Should -BeFalse
         ('!! value' | Test-Yaml) | Should -BeFalse
         ('!<tag:example.test,2026:bad tag> value' | Test-Yaml) | Should -BeFalse
+        ('!<tag:example.test,2026:a;b/c?d@e&f=g+h$i,j_k.l~m*n''o(p)[q]%21> value' |
+            Test-Yaml) | Should -BeTrue
         ("a: &a value`nb: &b *a" | Test-Yaml) | Should -BeFalse
     }
 
@@ -87,6 +95,23 @@ Describe 'Test-Yaml' {
     It 'returns false for duplicate mapping keys' {
         ("key: one`nkey: two" | Test-Yaml) | Should -BeFalse
         ("1: one`n01: two" | Test-Yaml) | Should -BeFalse
+    }
+
+    It 'includes effective tags in mapping-key equality' {
+        ("!foo x: one`n!bar x: two" | Test-Yaml) | Should -BeTrue
+        ("!foo x: one`n!foo x: two" | Test-Yaml) | Should -BeFalse
+        (@'
+? !foo [x]
+: one
+? !bar [x]
+: two
+'@ | Test-Yaml) | Should -BeTrue
+        (@'
+? !foo {x: y}
+: one
+? !bar {x: y}
+: two
+'@ | Test-Yaml) | Should -BeTrue
     }
 
     It 'accepts complex keys even though default object projection cannot' {

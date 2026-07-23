@@ -57,7 +57,11 @@ function Get-YamlNodeFingerprint {
 
             if ($effective.Kind -eq 'Scalar') {
                 $resolved = Resolve-YamlScalar -Node $effective
-                $fingerprint = Get-YamlScalarFingerprint -Value $resolved.Value -Hasher $Hasher
+                $valueFingerprint = Get-YamlScalarFingerprint -Value $resolved.Value -Hasher $Hasher
+                $effectiveTag = Get-YamlEffectiveTag -Node $effective -Value $resolved.Value
+                $fingerprint = Get-YamlFingerprintHash -Value (
+                    'scalar:{0}:{1}:{2}' -f $effectiveTag.Length, $effectiveTag, $valueFingerprint
+                ) -Hasher $Hasher
                 $Cache[$effective.Id] = $fingerprint
                 [void] $Active.Remove($effective.Id)
                 $frame.Holder.Value = $fingerprint
@@ -76,15 +80,12 @@ function Get-YamlNodeFingerprint {
 
         if ($frame.State -eq 'Sequence') {
             if ($frame.Index -ge $frame.Node.Items.Count) {
-                $semanticTag = if (
-                    $frame.Node.Tag -ceq 'tag:yaml.org,2002:omap' -or
-                    $frame.Node.Tag -ceq 'tag:yaml.org,2002:pairs'
-                ) {
-                    $frame.Node.Tag
-                } else {
-                    'tag:yaml.org,2002:seq'
-                }
-                $canonical = 'sequence:{0}:{1}' -f $semanticTag, ($frame.Parts -join '|')
+                $semanticTag = Get-YamlEffectiveTag -Node $frame.Node -Value $null
+                $canonical = 'sequence:{0}:{1}:{2}' -f @(
+                    $semanticTag.Length,
+                    $semanticTag,
+                    ($frame.Parts -join '|')
+                )
                 $fingerprint = Get-YamlFingerprintHash -Value $canonical -Hasher $Hasher
                 $Cache[$frame.Node.Id] = $fingerprint
                 [void] $Active.Remove($frame.Node.Id)
@@ -115,12 +116,12 @@ function Get-YamlNodeFingerprint {
         if ($frame.State -eq 'MappingKey') {
             if ($frame.Index -ge $frame.Node.Entries.Count) {
                 $frame.Parts.Sort([System.StringComparer]::Ordinal)
-                $mappingTag = if ($frame.Node.Tag -ceq 'tag:yaml.org,2002:set') {
-                    $frame.Node.Tag
-                } else {
-                    'tag:yaml.org,2002:map'
-                }
-                $canonical = 'mapping:{0}:{1}' -f $mappingTag, ($frame.Parts -join '|')
+                $mappingTag = Get-YamlEffectiveTag -Node $frame.Node -Value $null
+                $canonical = 'mapping:{0}:{1}:{2}' -f @(
+                    $mappingTag.Length,
+                    $mappingTag,
+                    ($frame.Parts -join '|')
+                )
                 $fingerprint = Get-YamlFingerprintHash -Value $canonical -Hasher $Hasher
                 $Cache[$frame.Node.Id] = $fingerprint
                 [void] $Active.Remove($frame.Node.Id)
