@@ -1,21 +1,23 @@
 $artifactManifestOverride = $env:PSMODULE_YAML_TEST_ARTIFACT
 $yamlModule = $null
 if (-not [string]::IsNullOrWhiteSpace($artifactManifestOverride)) {
-    $yamlModule = Import-Module -Name $artifactManifestOverride -Force -Global -PassThru `
-        -ErrorAction Stop |
-        Where-Object Name -EQ 'Yaml' |
+    $resolvedArtifactManifestPath = (
+        Resolve-Path -LiteralPath $artifactManifestOverride -ErrorAction Stop
+    ).Path
+    $artifactModuleBase = Split-Path -Parent $resolvedArtifactManifestPath
+    $yamlModule = Get-Module -Name Yaml |
+        Where-Object ModuleBase -EQ $artifactModuleBase |
         Select-Object -First 1
+    if ($null -eq $yamlModule) {
+        $yamlModule = Import-Module -Name $resolvedArtifactManifestPath -Force -Global -PassThru `
+            -ErrorAction Stop |
+            Where-Object Name -EQ 'Yaml' |
+            Select-Object -First 1
+    }
 }
 
 if ($null -eq $yamlModule) {
-    $yamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-    $yamlModule = if (
-        $null -ne $yamlCommand -and
-        $yamlCommand.ModuleName -eq 'Yaml' -and
-        $yamlCommand.CommandType -eq 'Function'
-    ) {
-        $yamlCommand.Module
-    }
+    $yamlModule = Get-Module -Name Yaml | Select-Object -First 1
 }
 
 if ($null -eq $yamlModule) {

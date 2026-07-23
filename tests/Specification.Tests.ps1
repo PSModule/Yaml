@@ -204,6 +204,9 @@ Describe 'Pinned yaml-test-suite reference cases' {
         ) | Should -BeTrue
         , $result.canonical | Should -BeOfType [byte[]]
         , $result.generic | Should -BeOfType [byte[]]
+        [System.Convert]::ToHexString(
+            [System.Security.Cryptography.SHA256]::HashData($result.canonical)
+        ) | Should -Be '0DD8F84D24840A21A56495526E5B227911D13389109C62194A64B6CCBF3B1400'
     }
 
     It 'projects the legacy ordered map in case J7PZ as an ordered dictionary' {

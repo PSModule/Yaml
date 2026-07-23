@@ -109,6 +109,42 @@ Describe 'Released yaml-test-suite corpus accounting' {
         )
     }
 
+    It 'does not mask altered JSON values as projection policy' {
+        $mutatedSuitePath = Join-Path $TestDrive 'mutated-policy-cases'
+        $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force
+        foreach ($case in @('565N', 'J7PZ')) {
+            Copy-Item -LiteralPath (Join-Path $suiteDataPath $case) `
+                -Destination $mutatedSuitePath -Recurse
+        }
+
+        $binaryJsonPath = Join-Path $mutatedSuitePath '565N\in.json'
+        $binaryJson = Get-Content -LiteralPath $binaryJsonPath -Raw |
+            ConvertFrom-Json -AsHashtable
+        $binaryJson['description'] = 'Altered expected value'
+        $binaryJson | ConvertTo-Json -Depth 10 |
+            Set-Content -LiteralPath $binaryJsonPath -Encoding utf8NoBOM
+
+        $orderedMapJsonPath = Join-Path $mutatedSuitePath 'J7PZ\in.json'
+        $orderedMapJson = Get-Content -LiteralPath $orderedMapJsonPath -Raw |
+            ConvertFrom-Json -AsHashtable
+        $orderedMapJson[0]['Mark McGwire'] = 66
+        $orderedMapJson | ConvertTo-Json -Depth 10 |
+            Set-Content -LiteralPath $orderedMapJsonPath -Encoding utf8NoBOM
+
+        $mutatedResults = @(
+            & (Join-Path $PSScriptRoot 'tools\Invoke-YamlTestSuite.ps1') `
+                -Path $mutatedSuitePath `
+                -CompareJson
+        )
+        @($mutatedResults | Sort-Object Case | Select-Object -ExpandProperty Case) |
+            Should -Be @('565N', 'J7PZ')
+        @($mutatedResults | Where-Object JsonResult -EQ 'PolicyDifference').Count |
+            Should -Be 0
+        @($mutatedResults | Where-Object JsonResult -EQ 'Fail').Count | Should -Be 2
+        @($mutatedResults.JsonReason | Select-Object -Unique) |
+            Should -Be @('ConstructedValueMismatch')
+    }
+
     It 'accounts for out.yaml representation comparisons' {
         @($suiteResults | Where-Object OutYamlResult -EQ 'Pass').Count | Should -Be 241
         @($suiteResults | Where-Object OutYamlResult -EQ 'PolicyDifference').Count |

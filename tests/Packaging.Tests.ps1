@@ -11,29 +11,15 @@
 [CmdletBinding()]
 param()
 
-$importedYamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
+$importedYamlModule = Get-Module -Name Yaml | Select-Object -First 1
 $skipArtifactTests = [string]::IsNullOrWhiteSpace($env:PSMODULE_YAML_TEST_ARTIFACT) -and (
-    $null -eq $importedYamlCommand -or $importedYamlCommand.ModuleName -ne 'Yaml'
+    $null -eq $importedYamlModule
 )
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
     $repositoryRoot = Split-Path -Parent $PSScriptRoot
-    $loadedYamlModule = if (-not [string]::IsNullOrWhiteSpace(
-            $env:PSMODULE_YAML_TEST_ARTIFACT
-        )) {
-        Import-Module -Name $env:PSMODULE_YAML_TEST_ARTIFACT -Force -Global -PassThru `
-            -ErrorAction Stop |
-            Where-Object Name -EQ 'Yaml' |
-            Select-Object -First 1
-    } else {
-        $command = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
-        if ($null -ne $command -and $command.ModuleName -eq 'Yaml') {
-            $command.Module
-        } else {
-            $null
-        }
-    }
+    $loadedYamlModule = $yamlModule
     $artifactManifestPath = if ($null -ne $loadedYamlModule) {
         Join-Path $loadedYamlModule.ModuleBase 'Yaml.psd1'
     } else {
@@ -63,8 +49,8 @@ Describe 'Dependency-free package source' {
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
     }
 
-    It 'declares the generated artifact runtime once in module initialization' {
-        $requirementPath = Join-Path $repositoryRoot 'src\init\requirements.ps1'
+    It 'declares the generated artifact runtime once in the module header' {
+        $requirementPath = Join-Path $repositoryRoot 'src\header.ps1'
         $source = Get-Content -LiteralPath $requirementPath -Raw
 
         $source | Should -Match '(?m)^#Requires -Version 7\.6\r?$'
@@ -164,8 +150,8 @@ Describe 'Generated artifact package' {
         $script = @'
 $ErrorActionPreference = 'Stop'
 $ps = $PSVersionTable.PSVersion
-if ($ps.Major -ne 7 -or $ps.Minor -ne 6) {
-    throw "Expected PowerShell 7.6.x but got $ps."
+if ($ps -lt [version] '7.6') {
+    throw "Expected PowerShell 7.6 or newer but got $ps."
 }
 if ($PSVersionTable.PSEdition -cne 'Core') {
     throw "Expected PowerShell Core but got $($PSVersionTable.PSEdition)."
@@ -212,7 +198,13 @@ if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
         $runtime = $output | Where-Object { $_ -like 'powershell-runtime=*' } |
             Select-Object -Last 1
 
-        $runtime | Should -Match '^powershell-runtime=7\.6\.\d+;edition=Core$'
+        $runtimeMatch = [regex]::Match(
+            [string] $runtime,
+            '^powershell-runtime=(?<Version>\d+(?:\.\d+){1,3});edition=Core$'
+        )
+        $runtimeMatch.Success | Should -BeTrue
+        ([version] $runtimeMatch.Groups['Version'].Value) -lt [version] '7.6' |
+            Should -BeFalse
         Write-Information -MessageData $runtime -InformationAction Continue
         $LASTEXITCODE | Should -Be 0
     }

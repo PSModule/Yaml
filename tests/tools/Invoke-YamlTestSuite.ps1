@@ -242,18 +242,123 @@ function ConvertTo-YamlSuiteReferenceSignature {
     return ($output -join ';')
 }
 
+function Test-YamlSuiteBinaryByteArrayProjection {
+    [OutputType([bool])]
+    param (
+        [Parameter(Mandatory)]
+        [object[]] $ExpectedValues,
+
+        [Parameter(Mandatory)]
+        [object[]] $ActualValues
+    )
+
+    if ($ExpectedValues.Count -ne 1 -or $ActualValues.Count -ne 1) {
+        return $false
+    }
+    $expectedDocument = $ExpectedValues[0]
+    $actualDocument = $ActualValues[0]
+    if ($expectedDocument -isnot [System.Collections.IDictionary] -or
+        $actualDocument -isnot [System.Collections.IDictionary] -or
+        $expectedDocument.Count -ne 3 -or $actualDocument.Count -ne 3) {
+        return $false
+    }
+
+    foreach ($key in @('canonical', 'generic', 'description')) {
+        if (-not $expectedDocument.Contains($key) -or -not $actualDocument.Contains($key)) {
+            return $false
+        }
+    }
+    if ($expectedDocument['description'] -isnot [string] -or
+        $actualDocument['description'] -isnot [string] -or
+        $actualDocument['description'] -cne $expectedDocument['description']) {
+        return $false
+    }
+
+    foreach ($key in @('canonical', 'generic')) {
+        if ($expectedDocument[$key] -isnot [string] -or
+            $actualDocument[$key] -isnot [byte[]]) {
+            return $false
+        }
+        $expectedBase64 = $expectedDocument[$key] -replace '\s', ''
+        $expectedBytes = [System.Convert]::FromBase64String($expectedBase64)
+        if (-not [System.Linq.Enumerable]::SequenceEqual[byte](
+                $expectedBytes,
+                [byte[]] $actualDocument[$key]
+            )) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-YamlSuiteLegacyOrderedMapProjection {
+    [OutputType([bool])]
+    param (
+        [Parameter(Mandatory)]
+        [object[]] $ExpectedValues,
+
+        [Parameter(Mandatory)]
+        [object[]] $ActualValues
+    )
+
+    if ($ExpectedValues.Count -ne 1 -or $ActualValues.Count -ne 1 -or
+        $ExpectedValues[0] -is [System.Collections.IDictionary] -or
+        $ExpectedValues[0] -isnot [System.Collections.IEnumerable] -or
+        $ActualValues[0] -isnot [System.Collections.Specialized.OrderedDictionary]) {
+        return $false
+    }
+
+    $expectedEntries = @($ExpectedValues[0])
+    $actualDocument = $ActualValues[0]
+    $actualKeys = @($actualDocument.Keys)
+    if ($expectedEntries.Count -ne $actualDocument.Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt $expectedEntries.Count; $index++) {
+        $expectedEntry = $expectedEntries[$index]
+        if ($expectedEntry -isnot [System.Collections.IDictionary] -or
+            $expectedEntry.Count -ne 1) {
+            return $false
+        }
+        $expectedKey = @($expectedEntry.Keys)[0]
+        if ($expectedKey -isnot [string] -or $actualKeys[$index] -cne $expectedKey -or
+            (ConvertTo-YamlSuiteCanonicalValue -Value $actualDocument[$expectedKey]) -cne
+            (ConvertTo-YamlSuiteCanonicalValue -Value $expectedEntry[$expectedKey])) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Get-YamlSuiteJsonPolicyReason {
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]
-        [string] $Case
+        [string] $Case,
+
+        [Parameter(Mandatory)]
+        [object[]] $ExpectedValues,
+
+        [Parameter(Mandatory)]
+        [object[]] $ActualValues
     )
 
     switch -CaseSensitive ($Case) {
-        '565N' { return 'BinaryByteArrayProjection' }
-        'J7PZ' { return 'LegacyOrderedMapProjection' }
+        '565N' {
+            if (Test-YamlSuiteBinaryByteArrayProjection -ExpectedValues $ExpectedValues `
+                    -ActualValues $ActualValues) {
+                return 'BinaryByteArrayProjection'
+            }
+        }
+        'J7PZ' {
+            if (Test-YamlSuiteLegacyOrderedMapProjection -ExpectedValues $ExpectedValues `
+                    -ActualValues $ActualValues) {
+                return 'LegacyOrderedMapProjection'
+            }
+        }
         default { return '' }
     }
+    return ''
 }
 
 function ConvertFrom-YamlSuiteEventText {
@@ -746,7 +851,9 @@ foreach ($inputFile in $inputFiles) {
             if ($projectedCanonical -ceq $expectedCanonical) {
                 $jsonResult = 'Pass'
             } else {
-                $reason = Get-YamlSuiteJsonPolicyReason -Case $casePath
+                $reason = Get-YamlSuiteJsonPolicyReason -Case $casePath `
+                    -ExpectedValues ([object[]] $expectedValues.ToArray()) `
+                    -ActualValues ([object[]] $projectedValues)
                 if ($reason) {
                     $jsonResult = 'PolicyDifference'
                     $jsonReason = $reason
