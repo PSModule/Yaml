@@ -115,7 +115,9 @@ function Split-YamlSuiteJsonDocument {
 function ConvertTo-YamlSuiteCanonicalValue {
     param (
         [AllowNull()]
-        [object] $Value
+        [object] $Value,
+
+        [switch] $SortMappings
     )
 
     if ($null -eq $Value -or $Value -is [System.DBNull]) {
@@ -126,6 +128,32 @@ function ConvertTo-YamlSuiteCanonicalValue {
     }
     if ($Value -is [bool]) {
         return 'bool:{0}' -f $Value.ToString().ToLowerInvariant()
+    }
+    if ($Value -is [byte[]]) {
+        return 'binary:{0}:{1}' -f $Value.Length, [System.Convert]::ToBase64String($Value)
+    }
+    if ($Value -is [char]) {
+        return 'char:{0}' -f [int] $Value
+    }
+    if ($Value.GetType().IsEnum) {
+        return 'enum:{0}:{1}' -f $Value.GetType().FullName, (
+            [System.Convert]::ToUInt64($Value, [cultureinfo]::InvariantCulture)
+        )
+    }
+    if ($Value -is [datetimeoffset]) {
+        return 'timestamp:{0}:{1}' -f $Value.UtcTicks, $Value.Offset.Ticks
+    }
+    if ($Value -is [datetime]) {
+        return 'datetime:{0}:{1}' -f $Value.Ticks, [int] $Value.Kind
+    }
+    if ($Value -is [timespan]) {
+        return 'timespan:{0}' -f $Value.Ticks
+    }
+    if ($Value -is [guid]) {
+        return 'guid:{0}' -f $Value.ToString('D')
+    }
+    if ($Value -is [uri]) {
+        return 'uri:{0}:{1}' -f $Value.OriginalString.Length, $Value.OriginalString
     }
 
     $typeCode = [System.Type]::GetTypeCode($Value.GetType())
@@ -149,27 +177,48 @@ function ConvertTo-YamlSuiteCanonicalValue {
     }
     if ($Value -is [System.Collections.IDictionary]) {
         $entries = [System.Collections.Generic.List[string]]::new()
-        foreach ($key in $Value.Keys) {
-            if ($key -isnot [string]) {
-                return 'unsupported:non-string-mapping-key'
-            }
-            $canonicalValue = ConvertTo-YamlSuiteCanonicalValue -Value $Value[$key]
-            $entries.Add(('{0}:{1}={2}' -f $key.Length, $key, $canonicalValue))
+        foreach ($entry in $Value.GetEnumerator()) {
+            $canonicalKey = ConvertTo-YamlSuiteCanonicalValue -Value $entry.Key `
+                -SortMappings:$SortMappings
+            $canonicalValue = ConvertTo-YamlSuiteCanonicalValue -Value $entry.Value `
+                -SortMappings:$SortMappings
+            $entries.Add(('{0}:{1}={2}:{3}' -f
+                    $canonicalKey.Length,
+                    $canonicalKey,
+                    $canonicalValue.Length,
+                    $canonicalValue
+                ))
         }
-        $entries.Sort([System.StringComparer]::Ordinal)
+        $isOrdered = (
+            $Value -is [System.Collections.Specialized.OrderedDictionary] -or
+            $Value.GetType().FullName -ceq 'System.Management.Automation.OrderedHashtable'
+        )
+        if ($SortMappings -or -not $isOrdered) {
+            $entries.Sort([System.StringComparer]::Ordinal)
+        }
         return 'map:{0}:{{{1}}}' -f $entries.Count, ($entries -join '|')
     }
     if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
-        if ($Value -is [byte[]]) {
-            return 'unsupported:System.Byte[]'
-        }
         $items = [System.Collections.Generic.List[string]]::new()
         foreach ($item in $Value) {
-            $items.Add((ConvertTo-YamlSuiteCanonicalValue -Value $item))
+            $items.Add((
+                    ConvertTo-YamlSuiteCanonicalValue -Value $item -SortMappings:$SortMappings
+                ))
         }
         return 'sequence:{0}:[{1}]' -f $items.Count, ($items -join '|')
     }
-    return 'unsupported:{0}' -f $Value.GetType().FullName
+
+    $serialized = [System.Management.Automation.PSSerializer]::Serialize($Value, 3)
+    $payload = [System.Convert]::ToBase64String(
+        [System.Text.Encoding]::UTF8.GetBytes($serialized)
+    )
+    if (-not $Value.GetType().IsValueType) {
+        return 'unsupported-reference:{0}:{1}:{2}' -f
+        $Value.GetType().FullName,
+        [System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($Value),
+        $payload
+    }
+    return 'unsupported-value:{0}:{1}' -f $Value.GetType().FullName, $payload
 }
 
 function ConvertTo-YamlSuiteReferenceSignature {
@@ -188,7 +237,7 @@ function ConvertTo-YamlSuiteReferenceSignature {
     while ($stack.Count -gt 0) {
         $frame = $stack.Pop()
         $current = $frame.Value
-        if ($null -eq $current -or $current -is [string] -or $current -is [byte[]]) {
+        if ($null -eq $current -or $current -is [string]) {
             continue
         }
         if ($current -isnot [System.Collections.IDictionary] -and
@@ -206,13 +255,22 @@ function ConvertTo-YamlSuiteReferenceSignature {
         if (-not $first) {
             continue
         }
+        if ($current -is [byte[]]) {
+            continue
+        }
 
         if ($current -is [System.Collections.IDictionary]) {
-            foreach ($key in $current.Keys) {
-                $childPath = '{0}{{{1}}}' -f $frame.Path, (ConvertTo-YamlSuiteCanonicalValue -Value $key)
+            foreach ($entry in $current.GetEnumerator()) {
+                $childPath = '{0}{{{1}}}' -f $frame.Path, (
+                    ConvertTo-YamlSuiteCanonicalValue -Value $entry.Key
+                )
                 $stack.Push([pscustomobject]@{
-                        Value = $current[$key]
-                        Path  = $childPath
+                        Value = $entry.Value
+                        Path  = "$childPath.value"
+                    })
+                $stack.Push([pscustomobject]@{
+                        Value = $entry.Key
+                        Path  = "$childPath.key"
                     })
             }
             continue
@@ -334,30 +392,21 @@ function Get-YamlSuiteJsonPolicyReason {
     [OutputType([string])]
     param (
         [Parameter(Mandatory)]
-        [string] $Case,
-
-        [Parameter(Mandatory)]
         [object[]] $ExpectedValues,
 
         [Parameter(Mandatory)]
         [object[]] $ActualValues
     )
 
-    switch -CaseSensitive ($Case) {
-        '565N' {
-            if (Test-YamlSuiteBinaryByteArrayProjection -ExpectedValues $ExpectedValues `
-                    -ActualValues $ActualValues) {
-                return 'BinaryByteArrayProjection'
-            }
-        }
-        'J7PZ' {
-            if (Test-YamlSuiteLegacyOrderedMapProjection -ExpectedValues $ExpectedValues `
-                    -ActualValues $ActualValues) {
-                return 'LegacyOrderedMapProjection'
-            }
-        }
-        default { return '' }
+    if (Test-YamlSuiteBinaryByteArrayProjection -ExpectedValues $ExpectedValues `
+            -ActualValues $ActualValues) {
+        return 'BinaryByteArrayProjection'
     }
+    if (Test-YamlSuiteLegacyOrderedMapProjection -ExpectedValues $ExpectedValues `
+            -ActualValues $ActualValues) {
+        return 'LegacyOrderedMapProjection'
+    }
+    return ''
     return ''
 }
 
@@ -749,6 +798,7 @@ foreach ($inputFile in $inputFiles) {
     $stream = $null
     $projectedValues = $null
     $projectedCanonical = $null
+    $projectedJsonCanonical = $null
     $projectedReference = ''
     $projectionError = ''
     $eventExpected = $null
@@ -756,6 +806,7 @@ foreach ($inputFile in $inputFiles) {
     $jsonExpected = $null
     $jsonActual = $null
     $outYamlCanonical = $null
+    $outYamlReference = $null
     $emitCanonical = $null
     $emitReference = $null
 
@@ -801,6 +852,8 @@ foreach ($inputFile in $inputFiles) {
         try {
             $projectedValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $stream.Value)).Value
             $projectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $projectedValues)
+            $projectedJsonCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                -Value ([object[]] $projectedValues) -SortMappings
             $projectedReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $projectedValues)
         } catch {
             if ($_.Exception.Data.Contains('YamlErrorId')) {
@@ -845,13 +898,14 @@ foreach ($inputFile in $inputFiles) {
             foreach ($document in $expectedDocuments) {
                 $expectedValues.Add((ConvertFrom-Json -InputObject $document -AsHashtable -NoEnumerate))
             }
-            $expectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $expectedValues.ToArray())
+            $expectedCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                -Value ([object[]] $expectedValues.ToArray()) -SortMappings
             $jsonExpected = $expectedCanonical
-            $jsonActual = $projectedCanonical
-            if ($projectedCanonical -ceq $expectedCanonical) {
+            $jsonActual = $projectedJsonCanonical
+            if ($projectedJsonCanonical -ceq $expectedCanonical) {
                 $jsonResult = 'Pass'
             } else {
-                $reason = Get-YamlSuiteJsonPolicyReason -Case $casePath `
+                $reason = Get-YamlSuiteJsonPolicyReason `
                     -ExpectedValues ([object[]] $expectedValues.ToArray()) `
                     -ActualValues ([object[]] $projectedValues)
                 if ($reason) {
@@ -877,12 +931,17 @@ foreach ($inputFile in $inputFiles) {
                 $outStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream -Arguments @($outYaml)
                 $outValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $outStream.Value)).Value
                 $outCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $outValues)
+                $outReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $outValues)
                 $outYamlCanonical = $outCanonical
-                if ($outCanonical -ceq $projectedCanonical) {
-                    $outYamlResult = 'Pass'
-                } else {
+                $outYamlReference = $outReference
+                if ($outCanonical -cne $projectedCanonical) {
                     $outYamlResult = 'Fail'
                     $outYamlReason = 'OutYamlConstructionMismatch'
+                } elseif ($outReference -cne $projectedReference) {
+                    $outYamlResult = 'Fail'
+                    $outYamlReason = 'OutYamlReferenceMismatch'
+                } else {
+                    $outYamlResult = 'Pass'
                 }
             } catch {
                 if ($_.Exception.Data.Contains('IsYamlException')) {
@@ -975,6 +1034,7 @@ foreach ($inputFile in $inputFiles) {
         JsonExpected    = $jsonExpected
         JsonActual      = $jsonActual
         OutYamlActual   = $outYamlCanonical
+        OutYamlRefs     = $outYamlReference
         EmitActual      = $emitCanonical
         EmitReferences  = $emitReference
         ProjectedActual = $projectedCanonical

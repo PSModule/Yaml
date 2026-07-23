@@ -26,14 +26,18 @@ BeforeAll {
         throw "Expected one release archive root, but found $($suiteRoots.Count)."
     }
     $suiteDataPath = $suiteRoots[0].FullName
+    $runnerPath = Join-Path $PSScriptRoot 'tools\Invoke-YamlTestSuite.ps1'
     $suiteResults = @(
-        & (Join-Path $PSScriptRoot 'tools\Invoke-YamlTestSuite.ps1') `
+        & $runnerPath `
             -Path $suiteDataPath `
             -CompareJson `
             -CompareEvents `
             -CompareOutYaml `
             -CompareEmitRoundTrip
     )
+    $emptySuitePath = Join-Path $TestDrive 'empty-suite'
+    $null = New-Item -Path $emptySuitePath -ItemType Directory
+    . $runnerPath -Path $emptySuitePath -CompareJson
 }
 
 Describe 'Released yaml-test-suite corpus accounting' {
@@ -143,6 +147,89 @@ Describe 'Released yaml-test-suite corpus accounting' {
         @($mutatedResults | Where-Object JsonResult -EQ 'Fail').Count | Should -Be 2
         @($mutatedResults.JsonReason | Select-Object -Unique) |
             Should -Be @('ConstructedValueMismatch')
+    }
+
+    It 'canonicalizes binary, complex-key, ordered, and unsupported values distinctly' {
+        (ConvertTo-YamlSuiteCanonicalValue -Value ([byte[]] @(1, 2))) |
+            Should -Not -Be (ConvertTo-YamlSuiteCanonicalValue -Value ([byte[]] @(3, 4)))
+
+        $firstComplex = [System.Collections.Specialized.OrderedDictionary]::new()
+        $secondComplex = [System.Collections.Specialized.OrderedDictionary]::new()
+        $firstComplex.Add([object[]] @('a'), 1)
+        $secondComplex.Add([object[]] @('b'), 1)
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstComplex) |
+            Should -Not -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondComplex)
+
+        $firstOrder = [System.Collections.Specialized.OrderedDictionary]::new()
+        $secondOrder = [System.Collections.Specialized.OrderedDictionary]::new()
+        $firstOrder.Add('a', 1)
+        $firstOrder.Add('b', 2)
+        $secondOrder.Add('b', 2)
+        $secondOrder.Add('a', 1)
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstOrder) |
+            Should -Not -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder)
+
+        (ConvertTo-YamlSuiteCanonicalValue -Value ([uri] 'https://example.com/one')) |
+            Should -Not -Be (
+                ConvertTo-YamlSuiteCanonicalValue -Value ([uri] 'https://example.com/two')
+            )
+    }
+
+    It 'includes binary and complex mapping-key identity in reference signatures' {
+        $sharedBytes = [byte[]] @(1, 2)
+        $sharedBinaryGraph = [object[]] @($sharedBytes, $sharedBytes)
+        $distinctBinaryGraph = [object[]] @([byte[]] @(1, 2), [byte[]] @(1, 2))
+        (ConvertTo-YamlSuiteReferenceSignature -Value $sharedBinaryGraph) |
+            Should -Not -Be (ConvertTo-YamlSuiteReferenceSignature -Value $distinctBinaryGraph)
+
+        $sharedKey = [object[]] @('key')
+        $sharedKeyGraph = [System.Collections.Specialized.OrderedDictionary]::new()
+        $sharedKeyGraph.Add($sharedKey, $sharedKey)
+        $distinctKeyGraph = [System.Collections.Specialized.OrderedDictionary]::new()
+        $distinctKeyGraph.Add([object[]] @('key'), [object[]] @('key'))
+        (ConvertTo-YamlSuiteReferenceSignature -Value $sharedKeyGraph) |
+            Should -Not -Be (ConvertTo-YamlSuiteReferenceSignature -Value $distinctKeyGraph)
+    }
+
+    It 'detects altered ordered-map and alias semantics in out.yaml' {
+        $mutatedSuitePath = Join-Path $TestDrive 'mutated-out-cases'
+        $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force
+        foreach ($case in @('J7PZ', 'UGM3')) {
+            Copy-Item -LiteralPath (Join-Path $suiteDataPath $case) `
+                -Destination $mutatedSuitePath -Recurse
+        }
+
+        @'
+--- !!omap
+- Sammy Sosa: 63
+- Mark McGwire: 65
+- Ken Griffy: 58
+'@ | Set-Content -LiteralPath (Join-Path $mutatedSuitePath 'J7PZ\out.yaml') `
+            -Encoding utf8NoBOM
+
+        $invoicePath = Join-Path $mutatedSuitePath 'UGM3\out.yaml'
+        $invoice = Get-Content -LiteralPath $invoicePath -Raw
+        $duplicateAddress = @'
+ship-to:
+  given: Chris
+  family: Dumars
+  address:
+    lines: |
+      458 Walkman Dr.
+      Suite #292
+    city: Royal Oak
+    state: MI
+    postal: 48046
+'@
+        $invoice.Replace('ship-to: *id001', $duplicateAddress.TrimEnd()) |
+            Set-Content -LiteralPath $invoicePath -Encoding utf8NoBOM
+
+        $mutatedResults = @(
+            & $runnerPath -Path $mutatedSuitePath -CompareOutYaml
+        )
+        @($mutatedResults | Where-Object OutYamlResult -EQ 'Fail').Count | Should -Be 2
+        @($mutatedResults | Sort-Object Case | Select-Object -ExpandProperty OutYamlReason) |
+            Should -Be @('OutYamlConstructionMismatch', 'OutYamlReferenceMismatch')
     }
 
     It 'accounts for out.yaml representation comparisons' {
