@@ -167,6 +167,9 @@ Describe 'Released yaml-test-suite corpus accounting' {
         $firstOrder.Add('b', 2)
         $secondOrder.Add('b', 2)
         $secondOrder.Add('a', 1)
+        $ordinarySameOrder = [System.Collections.Specialized.OrderedDictionary]::new()
+        $ordinarySameOrder.Add('a', 1)
+        $ordinarySameOrder.Add('b', 2)
         (ConvertTo-YamlSuiteCanonicalValue -Value $firstOrder) |
             Should -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder)
 
@@ -179,6 +182,12 @@ Describe 'Released yaml-test-suite corpus accounting' {
             -OrderedMappings $orderedMappings) |
             Should -Not -Be (
                 ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder `
+                    -OrderedMappings $orderedMappings
+            )
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstOrder `
+            -OrderedMappings $orderedMappings) |
+            Should -Not -Be (
+                ConvertTo-YamlSuiteCanonicalValue -Value $ordinarySameOrder `
                     -OrderedMappings $orderedMappings
             )
 
@@ -270,6 +279,30 @@ ship-to:
         $ordinaryResult = & $runnerPath -Path $ordinarySuitePath -CompareOutYaml
 
         $ordinaryResult.OutYamlResult | Should -Be 'Pass'
+    }
+
+    It 'detects explicit ordered-map tag loss across representation surfaces' {
+        $tagLossSuitePath = Join-Path $TestDrive 'ordered-map-tag-loss'
+        $tagLossCasePath = Join-Path $tagLossSuitePath 'omap-tag-loss'
+        $null = New-Item -Path $tagLossCasePath -ItemType Directory -Force
+        "!!omap`n- a: 1`n- b: 2" |
+            Set-Content -LiteralPath (Join-Path $tagLossCasePath 'in.yaml') `
+                -Encoding utf8NoBOM
+        foreach ($fixture in @('out.yaml', 'emit.yaml')) {
+            "a: 1`nb: 2" |
+                Set-Content -LiteralPath (Join-Path $tagLossCasePath $fixture) `
+                    -Encoding utf8NoBOM
+        }
+
+        $tagLossResult = & $runnerPath -Path $tagLossSuitePath `
+            -CompareOutYaml -CompareEmitYaml -CompareSelfRoundTrip
+
+        $tagLossResult.OutYamlResult | Should -Be 'Fail'
+        $tagLossResult.OutYamlReason | Should -Be 'OutYamlConstructionMismatch'
+        $tagLossResult.EmitYamlResult | Should -Be 'Fail'
+        $tagLossResult.EmitYamlReason | Should -Be 'EmitYamlRepresentationMismatch'
+        $tagLossResult.SelfRoundTripResult | Should -Be 'PolicyDifference'
+        $tagLossResult.SelfRoundTripReason | Should -Be 'LegacyOrderedMapProjection'
     }
 
     It 'accounts for out.yaml representation comparisons' {

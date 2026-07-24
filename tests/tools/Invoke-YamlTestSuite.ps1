@@ -199,7 +199,8 @@ function ConvertTo-YamlSuiteCanonicalValue {
         if ($SortMappings -or -not $isOrdered) {
             $entries.Sort([System.StringComparer]::Ordinal)
         }
-        return 'map:{0}:{{{1}}}' -f $entries.Count, ($entries -join '|')
+        $mappingKind = if ($isOrdered) { 'omap' } else { 'map' }
+        return '{0}:{1}:{{{2}}}' -f $mappingKind, $entries.Count, ($entries -join '|')
     }
     if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
         $items = [System.Collections.Generic.List[string]]::new()
