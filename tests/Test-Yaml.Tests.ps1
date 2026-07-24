@@ -37,7 +37,7 @@ Describe 'Test-Yaml' {
         ("a: &a value`nb: !foo *a" | Test-Yaml) | Should -BeFalse
     }
 
-    It 'enforces implicit-key line and Unicode scalar limits' {
+    It 'enforces block and flow-sequence implicit-key limits' {
         $emoji = [char]::ConvertFromUtf32(0x1F600)
 
         ("['multi`n  line': value]" | Test-Yaml) | Should -BeFalse
@@ -53,23 +53,19 @@ Describe 'Test-Yaml' {
                 @{ Key = '!local ' + ('k' * 1017); Valid = $true }
                 @{ Key = '!local ' + ('k' * 1018); Valid = $false }
             )) {
-            foreach ($yaml in @(
-                    "[$($case.Key)`: value]",
-                    "{$($case.Key)`: value}"
-                )) {
-                ($yaml | Test-Yaml) | Should -Be $case.Valid
-            }
+            ("[$($case.Key)`: value]" | Test-Yaml) | Should -Be $case.Valid
         }
 
         foreach ($length in @(513, 1024, 1025)) {
             $key = $emoji * $length
-            ("{$key`: value}" | Test-Yaml) |
+            ("[$key`: value]" | Test-Yaml) |
                 Should -Be ($length -le 1024)
         }
 
+        ("['$('k' * 1021)' : value]" | Test-Yaml) | Should -BeTrue
+        ("['$('k' * 1022)' : value]" | Test-Yaml) | Should -BeFalse
         ((('k' * 1023) + ' : value') | Test-Yaml) | Should -BeTrue
         ((('k' * 1024) + ' : value') | Test-Yaml) | Should -BeFalse
-
     }
 
     It 'resolves non-specific tags before comparing representation keys' {
@@ -84,9 +80,18 @@ Describe 'Test-Yaml' {
         ("{multi`n  line: value}" | Test-Yaml) | Should -BeTrue
     }
 
+    It 'does not apply implicit-key limits to ordinary flow mappings' {
+        $emoji = [char]::ConvertFromUtf32(0x1F600)
+
+        (('{' + ('k' * 1025) + ': value}') | Test-Yaml) | Should -BeTrue
+        (('{' + ($emoji * 1025) + ': value}') | Test-Yaml) | Should -BeTrue
+    }
+
     It 'validates tag directives, tag tokens, and alias properties' {
         ("%TAG !! tag:example.com,2000:app/`n---`n!!int value" | Test-Yaml) |
             Should -BeTrue
+        ("%TAG !e! tag:example.com,2000:app/#fragment`n---`n!e!foo value" |
+            Test-Yaml) | Should -BeTrue
         ("%FOO-BAR baz`n---`nvalue" | Test-Yaml) | Should -BeTrue
         ("%FOO:B alpha-beta p#q`n---`nvalue" | Test-Yaml) | Should -BeTrue
         ("%TAG ! tag:first/`n%TAG ! tag:second/`n---`n!value data" | Test-Yaml) |
@@ -106,6 +111,13 @@ Describe 'Test-Yaml' {
     It 'recognizes document markers only at column zero' {
         ("key:`n  ---" | Test-Yaml) | Should -BeTrue
         ("key:`n  ..." | Test-Yaml) | Should -BeTrue
+    }
+
+    It 'rejects tabs that indent compact collections after mapping indicators' {
+        ("?`t-" | Test-Yaml) | Should -BeFalse
+        ("? -`n:`t-" | Test-Yaml) | Should -BeFalse
+        ("?`tkey:" | Test-Yaml) | Should -BeFalse
+        ("? key:`n:`tkey:" | Test-Yaml) | Should -BeFalse
     }
 
     It 'returns false for duplicate mapping keys' {

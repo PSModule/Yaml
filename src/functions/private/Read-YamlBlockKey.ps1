@@ -48,7 +48,7 @@ function Read-YamlBlockKey {
         }
         $node = Read-YamlFlowNode -Cursor $cursor -Context $Context -Depth $Depth `
             -PendingTag $properties.Tag -PendingUnknownTag $properties.HasUnknownTag `
-            -PendingAnchor $properties.Anchor
+            -PendingAnchor $properties.Anchor -InImplicitKey
         $expectedEnd = $Context.LineStarts[$Line] + $Column + $Text.Length
         while ($cursor.Index -lt $expectedEnd -and $Context.Text[$cursor.Index] -in @(' ', "`t")) {
             Move-YamlCursor -Cursor $cursor -Context $Context

@@ -10,9 +10,18 @@ function Get-YamlImplicitKeyLength {
         [pscustomobject] $Node,
 
         [Parameter(Mandatory)]
-        [pscustomobject] $Context
+        [pscustomobject] $Context,
+
+        [Parameter()]
+        [ValidateRange(0, 2147483647)]
+        [int] $EndIndex
     )
 
-    $sourceLength = [Math]::Max(0, $Node.End.Index - $Node.Start.Index)
+    $sourceEnd = if ($PSBoundParameters.ContainsKey('EndIndex')) {
+        $EndIndex
+    } else {
+        $Node.End.Index
+    }
+    $sourceLength = [Math]::Max(0, $sourceEnd - $Node.Start.Index)
     return Get-YamlRuneCount -Text $Context.Text.Substring($Node.Start.Index, $sourceLength)
 }

@@ -79,8 +79,21 @@ function Read-YamlBlockMapping {
         if ($isExplicit) {
             $afterQuestion = $content.Substring(1)
             $leading = $afterQuestion.Length - $afterQuestion.TrimStart(' ', "`t").Length
+            $separator = $afterQuestion.Substring(0, $leading)
             $keyText = $afterQuestion.TrimStart(' ', "`t")
             $keyColumn = $contentColumn + 1 + $leading
+            if ($separator.IndexOf("`t", [System.StringComparison]::Ordinal) -ge 0 -and
+                (
+                    (Test-YamlIndicator -Text $keyText -Indicator '-') -or
+                    (Test-YamlIndicator -Text $keyText -Indicator '?') -or
+                    (Find-YamlMappingColon -Text $keyText -AllowAnchorFallback) -ge 0
+                )) {
+                $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn + 1) `
+                    -Line $lineNumber -Column ($contentColumn + 1)
+                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidIndentation' -Message (
+                        'A tab cannot separate a mapping indicator from a compact block collection.'
+                    ))
+            }
             if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $keyText))) {
                 $Context.LineIndex++
                 Skip-YamlBlockTrivia -Context $Context
@@ -133,10 +146,25 @@ function Read-YamlBlockMapping {
             }
             if ($valueIndent -eq $Indent -and
                 (Test-YamlIndicator -Text $valueContent -Indicator ':')) {
-                $valueText = $valueContent.Substring(1)
-                $leading = $valueText.Length - $valueText.TrimStart(' ', "`t").Length
-                $valueText = $valueText.TrimStart(' ', "`t")
+                $valueSource = $valueContent.Substring(1)
+                $leading = $valueSource.Length - $valueSource.TrimStart(' ', "`t").Length
+                $separator = $valueSource.Substring(0, $leading)
+                $valueText = $valueSource.TrimStart(' ', "`t")
                 $valueColumn = $Indent + 1 + $leading
+                if ($separator.IndexOf("`t", [System.StringComparison]::Ordinal) -ge 0 -and
+                    (
+                        (Test-YamlIndicator -Text $valueText -Indicator '-') -or
+                        (Test-YamlIndicator -Text $valueText -Indicator '?') -or
+                        (Find-YamlMappingColon -Text $valueText -AllowAnchorFallback) -ge 0
+                    )) {
+                    $mark = New-YamlMark -Index (
+                        $Context.LineStarts[$Context.LineIndex] + $Indent + 1
+                    ) -Line $Context.LineIndex -Column ($Indent + 1)
+                    throw (New-YamlException -Start $mark -End $mark `
+                            -ErrorId 'YamlInvalidIndentation' -Message (
+                            'A tab cannot separate a mapping indicator from a compact block collection.'
+                        ))
+                }
                 if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $valueText))) {
                     $valueLineNumber = $Context.LineIndex
                     $Context.LineIndex++

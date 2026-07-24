@@ -50,7 +50,8 @@ function Find-YamlMappingColon {
             while ($index -lt $Text.Length -and
                 -not (Test-YamlWhiteSpace -Character $Text[$index]) -and
                 $Text[$index] -notin @(',', '[', ']', '{', '}')) {
-                if (Test-YamlMappingValueIndicator -Text $Text -Index $index) {
+                if ($index + 1 -lt $Text.Length -and
+                    (Test-YamlMappingValueIndicator -Text $Text -Index $index)) {
                     $anchorColonCandidate = $index
                 }
                 $index++
@@ -63,6 +64,10 @@ function Find-YamlMappingColon {
             while ($index -lt $Text.Length -and
                 -not (Test-YamlWhiteSpace -Character $Text[$index]) -and
                 $Text[$index] -notin @(',', '[', ']', '{', '}')) {
+                if ($index + 1 -lt $Text.Length -and
+                    (Test-YamlMappingValueIndicator -Text $Text -Index $index)) {
+                    $anchorColonCandidate = $index
+                }
                 $index++
             }
             $index--

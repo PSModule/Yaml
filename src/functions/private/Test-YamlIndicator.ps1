@@ -21,8 +21,5 @@ function Test-YamlIndicator {
     if ($Text.Length -eq 1) {
         return $true
     }
-    if ($Indicator.Equals('-', [System.StringComparison]::Ordinal)) {
-        return Test-YamlWhiteSpace -Character $Text[1]
-    }
-    return $Text[1].Equals([char] ' ')
+    return Test-YamlWhiteSpace -Character $Text[1]
 }

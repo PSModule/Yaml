@@ -43,7 +43,7 @@ function Read-YamlDirectiveBlock {
             $yamlDirectiveSeen = $true
         } elseif ($directive -cmatch '^%TAG(?:[ \t]|$)') {
             if ($directive -cnotmatch (
-                    '^%TAG[ \t]+(!|!!|![0-9A-Za-z-]+!)[ \t]+([^ \t#]+)(?:[ \t]+#.*)?$'
+                    '^%TAG[ \t]+(!|!!|![0-9A-Za-z-]+!)[ \t]+([^ \t]+)(?:[ \t]+#.*)?$'
                 )) {
                 throw (New-YamlException -Start $mark -End $mark `
                         -ErrorId 'YamlInvalidDirective' -Message (

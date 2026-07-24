@@ -24,7 +24,9 @@ function Read-YamlFlowNode {
         [AllowEmptyString()]
         [string] $PendingAnchor = '',
 
-        [switch] $InFlowCollection
+        [switch] $InFlowCollection,
+
+        [switch] $InImplicitKey
     )
 
     Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
@@ -85,8 +87,9 @@ function Read-YamlFlowNode {
                 -not (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index]) -and
                 $Context.Text[$Cursor.Index] -cne "`n" -and
                 $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}') -and
-                -not ($InFlowCollection -and
-                    (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow))) {
+                -not (($InFlowCollection -or $InImplicitKey) -and
+                    (Test-YamlMappingValueIndicator -Text $Context.Text `
+                        -Index $Cursor.Index -Flow:$InFlowCollection))) {
                 Move-YamlCursor -Cursor $Cursor -Context $Context
             }
             $anchor = $Context.Text.Substring($anchorStart, $Cursor.Index - $anchorStart)
@@ -133,8 +136,9 @@ function Read-YamlFlowNode {
             -not (Test-YamlWhiteSpace -Character $Context.Text[$Cursor.Index]) -and
             $Context.Text[$Cursor.Index] -cne "`n" -and
             $Context.Text[$Cursor.Index] -notin @(',', '[', ']', '{', '}') -and
-            -not ($InFlowCollection -and
-                (Test-YamlMappingValueIndicator -Text $Context.Text -Index $Cursor.Index -Flow))) {
+            -not (($InFlowCollection -or $InImplicitKey) -and
+                (Test-YamlMappingValueIndicator -Text $Context.Text `
+                    -Index $Cursor.Index -Flow:$InFlowCollection))) {
             Move-YamlCursor -Cursor $Cursor -Context $Context
         }
         $alias = $Context.Text.Substring($aliasStart, $Cursor.Index - $aliasStart)
@@ -192,7 +196,8 @@ function Read-YamlFlowNode {
                 if ($Cursor.Index -lt $Context.Text.Length -and $Context.Text[$Cursor.Index] -eq ':') {
                     if (-not $explicitPair -and (
                             $Cursor.Line -ne $itemStartLine -or
-                            (Get-YamlImplicitKeyLength -Node $item -Context $Context) -gt 1024
+                            (Get-YamlImplicitKeyLength -Node $item -Context $Context `
+                                -EndIndex $Cursor.Index) -gt 1024
                         )) {
                         $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
                         throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidImplicitKey' -Message (
@@ -271,14 +276,6 @@ function Read-YamlFlowNode {
                     }
                 }
                 Skip-YamlFlowTrivia -Cursor $Cursor -Context $Context
-                if (-not $explicit -and (
-                        (Get-YamlImplicitKeyLength -Node $key -Context $Context) -gt 1024
-                    )) {
-                    $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
-                    throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidImplicitKey' -Message (
-                            'An implicit mapping key must fit on one line and cannot exceed 1024 Unicode scalar values.'
-                        ))
-                }
                 if ($Cursor.Index -ge $Context.Text.Length -or $Context.Text[$Cursor.Index] -ne ':') {
                     if (-not $explicit) {
                         if ($Cursor.Index -lt $Context.Text.Length -and

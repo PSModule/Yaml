@@ -181,6 +181,15 @@ folded: >
             $sequencePair.Count | Should -Be 1
             $sequencePair[0].foo | Should -Be @('bar')
         }
+
+        It 'accepts tabs after explicit block mapping indicators' {
+            $tabAfterQuestion = "?`tkey`n: value" | ConvertFrom-Yaml -AsHashtable
+            $tabAfterColon = "? key`n:`tvalue" | ConvertFrom-Yaml -AsHashtable
+
+            $tabAfterQuestion['key'] | Should -Be 'value'
+            $tabAfterColon['key'] | Should -Be 'value'
+            $tabAfterColon.Count | Should -Be 1
+        }
     }
 
     Context 'Streams and pipeline input' {
@@ -231,11 +240,18 @@ folded: >
             $emptyKey = '&a: value' | ConvertFrom-Yaml -AsHashtable
             $aliasedKey = '{anchor: &a foo, *a: value}' |
                 ConvertFrom-Yaml -AsHashtable
+            $blockAliasedKey = "source: &a key`n*a: value" |
+                ConvertFrom-Yaml -AsHashtable
+            $colonAliasName = "&a: key: &a value`nfoo:`n  *a:" |
+                ConvertFrom-Yaml -AsHashtable
 
             $emptyKey.Count | Should -Be 1
             $emptyKey[[System.DBNull]::Value] | Should -Be 'value'
             @($aliasedKey.Keys) | Should -Be @('anchor', 'foo')
             @($aliasedKey.Values) | Should -Be @('foo', 'value')
+            @($blockAliasedKey.Keys) | Should -Be @('source', 'key')
+            @($blockAliasedKey.Values) | Should -Be @('key', 'value')
+            $colonAliasName['foo'] | Should -Be 'key'
         }
 
         It 'constructs explicit standard scalar tags safely' {
