@@ -177,7 +177,7 @@ The archive contains 402 inputs:
 | JSON projection | 277 | 2 | 0 | 123 |
 | `out.yaml` projection | 241 | 1 | 0 | 160 |
 | Official `emit.yaml` fixtures | 55 | 0 | 0 | 347 |
-| Module self-round-trip | 306 | 2 | 0 | 94 |
+| Module self-round-trip | 305 | 3 | 0 | 94 |
 
 All 94 fixtures marked invalid are rejected. The valid `2JQS` and `X38W`
 inputs are syntactically recognized and produce matching representation
@@ -189,10 +189,15 @@ case with an `out.yaml` fixture, is also reported that way on that surface.
 The two JSON projection differences are `565N`, where `!!binary` intentionally
 becomes `byte[]` instead of a Base64 string, and `J7PZ`, where legacy `!!omap`
 intentionally becomes `System.Collections.Specialized.OrderedDictionary`
-instead of remaining a sequence of one-entry mappings. No event mismatch is
-classified as policy. All 55 official `emit.yaml` fixtures are read and
-validated independently of the 402-input module self-round-trip. The
-deterministic runner reports no unexplained failures.
+instead of remaining a sequence of one-entry mappings. `J7PZ` is also a
+self-round-trip policy difference: once projected, its ordered dictionary
+cannot be distinguished from an ordinary insertion-ordered PowerShell
+dictionary, so emission cannot reconstruct the explicit `!!omap` tag. The
+runner still preserves and compares `!!omap` order from representation
+metadata. No event mismatch is classified as policy. All 55 official
+`emit.yaml` fixtures are read and validated independently of the 402-input
+module self-round-trip. The deterministic runner reports no unexplained
+failures.
 
 These results are a pinned compatibility measurement, not a claim that a finite
 corpus proves complete YAML 1.2.2 compliance.
