@@ -16,7 +16,12 @@ function Test-YamlDocumentPrefix {
         [switch] $RequireDocumentStart
     )
 
+    $directiveSeen = $false
     while ($Index -lt $Text.Length) {
+        if ($Text[$Index] -ceq [char] 0xFEFF) {
+            $Index++
+            continue
+        }
         $lineEnd = $Text.IndexOf("`n", $Index, [System.StringComparison]::Ordinal)
         if ($lineEnd -lt 0) {
             $lineEnd = $Text.Length
@@ -26,13 +31,14 @@ function Test-YamlDocumentPrefix {
         if ($trimmed.Length -eq 0 -or
             $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
             if ($lineEnd -ge $Text.Length) {
-                return $false
+                return -not $directiveSeen
             }
             $Index = $lineEnd + 1
             continue
         }
         if ($line.StartsWith('%', [System.StringComparison]::Ordinal) -and
             -not $RequireDocumentStart) {
+            $directiveSeen = $true
             if ($lineEnd -ge $Text.Length) {
                 return $false
             }
@@ -45,5 +51,5 @@ function Test-YamlDocumentPrefix {
         return $line.Length -eq 3 -or
         (Test-YamlWhiteSpace -Character $line[3])
     }
-    return $false
+    return -not $directiveSeen
 }

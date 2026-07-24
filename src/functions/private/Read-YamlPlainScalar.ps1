@@ -36,7 +36,8 @@ function Read-YamlPlainScalar {
         -Column $FirstColumn
     $parts = [System.Collections.Generic.List[object]]::new()
     $firstComment = Find-YamlCommentStart -Text $FirstText
-    $firstValue = (Get-YamlContentWithoutComment -Text $FirstText).Trim(' ', "`t")
+    $firstValue = Get-YamlContentWithoutComment -Text $FirstText -Mark $start
+    $firstValue = $firstValue.Trim(' ', "`t")
     Assert-YamlNoByteOrderMark -Text $firstValue -Mark $start
     $firstCharacter = if ($firstValue.Length -gt 0) { $firstValue[0] } else { [char] 0 }
     $forbiddenFirst = $firstCharacter -in @(
@@ -88,7 +89,9 @@ function Read-YamlPlainScalar {
         }
         $sourceContent = $line.Substring($indent)
         $comment = Find-YamlCommentStart -Text $sourceContent
-        $content = Get-YamlContentWithoutComment -Text $sourceContent
+        $contentMark = New-YamlMark -Index ($Context.LineStarts[$Context.LineIndex] + $indent) `
+            -Line $Context.LineIndex -Column $indent
+        $content = Get-YamlContentWithoutComment -Text $sourceContent -Mark $contentMark
         if ((Find-YamlMappingColon -Text $content) -ge 0) {
             break
         }

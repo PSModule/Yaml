@@ -31,6 +31,10 @@ function Read-YamlBlockScalar {
         [string] $Anchor = ''
     )
 
+    $headerMark = New-YamlMark -Index (
+        $Context.LineStarts[$Context.LineIndex] + $HeaderColumn
+    ) -Line $Context.LineIndex -Column $HeaderColumn
+    Assert-YamlNoByteOrderMark -Text $Header -Mark $headerMark
     if ($Header -notmatch (
             '^([|>])(?:(?:([1-9])([+-])?)|(?:([+-])([1-9])?))?' +
             '(?:[ \t]+#.*|[ \t]*)$'

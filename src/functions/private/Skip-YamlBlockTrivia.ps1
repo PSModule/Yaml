@@ -16,7 +16,15 @@ function Skip-YamlBlockTrivia {
     while ($Context.LineIndex -lt $Context.Lines.Count) {
         $line = $Context.Lines[$Context.LineIndex]
         $trimmed = $line.TrimStart(' ', "`t")
-        if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+        if ($trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+            $column = $line.Length - $trimmed.Length
+            $mark = New-YamlMark -Index ($Context.LineStarts[$Context.LineIndex] + $column) `
+                -Line $Context.LineIndex -Column $column
+            Assert-YamlNoByteOrderMark -Text $trimmed -Mark $mark
+            $Context.LineIndex++
+            continue
+        }
+        if ($trimmed.Length -eq 0) {
             $Context.LineIndex++
             continue
         }

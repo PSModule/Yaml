@@ -53,7 +53,15 @@ function Read-YamlBlockMapping {
                 (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
                 break
             }
-            if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+            if ($trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+                $column = $line.Length - $trimmed.Length
+                $mark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $column) `
+                    -Line $lineNumber -Column $column
+                Assert-YamlNoByteOrderMark -Text $trimmed -Mark $mark
+                $Context.LineIndex++
+                continue
+            }
+            if ($trimmed.Length -eq 0) {
                 $Context.LineIndex++
                 continue
             }
@@ -94,7 +102,11 @@ function Read-YamlBlockMapping {
                         'A tab cannot separate a mapping indicator from a compact block collection.'
                     ))
             }
-            if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $keyText))) {
+            $keyMark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $keyColumn) `
+                -Line $lineNumber -Column $keyColumn
+            if ([string]::IsNullOrEmpty((
+                        Get-YamlContentWithoutComment -Text $keyText -Mark $keyMark
+                    ))) {
                 $Context.LineIndex++
                 Skip-YamlBlockTrivia -Context $Context
                 if ($Context.LineIndex -ge $Context.Lines.Count) {
@@ -165,7 +177,12 @@ function Read-YamlBlockMapping {
                             'A tab cannot separate a mapping indicator from a compact block collection.'
                         ))
                 }
-                if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $valueText))) {
+                $valueMark = New-YamlMark -Index (
+                    $Context.LineStarts[$Context.LineIndex] + $valueColumn
+                ) -Line $Context.LineIndex -Column $valueColumn
+                if ([string]::IsNullOrEmpty((
+                            Get-YamlContentWithoutComment -Text $valueText -Mark $valueMark
+                        ))) {
                     $valueLineNumber = $Context.LineIndex
                     $Context.LineIndex++
                     Skip-YamlBlockTrivia -Context $Context
@@ -234,7 +251,11 @@ function Read-YamlBlockMapping {
         $leading = $valueSource.Length - $valueSource.TrimStart(' ', "`t").Length
         $valueText = $valueSource.TrimStart(' ', "`t")
         $valueColumn = $contentColumn + $valueStart + $leading
-        if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $valueText))) {
+        $valueMark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $valueColumn) `
+            -Line $lineNumber -Column $valueColumn
+        if ([string]::IsNullOrEmpty((
+                    Get-YamlContentWithoutComment -Text $valueText -Mark $valueMark
+                ))) {
             $Context.LineIndex = $lineNumber + 1
             Skip-YamlBlockTrivia -Context $Context
             if ($Context.LineIndex -lt $Context.Lines.Count) {

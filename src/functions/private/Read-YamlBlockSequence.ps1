@@ -51,7 +51,15 @@ function Read-YamlBlockSequence {
                 (Test-YamlDocumentByteOrderMark -Context $Context -RequireDocumentStart)) {
                 break
             }
-            if ($trimmed.Length -eq 0 -or $trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+            if ($trimmed.StartsWith('#', [System.StringComparison]::Ordinal)) {
+                $column = $line.Length - $trimmed.Length
+                $mark = New-YamlMark -Index ($Context.LineStarts[$Context.LineIndex] + $column) `
+                    -Line $Context.LineIndex -Column $column
+                Assert-YamlNoByteOrderMark -Text $trimmed -Mark $mark
+                $Context.LineIndex++
+                continue
+            }
+            if ($trimmed.Length -eq 0) {
                 $Context.LineIndex++
                 continue
             }
@@ -70,7 +78,12 @@ function Read-YamlBlockSequence {
             )
         }
 
-        if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $rest))) {
+        $restMark = New-YamlMark -Index (
+            $Context.LineStarts[$Context.LineIndex] + $itemColumn
+        ) -Line $Context.LineIndex -Column $itemColumn
+        if ([string]::IsNullOrEmpty((
+                    Get-YamlContentWithoutComment -Text $rest -Mark $restMark
+                ))) {
             $line = $Context.LineIndex
             $Context.LineIndex++
             Skip-YamlBlockTrivia -Context $Context

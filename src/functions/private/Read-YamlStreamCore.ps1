@@ -51,16 +51,16 @@ function Read-YamlStreamCore {
     $implicitDocumentSeen = $false
 
     while ($context.LineIndex -lt $lines.Count) {
-        Read-YamlDocumentByteOrderMark -Context $context
-        Skip-YamlBlockTrivia -Context $context
+        Skip-YamlDocumentPrefix -Context $context
         if ($context.LineIndex -ge $lines.Count) {
             break
         }
         if ($lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
-            $suffix = Get-YamlContentWithoutComment -Text $lines[$context.LineIndex].Substring(3)
+            $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
+                -Line $context.LineIndex -Column 3
+            $suffix = Get-YamlContentWithoutComment `
+                -Text $lines[$context.LineIndex].Substring(3) -Mark $mark
             if ($suffix.Trim(' ', "`t").Length -gt 0) {
-                $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
-                    -Line $context.LineIndex -Column 3
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
                         'Unexpected content follows the document end marker.'
                     ))
@@ -109,7 +109,12 @@ function Read-YamlStreamCore {
             $leading = $afterMarker.Length - $afterMarker.TrimStart(' ', "`t").Length
             $segment = $afterMarker.TrimStart(' ', "`t")
             $segmentColumn = 3 + $leading
-            if ([string]::IsNullOrEmpty((Get-YamlContentWithoutComment -Text $segment))) {
+            $segmentMark = New-YamlMark -Index (
+                $lineStarts[$context.LineIndex] + $segmentColumn
+            ) -Line $context.LineIndex -Column $segmentColumn
+            if ([string]::IsNullOrEmpty((
+                        Get-YamlContentWithoutComment -Text $segment -Mark $segmentMark
+                    ))) {
                 $markerLine = $context.LineIndex
                 $context.LineIndex++
                 Skip-YamlBlockTrivia -Context $context
@@ -164,24 +169,23 @@ function Read-YamlStreamCore {
         }
         $documents.Add($document)
 
-        Skip-YamlBlockTrivia -Context $context
-        Read-YamlDocumentByteOrderMark -Context $context -RequireDocumentStart
-        Skip-YamlBlockTrivia -Context $context
+        Skip-YamlDocumentPrefix -Context $context -RequireDocumentStart
         $explicitEnd = $false
         if ($context.LineIndex -lt $lines.Count -and
             $lines[$context.LineIndex] -match '^\.\.\.(?:[ \t]|$)') {
             $explicitEnd = $true
             $endLine = $lines[$context.LineIndex]
-            if ((Get-YamlContentWithoutComment -Text $endLine.Substring(3)).
+            $endMark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
+                -Line $context.LineIndex -Column 3
+            if ((Get-YamlContentWithoutComment -Text $endLine.Substring(3) -Mark $endMark).
                 Trim(' ', "`t").Length -gt 0) {
-                $mark = New-YamlMark -Index ($lineStarts[$context.LineIndex] + 3) `
-                    -Line $context.LineIndex -Column 3
-                throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidDocumentEnd' -Message (
+                throw (New-YamlException -Start $endMark -End $endMark `
+                        -ErrorId 'YamlInvalidDocumentEnd' -Message (
                         'Unexpected content follows the document end marker.'
                     ))
             }
             $context.LineIndex++
-            Skip-YamlBlockTrivia -Context $context
+            Skip-YamlDocumentPrefix -Context $context
             $implicitDocumentSeen = $false
         }
         if (-not $explicitEnd -and $context.LineIndex -lt $lines.Count -and

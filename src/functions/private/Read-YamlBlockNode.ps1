@@ -113,8 +113,10 @@ function Read-YamlBlockNode {
     $unknownTag = $properties.HasUnknownTag -or $PendingUnknownTag
     $anchor = if (-not [string]::IsNullOrEmpty($properties.Anchor)) { $properties.Anchor } else { $PendingAnchor }
     $restSource = $properties.Rest
-    $rest = Get-YamlContentWithoutComment -Text $restSource
     $contentColumn = $SegmentColumn + $properties.Consumed
+    $restMark = New-YamlMark -Index ($Context.LineStarts[$lineNumber] + $contentColumn) `
+        -Line $lineNumber -Column $contentColumn
+    $rest = Get-YamlContentWithoutComment -Text $restSource -Mark $restMark
 
     if ([string]::IsNullOrEmpty($rest)) {
         $Context.LineIndex++

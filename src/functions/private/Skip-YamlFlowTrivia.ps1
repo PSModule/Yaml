@@ -23,13 +23,24 @@ function Skip-YamlFlowTrivia {
             continue
         }
         if ($character -eq '#') {
+            $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
             if ($Cursor.Index -gt 0 -and
                 $Context.Text[$Cursor.Index - 1] -notin @(' ', "`t", "`n")) {
-                $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlInvalidComment' -Message (
                         'A YAML comment must be separated from preceding content.'
                     ))
             }
+            $commentEnd = $Context.Text.IndexOf(
+                "`n",
+                $Cursor.Index,
+                [System.StringComparison]::Ordinal
+            )
+            if ($commentEnd -lt 0) {
+                $commentEnd = $Context.Text.Length
+            }
+            Assert-YamlNoByteOrderMark `
+                -Text $Context.Text.Substring($Cursor.Index, $commentEnd - $Cursor.Index) `
+                -Mark $mark
             while ($Cursor.Index -lt $Context.Text.Length -and $Context.Text[$Cursor.Index] -ne "`n") {
                 Move-YamlCursor -Cursor $Cursor -Context $Context
             }
@@ -56,6 +67,18 @@ function Skip-YamlFlowTrivia {
                 return
             }
             if ($Context.Text[$Cursor.Index] -eq '#') {
+                $mark = New-YamlMark -Index $Cursor.Index -Line $Cursor.Line -Column $Cursor.Column
+                $commentEnd = $Context.Text.IndexOf(
+                    "`n",
+                    $Cursor.Index,
+                    [System.StringComparison]::Ordinal
+                )
+                if ($commentEnd -lt 0) {
+                    $commentEnd = $Context.Text.Length
+                }
+                Assert-YamlNoByteOrderMark `
+                    -Text $Context.Text.Substring($Cursor.Index, $commentEnd - $Cursor.Index) `
+                    -Mark $mark
                 while ($Cursor.Index -lt $Context.Text.Length -and $Context.Text[$Cursor.Index] -ne "`n") {
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                 }
