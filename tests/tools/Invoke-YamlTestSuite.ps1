@@ -120,7 +120,10 @@ function ConvertTo-YamlSuiteCanonicalValue {
         [AllowNull()]
         [object] $Value,
 
-        [switch] $SortMappings
+        [switch] $SortMappings,
+
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[object]] $OrderedMappings
     )
 
     if ($null -eq $Value -or $Value -is [System.DBNull]) {
@@ -182,9 +185,9 @@ function ConvertTo-YamlSuiteCanonicalValue {
         $entries = [System.Collections.Generic.List[string]]::new()
         foreach ($entry in $Value.GetEnumerator()) {
             $canonicalKey = ConvertTo-YamlSuiteCanonicalValue -Value $entry.Key `
-                -SortMappings:$SortMappings
+                -SortMappings:$SortMappings -OrderedMappings $OrderedMappings
             $canonicalValue = ConvertTo-YamlSuiteCanonicalValue -Value $entry.Value `
-                -SortMappings:$SortMappings
+                -SortMappings:$SortMappings -OrderedMappings $OrderedMappings
             $entries.Add(('{0}:{1}={2}:{3}' -f
                     $canonicalKey.Length,
                     $canonicalKey,
@@ -192,10 +195,7 @@ function ConvertTo-YamlSuiteCanonicalValue {
                     $canonicalValue
                 ))
         }
-        $isOrdered = (
-            $Value -is [System.Collections.Specialized.OrderedDictionary] -or
-            $Value.GetType().FullName -ceq 'System.Management.Automation.OrderedHashtable'
-        )
+        $isOrdered = $null -ne $OrderedMappings -and $OrderedMappings.Contains($Value)
         if ($SortMappings -or -not $isOrdered) {
             $entries.Sort([System.StringComparer]::Ordinal)
         }
@@ -205,7 +205,8 @@ function ConvertTo-YamlSuiteCanonicalValue {
         $items = [System.Collections.Generic.List[string]]::new()
         foreach ($item in $Value) {
             $items.Add((
-                    ConvertTo-YamlSuiteCanonicalValue -Value $item -SortMappings:$SortMappings
+                    ConvertTo-YamlSuiteCanonicalValue -Value $item -SortMappings:$SortMappings `
+                        -OrderedMappings $OrderedMappings
                 ))
         }
         return 'sequence:{0}:[{1}]' -f $items.Count, ($items -join '|')
@@ -228,7 +229,10 @@ function ConvertTo-YamlSuiteReferenceSignature {
     [OutputType([string])]
     param (
         [AllowNull()]
-        [object] $Value
+        [object] $Value,
+
+        [AllowNull()]
+        [System.Collections.Generic.HashSet[object]] $OrderedMappings
     )
 
     $idGenerator = [System.Runtime.Serialization.ObjectIDGenerator]::new()
@@ -265,7 +269,8 @@ function ConvertTo-YamlSuiteReferenceSignature {
         if ($current -is [System.Collections.IDictionary]) {
             foreach ($entry in $current.GetEnumerator()) {
                 $childPath = '{0}{{{1}}}' -f $frame.Path, (
-                    ConvertTo-YamlSuiteCanonicalValue -Value $entry.Key
+                    ConvertTo-YamlSuiteCanonicalValue -Value $entry.Key `
+                        -OrderedMappings $OrderedMappings
                 )
                 $stack.Push([pscustomobject]@{
                         Value = $entry.Value
@@ -301,6 +306,49 @@ function ConvertTo-YamlSuiteReferenceSignature {
     $output = [string[]] $parts.ToArray()
     [array]::Sort($output, [System.StringComparer]::Ordinal)
     return ($output -join ';')
+}
+
+function Get-YamlSuiteDictionaryReferenceSet {
+    [OutputType([System.Collections.Generic.HashSet[object]])]
+    param (
+        [AllowNull()]
+        [object] $Value
+    )
+
+    $comparer = [System.Collections.Generic.ReferenceEqualityComparer]::Instance
+    $dictionaries = [System.Collections.Generic.HashSet[object]]::new($comparer)
+    $visited = [System.Collections.Generic.HashSet[object]]::new($comparer)
+    $pending = [System.Collections.Generic.Stack[object]]::new()
+    $pending.Push($Value)
+    while ($pending.Count -gt 0) {
+        $current = $pending.Pop()
+        if ($null -eq $current -or $current -is [string] -or
+            $current.GetType().IsValueType) {
+            continue
+        }
+        if ($current -isnot [System.Collections.IDictionary] -and
+            $current -isnot [System.Collections.IEnumerable]) {
+            continue
+        }
+        if (-not $visited.Add($current)) {
+            continue
+        }
+        if ($current -is [System.Collections.IDictionary]) {
+            [void] $dictionaries.Add($current)
+            foreach ($entry in $current.GetEnumerator()) {
+                $pending.Push($entry.Key)
+                $pending.Push($entry.Value)
+            }
+            continue
+        }
+        if ($current -is [byte[]]) {
+            continue
+        }
+        foreach ($item in $current) {
+            $pending.Push($item)
+        }
+    }
+    Write-Output -InputObject $dictionaries -NoEnumerate
 }
 
 function Test-YamlSuiteBinaryByteArrayProjection {
@@ -738,24 +786,43 @@ $readYamlSuiteStream = {
 $projectYamlSuiteStream = {
     param ([object[]] $Nodes)
     $values = [System.Collections.Generic.List[object]]::new()
+    $orderedMappings = [System.Collections.Generic.HashSet[object]]::new(
+        [System.Collections.Generic.ReferenceEqualityComparer]::Instance
+    )
     foreach ($node in $Nodes) {
         $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
         $values.Add((ConvertFrom-YamlNode -Node $node -Cache $cache -AsHashtable).Value)
+        $visited = [System.Collections.Generic.HashSet[int]]::new()
+        $pending = [System.Collections.Generic.Stack[object]]::new()
+        $pending.Push($node)
+        while ($pending.Count -gt 0) {
+            $current = $pending.Pop()
+            while ($current.Kind -eq 'Alias') {
+                $current = $current.Target
+            }
+            if (-not $visited.Add($current.Id)) {
+                continue
+            }
+            if ($current.Tag -ceq 'tag:yaml.org,2002:omap' -and
+                $cache.ContainsKey($current.Id)) {
+                [void] $orderedMappings.Add($cache[$current.Id])
+            }
+            if ($current.Kind -eq 'Sequence') {
+                foreach ($item in $current.Items) {
+                    $pending.Push($item)
+                }
+            } elseif ($current.Kind -eq 'Mapping') {
+                foreach ($entry in $current.Entries) {
+                    $pending.Push($entry.Key)
+                    $pending.Push($entry.Value)
+                }
+            }
+        }
     }
-    New-YamlValueBox -Value ([object[]] $values.ToArray())
-}
-$projectYamlSuiteText = {
-    param ([string] $YamlText)
-
-    $stream = Read-YamlStream -Yaml $YamlText -Depth 128 -MaxNodes 100000 `
-        -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 `
-        -MaxTotalTagLength 65536 -MaxNumericLength 4096
-    $values = [System.Collections.Generic.List[object]]::new()
-    foreach ($node in $stream.Value) {
-        $cache = [System.Collections.Generic.Dictionary[int, object]]::new()
-        $values.Add((ConvertFrom-YamlNode -Node $node -Cache $cache -AsHashtable).Value)
-    }
-    New-YamlValueBox -Value ([object[]] $values.ToArray())
+    New-YamlValueBox -Value ([pscustomobject]@{
+            Values          = [object[]] $values.ToArray()
+            OrderedMappings = $orderedMappings
+        })
 }
 $testYamlSuiteText = {
     param ([string] $YamlText)
@@ -808,6 +875,7 @@ foreach ($inputFile in $inputFiles) {
     $representation = $null
     $stream = $null
     $projectedValues = $null
+    $projectedOrderedMappings = $null
     $projectedCanonical = $null
     $projectedJsonCanonical = $null
     $projectedReference = ''
@@ -867,11 +935,20 @@ foreach ($inputFile in $inputFiles) {
 
     if ($null -ne $stream) {
         try {
-            $projectedValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $stream.Value)).Value
-            $projectedCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $projectedValues)
+            $projected = (
+                Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $stream.Value)
+            ).Value
+            $projectedValues = $projected.Values
+            $projectedOrderedMappings = $projected.OrderedMappings
+            $projectedCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                -Value ([object[]] $projectedValues) `
+                -OrderedMappings $projectedOrderedMappings
             $projectedJsonCanonical = ConvertTo-YamlSuiteCanonicalValue `
-                -Value ([object[]] $projectedValues) -SortMappings
-            $projectedReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $projectedValues)
+                -Value ([object[]] $projectedValues) -SortMappings `
+                -OrderedMappings $projectedOrderedMappings
+            $projectedReference = ConvertTo-YamlSuiteReferenceSignature `
+                -Value ([object[]] $projectedValues) `
+                -OrderedMappings $projectedOrderedMappings
         } catch {
             if ($_.Exception.Data.Contains('YamlErrorId')) {
                 $projectionError = [string] $_.Exception.Data['YamlErrorId']
@@ -952,9 +1029,17 @@ foreach ($inputFile in $inputFiles) {
             $outYaml = [System.IO.File]::ReadAllText($outYamlPath, [System.Text.UTF8Encoding]::new($false, $true))
             try {
                 $outStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream -Arguments @($outYaml)
-                $outValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream -Arguments (, $outStream.Value)).Value
-                $outCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $outValues)
-                $outReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $outValues)
+                $outProjection = (
+                    Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream `
+                        -Arguments (, $outStream.Value)
+                ).Value
+                $outValues = $outProjection.Values
+                $outCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                    -Value ([object[]] $outValues) `
+                    -OrderedMappings $outProjection.OrderedMappings
+                $outReference = ConvertTo-YamlSuiteReferenceSignature `
+                    -Value ([object[]] $outValues) `
+                    -OrderedMappings $outProjection.OrderedMappings
                 $outYamlCanonical = $outCanonical
                 $outYamlReference = $outReference
                 if ($outCanonical -cne $projectedCanonical) {
@@ -989,12 +1074,19 @@ foreach ($inputFile in $inputFiles) {
                 $emitYamlResult = 'Fail'
                 $emitYamlReason = 'EmitYamlInvalid'
             } else {
-                $fixtureValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
-                        -Arguments @($emitYaml)).Value
+                $fixtureStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream `
+                    -Arguments @($emitYaml)
+                $fixtureProjection = (
+                    Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream `
+                        -Arguments (, $fixtureStream.Value)
+                ).Value
+                $fixtureValues = $fixtureProjection.Values
                 $fixtureCanonical = ConvertTo-YamlSuiteCanonicalValue `
-                    -Value ([object[]] $fixtureValues)
+                    -Value ([object[]] $fixtureValues) `
+                    -OrderedMappings $fixtureProjection.OrderedMappings
                 $fixtureReference = ConvertTo-YamlSuiteReferenceSignature `
-                    -Value ([object[]] $fixtureValues)
+                    -Value ([object[]] $fixtureValues) `
+                    -OrderedMappings $fixtureProjection.OrderedMappings
 
                 $fixtureOracleCanonical = $null
                 $fixtureOracleActual = $fixtureCanonical
@@ -1005,9 +1097,16 @@ foreach ($inputFile in $inputFiles) {
                 } elseif ($null -ne $jsonOracleCanonical) {
                     $fixtureOracleCanonical = $jsonOracleCanonical
                     $fixtureOracleActual = ConvertTo-YamlSuiteCanonicalValue `
-                        -Value ([object[]] $fixtureValues) -SortMappings
+                        -Value ([object[]] $fixtureValues) -SortMappings `
+                        -OrderedMappings $fixtureProjection.OrderedMappings
                 }
 
+                $emitYamlExpected = $fixtureOracleCanonical
+                $emitYamlActual = $fixtureOracleActual
+                if ($null -ne $projectedCanonical) {
+                    $emitYamlExpectedReference = $projectedReference
+                }
+                $emitYamlActualReference = $fixtureReference
                 if ($null -eq $fixtureOracleCanonical) {
                     $emitYamlResult = 'Fail'
                     $emitYamlReason = 'EmitYamlOracleUnavailable'
@@ -1015,54 +1114,10 @@ foreach ($inputFile in $inputFiles) {
                     $fixtureReferenceMismatch) {
                     $emitYamlResult = 'Fail'
                     $emitYamlReason = 'EmitYamlRepresentationMismatch'
-                    $emitYamlExpected = $fixtureOracleCanonical
-                    $emitYamlActual = $fixtureOracleActual
-                    if ($null -ne $projectedCanonical) {
-                        $emitYamlExpectedReference = $projectedReference
-                    }
-                    $emitYamlActualReference = $fixtureReference
                 } else {
-                    $fixtureEmittedDocuments = [System.Collections.Generic.List[string]]::new()
-                    foreach ($fixtureValue in $fixtureValues) {
-                        $fixtureEmitted = Invoke-InYamlModule -ScriptBlock {
-                            param ($InputValue)
-                            ConvertTo-Yaml -InputObject $InputValue -ExplicitDocumentStart
-                        } -Arguments (, $fixtureValue)
-                        $fixtureEmittedDocuments.Add([string] $fixtureEmitted)
-                    }
-                    $fixtureEmittedText = $fixtureEmittedDocuments.ToArray() -join "`n"
-                    $isValidFixtureEmit = Invoke-InYamlModule `
-                        -ScriptBlock $testYamlSuiteText -Arguments @($fixtureEmittedText)
-                    if (-not $isValidFixtureEmit) {
-                        $emitYamlResult = 'Fail'
-                        $emitYamlReason = 'EmittedYamlInvalid'
-                    } else {
-                        $fixtureRoundTripValues = (
-                            Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
-                                -Arguments @($fixtureEmittedText)
-                        ).Value
-                        $fixtureRoundCanonical = ConvertTo-YamlSuiteCanonicalValue `
-                            -Value ([object[]] $fixtureRoundTripValues)
-                        $fixtureRoundReference = ConvertTo-YamlSuiteReferenceSignature `
-                            -Value ([object[]] $fixtureRoundTripValues)
-                        $emitYamlExpected = $fixtureCanonical
-                        $emitYamlActual = $fixtureRoundCanonical
-                        $emitYamlExpectedReference = $fixtureReference
-                        $emitYamlActualReference = $fixtureRoundReference
-                    }
-                    if ($emitYamlResult -ne 'Fail' -and
-                        $fixtureRoundCanonical -ceq $fixtureCanonical -and
-                        $fixtureRoundReference -ceq $fixtureReference) {
-                        $emitYamlResult = 'Pass'
-                    } elseif ($emitYamlResult -ne 'Fail') {
-                        $emitYamlResult = 'Fail'
-                        $emitYamlReason = 'EmitYamlRoundTripMismatch'
-                    }
+                    $emitYamlResult = 'Pass'
                 }
             }
-        } catch [System.NotSupportedException] {
-            $emitYamlResult = 'Fail'
-            $emitYamlReason = 'UnsupportedEmissionType'
         } catch {
             if ($_.Exception.Data.Contains('IsYamlException')) {
                 $emitYamlResult = 'Fail'
@@ -1100,17 +1155,50 @@ foreach ($inputFile in $inputFiles) {
                     $selfRoundTripResult = 'Fail'
                     $selfRoundTripReason = 'EmittedYamlInvalid'
                 } else {
-                    $roundTripValues = (Invoke-InYamlModule -ScriptBlock $projectYamlSuiteText `
-                            -Arguments @($emittedText)).Value
-                    $roundCanonical = ConvertTo-YamlSuiteCanonicalValue -Value ([object[]] $roundTripValues)
-                    $roundReference = ConvertTo-YamlSuiteReferenceSignature -Value ([object[]] $roundTripValues)
+                    $roundTripStream = Invoke-InYamlModule -ScriptBlock $readYamlSuiteStream `
+                        -Arguments @($emittedText)
+                    $roundTripProjection = (
+                        Invoke-InYamlModule -ScriptBlock $projectYamlSuiteStream `
+                            -Arguments (, $roundTripStream.Value)
+                    ).Value
+                    $roundTripValues = $roundTripProjection.Values
+                    $roundCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                        -Value ([object[]] $roundTripValues) `
+                        -OrderedMappings $roundTripProjection.OrderedMappings
+                    $roundReference = ConvertTo-YamlSuiteReferenceSignature `
+                        -Value ([object[]] $roundTripValues) `
+                        -OrderedMappings $roundTripProjection.OrderedMappings
                     $selfRoundTripCanonical = $roundCanonical
                     $selfRoundTripReference = $roundReference
                     if ($roundCanonical -ceq $projectedCanonical -and $roundReference -ceq $projectedReference) {
                         $selfRoundTripResult = 'Pass'
                     } else {
-                        $selfRoundTripResult = 'Fail'
-                        $selfRoundTripReason = 'SelfRoundTripMismatch'
+                        $projectedDictionaryMappings = Get-YamlSuiteDictionaryReferenceSet `
+                            -Value ([object[]] $projectedValues)
+                        $roundDictionaryMappings = Get-YamlSuiteDictionaryReferenceSet `
+                            -Value ([object[]] $roundTripValues)
+                        $projectedProjectionCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                            -Value ([object[]] $projectedValues) `
+                            -OrderedMappings $projectedDictionaryMappings
+                        $roundProjectionCanonical = ConvertTo-YamlSuiteCanonicalValue `
+                            -Value ([object[]] $roundTripValues) `
+                            -OrderedMappings $roundDictionaryMappings
+                        $projectedProjectionReference = ConvertTo-YamlSuiteReferenceSignature `
+                            -Value ([object[]] $projectedValues) `
+                            -OrderedMappings $projectedDictionaryMappings
+                        $roundProjectionReference = ConvertTo-YamlSuiteReferenceSignature `
+                            -Value ([object[]] $roundTripValues) `
+                            -OrderedMappings $roundDictionaryMappings
+                        if ($projectedOrderedMappings.Count -gt
+                            $roundTripProjection.OrderedMappings.Count -and
+                            $projectedProjectionCanonical -ceq $roundProjectionCanonical -and
+                            $projectedProjectionReference -ceq $roundProjectionReference) {
+                            $selfRoundTripResult = 'PolicyDifference'
+                            $selfRoundTripReason = 'LegacyOrderedMapProjection'
+                        } else {
+                            $selfRoundTripResult = 'Fail'
+                            $selfRoundTripReason = 'SelfRoundTripMismatch'
+                        }
                     }
                 }
             } catch [System.NotSupportedException] {

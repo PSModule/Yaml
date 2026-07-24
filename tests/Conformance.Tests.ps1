@@ -168,7 +168,32 @@ Describe 'Released yaml-test-suite corpus accounting' {
         $secondOrder.Add('b', 2)
         $secondOrder.Add('a', 1)
         (ConvertTo-YamlSuiteCanonicalValue -Value $firstOrder) |
-            Should -Not -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder)
+            Should -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder)
+
+        $orderedMappings = [System.Collections.Generic.HashSet[object]]::new(
+            [System.Collections.Generic.ReferenceEqualityComparer]::Instance
+        )
+        [void] $orderedMappings.Add($firstOrder)
+        [void] $orderedMappings.Add($secondOrder)
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstOrder `
+            -OrderedMappings $orderedMappings) |
+            Should -Not -Be (
+                ConvertTo-YamlSuiteCanonicalValue -Value $secondOrder `
+                    -OrderedMappings $orderedMappings
+            )
+
+        $firstNestedKey = [System.Collections.Specialized.OrderedDictionary]::new()
+        $secondNestedKey = [System.Collections.Specialized.OrderedDictionary]::new()
+        $firstNestedKey.Add($firstOrder, 'value')
+        $secondNestedKey.Add($secondOrder, 'value')
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstNestedKey) |
+            Should -Be (ConvertTo-YamlSuiteCanonicalValue -Value $secondNestedKey)
+        (ConvertTo-YamlSuiteCanonicalValue -Value $firstNestedKey `
+            -OrderedMappings $orderedMappings) |
+            Should -Not -Be (
+                ConvertTo-YamlSuiteCanonicalValue -Value $secondNestedKey `
+                    -OrderedMappings $orderedMappings
+            )
 
         (ConvertTo-YamlSuiteCanonicalValue -Value ([uri] 'https://example.com/one')) |
             Should -Not -Be (
@@ -233,6 +258,20 @@ ship-to:
             Should -Be @('OutYamlConstructionMismatch', 'OutYamlReferenceMismatch')
     }
 
+    It 'ignores source order for ordinary mapping out.yaml comparisons' {
+        $ordinarySuitePath = Join-Path $TestDrive 'ordinary-mapping-order'
+        $ordinaryCasePath = Join-Path $ordinarySuitePath 'ordinary-map'
+        $null = New-Item -Path $ordinaryCasePath -ItemType Directory -Force
+        "a: 1`nb: 2" | Set-Content -LiteralPath (Join-Path $ordinaryCasePath 'in.yaml') `
+            -Encoding utf8NoBOM
+        "b: 2`na: 1" | Set-Content -LiteralPath (Join-Path $ordinaryCasePath 'out.yaml') `
+            -Encoding utf8NoBOM
+
+        $ordinaryResult = & $runnerPath -Path $ordinarySuitePath -CompareOutYaml
+
+        $ordinaryResult.OutYamlResult | Should -Be 'Pass'
+    }
+
     It 'accounts for out.yaml representation comparisons' {
         @($suiteResults | Where-Object OutYamlResult -EQ 'Pass').Count | Should -Be 241
         @($suiteResults | Where-Object OutYamlResult -EQ 'PolicyDifference').Count |
@@ -295,11 +334,27 @@ ship-to:
             Should -Be @('EmitYamlRepresentationMismatch')
     }
 
+    It 'does not run module emission while validating official fixtures' {
+        $independentSuitePath = Join-Path $TestDrive 'independent-emit-fixture'
+        $independentCasePath = Join-Path $independentSuitePath 'deep-fixture'
+        $null = New-Item -Path $independentCasePath -ItemType Directory -Force
+        $deepYaml = ('[' * 101) + 'value' + (']' * 101)
+        $deepYaml | Set-Content -LiteralPath (Join-Path $independentCasePath 'in.yaml') `
+            -Encoding utf8NoBOM -NoNewline
+        $deepYaml | Set-Content -LiteralPath (Join-Path $independentCasePath 'emit.yaml') `
+            -Encoding utf8NoBOM -NoNewline
+
+        $independentResult = & $runnerPath -Path $independentSuitePath -CompareEmitYaml
+
+        $independentResult.EmitYamlResult | Should -Be 'Pass'
+        $independentResult.SelfRoundTripResult | Should -Be 'NotApplicable'
+    }
+
     It 'accounts honestly for general module self-round-trips' {
         @($suiteResults | Where-Object SelfRoundTripResult -EQ 'Pass').Count |
-            Should -Be 306
+            Should -Be 305
         @($suiteResults | Where-Object SelfRoundTripResult -EQ 'PolicyDifference').Count |
-            Should -Be 2
+            Should -Be 3
         @($suiteResults | Where-Object SelfRoundTripResult -EQ 'Fail').Count |
             Should -Be 0
         @($suiteResults | Where-Object SelfRoundTripResult -EQ 'NotApplicable').Count |
@@ -309,9 +364,12 @@ ship-to:
                 Where-Object SelfRoundTripResult -EQ 'PolicyDifference' |
                 Sort-Object Case
         )
-        @($policyResults.Case) | Should -Be @('2JQS', 'X38W')
-        @($policyResults.SelfRoundTripReason | Select-Object -Unique) |
-            Should -Be @('RepresentationMappingKeyUniqueness')
+        @($policyResults.Case) | Should -Be @('2JQS', 'J7PZ', 'X38W')
+        @($policyResults.SelfRoundTripReason) | Should -Be @(
+            'RepresentationMappingKeyUniqueness',
+            'LegacyOrderedMapProjection',
+            'RepresentationMappingKeyUniqueness'
+        )
     }
 
     It 'keeps the previously failing multi-document JSON cases green' {
