@@ -249,6 +249,25 @@ folded: >
             ("[value # a${bom}b`n ]" | Test-Yaml) | Should -BeFalse
             ("| # a${bom}b`n  value" | Test-Yaml) | Should -BeFalse
         }
+
+        It 'validates repeated document prefixes with one suffix scan' {
+            $bom = [char] 0xFEFF
+            $yaml = ((([string] $bom + "# prefix`n") * 64) -join '') + "---`nvalue"
+            $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
+            if ($null -eq $loadedModule) {
+                Mock Test-YamlDocumentPrefix { $true }
+            } else {
+                Mock Test-YamlDocumentPrefix -ModuleName $loadedModule.Name { $true }
+            }
+
+            ($yaml | ConvertFrom-Yaml) | Should -Be 'value'
+            if ($null -eq $loadedModule) {
+                Should -Invoke Test-YamlDocumentPrefix -Times 1 -Exactly
+            } else {
+                Should -Invoke Test-YamlDocumentPrefix -ModuleName $loadedModule.Name `
+                    -Times 1 -Exactly
+            }
+        }
     }
 
     Context 'Tags, anchors, and aliases' {

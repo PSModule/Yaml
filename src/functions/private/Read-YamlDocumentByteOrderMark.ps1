@@ -12,7 +12,9 @@ function Read-YamlDocumentByteOrderMark {
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
-        [switch] $RequireDocumentStart
+        [switch] $RequireDocumentStart,
+
+        [switch] $SkipValidation
     )
 
     if ($Context.LineIndex -ge $Context.Lines.Count) {
@@ -20,7 +22,7 @@ function Read-YamlDocumentByteOrderMark {
     }
     $index = $Context.LineStarts[$Context.LineIndex]
     $atStreamStart = $index -eq 0
-    if (-not $atStreamStart -and
+    if (-not $atStreamStart -and -not $SkipValidation -and
         -not (Test-YamlDocumentByteOrderMark -Context $Context `
                 -RequireDocumentStart:$RequireDocumentStart)) {
         return
@@ -32,9 +34,13 @@ function Read-YamlDocumentByteOrderMark {
         return
     }
 
-    $Context.Text = $Context.Text.Remove($index, 1)
-    $Context.Lines[$Context.LineIndex] = $Context.Lines[$Context.LineIndex].Substring(1)
-    for ($line = $Context.LineIndex + 1; $line -lt $Context.LineStarts.Count; $line++) {
-        $Context.LineStarts[$line]--
+    $line = $Context.Lines[$Context.LineIndex]
+    $count = 0
+    while ($count -lt $line.Length -and $line[$count] -ceq [char] 0xFEFF) {
+        $count++
     }
+
+    # Keep the source immutable and advance only this line's physical source offset.
+    $Context.Lines[$Context.LineIndex] = $line.Substring($count)
+    $Context.LineStarts[$Context.LineIndex] += $count
 }

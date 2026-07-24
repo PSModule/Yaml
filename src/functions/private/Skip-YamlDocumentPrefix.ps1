@@ -15,14 +15,30 @@ function Skip-YamlDocumentPrefix {
         [switch] $RequireDocumentStart
     )
 
+    $validatedPrefix = $false
     do {
         $lineIndex = $Context.LineIndex
-        $textLength = $Context.Text.Length
-        Read-YamlDocumentByteOrderMark -Context $Context `
-            -RequireDocumentStart:$RequireDocumentStart
+        $consumedByteOrderMark = $false
+        if ($lineIndex -lt $Context.Lines.Count -and
+            $Context.Lines[$lineIndex].StartsWith(
+                [string] [char] 0xFEFF,
+                [System.StringComparison]::Ordinal
+            )) {
+            $atStreamStart = $Context.LineStarts[$lineIndex] -eq 0
+            if ($atStreamStart -or $validatedPrefix -or
+                (Test-YamlDocumentByteOrderMark -Context $Context `
+                    -RequireDocumentStart:$RequireDocumentStart)) {
+                Read-YamlDocumentByteOrderMark -Context $Context `
+                    -RequireDocumentStart:$RequireDocumentStart -SkipValidation
+                $consumedByteOrderMark = $true
+                if (-not $atStreamStart) {
+                    $validatedPrefix = $true
+                }
+            }
+        }
         Skip-YamlBlockTrivia -Context $Context
     } while (
         $Context.LineIndex -ne $lineIndex -or
-        $Context.Text.Length -ne $textLength
+        $consumedByteOrderMark
     )
 }
