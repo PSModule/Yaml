@@ -228,16 +228,29 @@ folded: >
             $trailingPrefix = @(
                 "---`nvalue`n...`n${bom}# trailing prefix" | ConvertFrom-Yaml
             )
+            $barePrefixDocument = @(
+                "# prefix`n${bom}value" | ConvertFrom-Yaml
+            )
+            $bareBoundaryDocuments = @(
+                "---`none`n...`n${bom}two" | ConvertFrom-Yaml
+            )
+            $commentedBareBoundaryDocuments = @(
+                "---`none`n...`n${bom}# comment`ntwo" | ConvertFrom-Yaml
+            )
 
             $documents | Should -Be @('one', 'two')
             $implicitBoundaryDocuments | Should -Be @('one', 'two')
             $commentThenBom | Should -Be @('value')
             $alternatingPrefixes | Should -Be @('value')
             $trailingPrefix | Should -Be @('value')
+            $barePrefixDocument | Should -Be @('value')
+            $bareBoundaryDocuments | Should -Be @('one', 'two')
+            $commentedBareBoundaryDocuments | Should -Be @('one', 'two')
             ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
             ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
             ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
-            ("---`none`n...`n${bom}# comment`ntwo" | Test-Yaml) | Should -BeFalse
+            ("---`none`n${bom}two" | Test-Yaml) | Should -BeFalse
+            ("${bom}%YAML 1.2`nvalue" | Test-Yaml) | Should -BeFalse
             ('"foo' + $bom + 'bar"' | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
             ("'foo${bom}bar'" | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
             ("`"a`n${bom}%foo`nb`"" | ConvertFrom-Yaml) |

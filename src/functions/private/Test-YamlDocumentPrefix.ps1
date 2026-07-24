@@ -45,11 +45,11 @@ function Test-YamlDocumentPrefix {
             $Index = $lineEnd + 1
             continue
         }
-        if (-not $line.StartsWith('---', [System.StringComparison]::Ordinal)) {
-            return $false
+        if ($line.StartsWith('---', [System.StringComparison]::Ordinal) -and
+            ($line.Length -eq 3 -or (Test-YamlWhiteSpace -Character $line[3]))) {
+            return $true
         }
-        return $line.Length -eq 3 -or
-        (Test-YamlWhiteSpace -Character $line[3])
+        return -not $RequireDocumentStart -and -not $directiveSeen
     }
     return -not $directiveSeen
 }
