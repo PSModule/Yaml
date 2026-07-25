@@ -71,7 +71,8 @@ function Resolve-YamlTag {
     $expanded = if ($isNonSpecific) {
         ''
     } else {
-        ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token
+        ConvertFrom-YamlTagUriEscape -Text ($prefix + $suffix) -Mark $Mark -Token $Token `
+            -MaxLength $Context.MaxTagLength
     }
     $expandedLength = $expanded.Length
     if ($expandedLength -gt $Context.MaxTagLength) {

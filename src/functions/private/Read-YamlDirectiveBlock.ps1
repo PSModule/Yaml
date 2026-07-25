@@ -58,10 +58,10 @@ function Read-YamlDirectiveBlock {
                         "The tag handle '$handle' is declared more than once."
                     ))
             }
-            if ($prefix.Length -gt $Context.MaxTagLength) {
+            if ($prefix.Length -gt (Get-YamlTagPresentationLimit -Context $Context)) {
                 throw (New-YamlException -Start $mark -End $mark `
                         -ErrorId 'YamlTagLimitExceeded' -Message (
-                        "A YAML tag prefix exceeds the configured limit of $($Context.MaxTagLength) characters."
+                        "A YAML tag prefix cannot fit the configured limit of $($Context.MaxTagLength) decoded characters."
                     ))
             }
             if (-not $prefix.Equals('!', [System.StringComparison]::Ordinal) -and
@@ -71,6 +71,8 @@ function Read-YamlDirectiveBlock {
                         "The TAG directive prefix '$prefix' contains invalid URI text."
                     ))
             }
+            $null = ConvertFrom-YamlTagUriEscape -Text $prefix -Mark $mark -Token $prefix `
+                -MaxLength $Context.MaxTagLength
             $tagHandles[$handle] = $prefix
         } elseif (-not (Test-YamlReservedDirective -Directive $directive)) {
             throw (New-YamlException -Start $mark -End $mark `

@@ -13,7 +13,11 @@ function ConvertFrom-YamlTagUriEscape {
         [pscustomobject] $Mark,
 
         [Parameter(Mandatory)]
-        [string] $Token
+        [string] $Token,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 1048576)]
+        [int] $MaxLength
     )
 
     $builder = [System.Text.StringBuilder]::new()
@@ -25,13 +29,26 @@ function ConvertFrom-YamlTagUriEscape {
         if ($character -ne '%') {
             if ($escapedBytes.Count -gt 0) {
                 try {
-                    [void] $builder.Append($utf8.GetString($escapedBytes.ToArray()))
+                    $decoded = $utf8.GetString($escapedBytes.ToArray())
                 } catch [System.Text.DecoderFallbackException] {
                     throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
                             "The tag token '$Token' contains an invalid UTF-8 escape sequence."
                         ))
                 }
+                if ($builder.Length + $decoded.Length -gt $MaxLength) {
+                    throw (New-YamlException -Start $Mark -End $Mark `
+                            -ErrorId 'YamlTagLimitExceeded' -Message (
+                            "A YAML tag exceeds the configured limit of $MaxLength characters."
+                        ))
+                }
+                [void] $builder.Append($decoded)
                 $escapedBytes.Clear()
+            }
+            if ($builder.Length -ge $MaxLength) {
+                throw (New-YamlException -Start $Mark -End $Mark `
+                        -ErrorId 'YamlTagLimitExceeded' -Message (
+                        "A YAML tag exceeds the configured limit of $MaxLength characters."
+                    ))
             }
             [void] $builder.Append($character)
             continue
@@ -54,12 +71,19 @@ function ConvertFrom-YamlTagUriEscape {
 
     if ($escapedBytes.Count -gt 0) {
         try {
-            [void] $builder.Append($utf8.GetString($escapedBytes.ToArray()))
+            $decoded = $utf8.GetString($escapedBytes.ToArray())
         } catch [System.Text.DecoderFallbackException] {
             throw (New-YamlException -Start $Mark -End $Mark -ErrorId 'YamlInvalidTag' -Message (
                     "The tag token '$Token' contains an invalid UTF-8 escape sequence."
                 ))
         }
+        if ($builder.Length + $decoded.Length -gt $MaxLength) {
+            throw (New-YamlException -Start $Mark -End $Mark `
+                    -ErrorId 'YamlTagLimitExceeded' -Message (
+                    "A YAML tag exceeds the configured limit of $MaxLength characters."
+                ))
+        }
+        [void] $builder.Append($decoded)
     }
 
     $builder.ToString()

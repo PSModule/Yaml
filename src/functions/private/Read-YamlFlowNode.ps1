@@ -62,9 +62,11 @@ function Read-YamlFlowNode {
                     Move-YamlCursor -Cursor $Cursor -Context $Context
                 }
             }
-            if ($Cursor.Index - $tokenStart -gt $Context.MaxTagLength) {
+            if ($Cursor.Index - $tokenStart -gt (
+                    Get-YamlTagPresentationLimit -Context $Context -Token
+                )) {
                 throw (New-YamlException -Start $start -End $start -ErrorId 'YamlTagLimitExceeded' -Message (
-                        "A YAML tag token exceeds the configured limit of $($Context.MaxTagLength) characters."
+                        "A YAML tag token cannot fit the configured limit of $($Context.MaxTagLength) decoded characters."
                     ))
             }
             $resolved = Resolve-YamlTag -Token $Context.Text.Substring(

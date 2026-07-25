@@ -270,6 +270,63 @@ float: .nan
     }
 
     Context 'Validation and parser limits' {
+        It 'keeps exact effective tag-length boundaries idempotent' -ForEach @(
+            @{
+                Name    = 'local'
+                Yaml    = '!abc value'
+                TooLong = '!abcd value'
+                Limit   = 4
+            }
+            @{
+                Name    = 'verbatim'
+                Yaml    = '!<a%20b> value'
+                TooLong = '!<a%20bc> value'
+                Limit   = 3
+            }
+            @{
+                Name    = 'expanded handle'
+                Yaml    = "%TAG !e! tag:x%2C`n---`n!e!a value"
+                TooLong = "%TAG !e! tag:x%2C`n---`n!e!ab value"
+                Limit   = 7
+            }
+        ) {
+            $first = $Yaml | Format-Yaml -MaxTagLength $Limit
+            $second = $first | Format-Yaml -MaxTagLength $Limit
+            $failure = Get-TestYamlFailure {
+                $TooLong | Format-Yaml -MaxTagLength $Limit
+            }
+
+            $second | Should -BeExactly $first
+            $failure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly 'YamlTagLimitExceeded'
+        }
+
+        It 'keeps the default tag-length boundary idempotent' {
+            $accepted = '!' + ('a' * 1023) + ' value'
+            $rejected = '!' + ('a' * 1024) + ' value'
+
+            $first = $accepted | Format-Yaml
+            ($first | Format-Yaml) | Should -BeExactly $first
+            $failure = Get-TestYamlFailure {
+                $rejected | Format-Yaml
+            }
+            $failure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly 'YamlTagLimitExceeded'
+        }
+
+        It 'keeps cumulative effective tag budgets idempotent' {
+            $yaml = "!abc one`n---`n!def two"
+            $first = $yaml | Format-Yaml -MaxTagLength 4 -MaxTotalTagLength 8
+
+            ($first | Format-Yaml -MaxTagLength 4 -MaxTotalTagLength 8) |
+                Should -BeExactly $first
+            $failure = Get-TestYamlFailure {
+                $yaml | Format-Yaml -MaxTagLength 4 -MaxTotalTagLength 7
+            }
+            $failure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly 'YamlTagLimitExceeded'
+        }
+
         It 'classifies every parser resource limit like ConvertFrom-Yaml' -ForEach @(
             @{ Name = 'depth'; Yaml = "a:`n  b:`n    c: value"; Parameters = @{ Depth = 2 } }
             @{ Name = 'nodes'; Yaml = '[one, two]'; Parameters = @{ MaxNodes = 2 } }

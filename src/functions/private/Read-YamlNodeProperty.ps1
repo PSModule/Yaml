@@ -54,11 +54,13 @@ function Read-YamlNodeProperty {
                     $position++
                 }
             }
-            if ($position - $start -gt $Context.MaxTagLength) {
+            if ($position - $start -gt (
+                    Get-YamlTagPresentationLimit -Context $Context -Token
+                )) {
                 $mark = New-YamlMark -Index ($Context.LineStarts[$Line] + $Column + $start) -Line $Line `
                     -Column ($Column + $start)
                 throw (New-YamlException -Start $mark -End $mark -ErrorId 'YamlTagLimitExceeded' -Message (
-                        "A YAML tag token exceeds the configured limit of $($Context.MaxTagLength) characters."
+                        "A YAML tag token cannot fit the configured limit of $($Context.MaxTagLength) decoded characters."
                     ))
             }
             $token = $Text.Substring($start, $position - $start)
