@@ -36,7 +36,7 @@ function Resolve-YamlRemovalTarget {
             Edge          = $Document
             Node          = $Document
             Depth         = 0
-            Ancestors     = [string[]]::new(0)
+            Path          = [string[]] @($documentKey)
             Pointer       = $Pointer
             DocumentIndex = $DocumentIndex
         }
@@ -122,7 +122,7 @@ function Resolve-YamlRemovalTarget {
                     Edge          = $matchedEntry
                     Node          = $matchedEntry.Value
                     Depth         = $Tokens.Count
-                    Ancestors     = [string[]] $ancestors.ToArray()
+                    Path          = [string[]] (@($ancestors.ToArray()) + $edgeKey)
                     Pointer       = $Pointer
                     DocumentIndex = $DocumentIndex
                 }
@@ -176,7 +176,7 @@ function Resolve-YamlRemovalTarget {
                     Edge          = $sequenceItem
                     Node          = $sequenceItem
                     Depth         = $Tokens.Count
-                    Ancestors     = [string[]] $ancestors.ToArray()
+                    Path          = [string[]] (@($ancestors.ToArray()) + $edgeKey)
                     Pointer       = $Pointer
                     DocumentIndex = $DocumentIndex
                 }

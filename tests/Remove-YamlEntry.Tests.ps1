@@ -609,6 +609,76 @@ node: &node
             $result['node'].Contains('self') | Should -BeFalse
             $result['node']['keep'] | Should -BeTrue
         }
+
+        It 'removes an edge that repeats in its own direct cyclic path' {
+            $yaml = @'
+node: &node
+  self: *node
+  keep: true
+'@
+            $result = Remove-YamlEntry $yaml '/node/self/self' |
+                ConvertFrom-Yaml -AsHashtable
+
+            $result['node'].Contains('self') | Should -BeFalse
+            $result['node']['keep'] | Should -BeTrue
+        }
+
+        It 'removes an edge that repeats through a longer cycle' {
+            $yaml = @'
+first: &first
+  next: &second
+    back: *first
+    keep: true
+'@
+            $result = Remove-YamlEntry $yaml '/first/next/back/next/back' |
+                ConvertFrom-Yaml -AsHashtable
+
+            $result['first']['next'].Contains('back') | Should -BeFalse
+            $result['first']['next']['keep'] | Should -BeTrue
+        }
+
+        It 'does not mutually subsume targets reached through cyclic branches' {
+            $yaml = @'
+node: &node
+  a: *node
+  b: *node
+  keep: true
+'@
+            $result = Remove-YamlEntry $yaml @('/node/a/b', '/node/b/a') |
+                ConvertFrom-Yaml -AsHashtable
+
+            $result['node'].Contains('a') | Should -BeFalse
+            $result['node'].Contains('b') | Should -BeFalse
+            $result['node']['keep'] | Should -BeTrue
+        }
+
+        It 'coalesces one cyclic target reached through duplicate aliases' {
+            $yaml = @'
+node: &node
+  self: *node
+  keep: true
+copy: *node
+'@
+            $result = Remove-YamlEntry $yaml @('/node/self/self', '/copy/self/self') |
+                ConvertFrom-Yaml -AsHashtable
+
+            $result['node'].Contains('self') | Should -BeFalse
+            [object]::ReferenceEquals($result['node'], $result['copy']) |
+                Should -BeTrue
+        }
+
+        It 'subsumes a cyclic descendant only under a proper requested ancestor' {
+            $yaml = @'
+node: &node
+  self: *node
+  keep: true
+'@
+            $result = Remove-YamlEntry $yaml @('/node/self', '/node/self/self/keep') |
+                ConvertFrom-Yaml -AsHashtable
+
+            $result['node'].Contains('self') | Should -BeFalse
+            $result['node']['keep'] | Should -BeTrue
+        }
     }
 
     Context 'Tags and resulting graph validation' {

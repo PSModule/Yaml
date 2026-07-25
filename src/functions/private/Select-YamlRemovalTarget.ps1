@@ -20,12 +20,12 @@ function Select-YamlRemovalTarget {
     foreach ($target in $Targets) {
         Add-YamlRemovalWork -State $State -Operation 'target coalescing' -Node $target.Node
         if ($coalesced.ContainsKey($target.Key)) {
-            $coalesced[$target.Key].AncestorSets.Add([string[]] $target.Ancestors)
+            $coalesced[$target.Key].PathSets.Add([string[]] $target.Path)
             continue
         }
 
-        $ancestorSets = [System.Collections.Generic.List[object]]::new()
-        $ancestorSets.Add([string[]] $target.Ancestors)
+        $pathSets = [System.Collections.Generic.List[object]]::new()
+        $pathSets.Add([string[]] $target.Path)
         $coalesced[$target.Key] = [pscustomobject]@{
             Key           = $target.Key
             Kind          = $target.Kind
@@ -34,28 +34,59 @@ function Select-YamlRemovalTarget {
             Edge          = $target.Edge
             Node          = $target.Node
             Depth         = $target.Depth
-            AncestorSets  = $ancestorSets
+            PathSets      = $pathSets
             Pointer       = $target.Pointer
             DocumentIndex = $target.DocumentIndex
         }
     }
 
-    $selectedKeys = [System.Collections.Generic.HashSet[string]]::new(
-        [System.StringComparer]::Ordinal
-    )
-    foreach ($key in $coalesced.Keys) {
-        [void] $selectedKeys.Add($key)
+    $pathRoot = [pscustomobject]@{
+        Children   = [System.Collections.Generic.Dictionary[string, object]]::new(
+            [System.StringComparer]::Ordinal
+        )
+        TargetKeys = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::Ordinal
+        )
+    }
+    foreach ($target in $coalesced.Values) {
+        foreach ($path in $target.PathSets) {
+            $pathNode = $pathRoot
+            foreach ($edgeKey in $path) {
+                Add-YamlRemovalWork -State $State -Operation 'target path indexing' `
+                    -Node $target.Node
+                if (-not $pathNode.Children.ContainsKey($edgeKey)) {
+                    $pathNode.Children[$edgeKey] = [pscustomobject]@{
+                        Children   = [System.Collections.Generic.Dictionary[string, object]]::new(
+                            [System.StringComparer]::Ordinal
+                        )
+                        TargetKeys = [System.Collections.Generic.HashSet[string]]::new(
+                            [System.StringComparer]::Ordinal
+                        )
+                    }
+                }
+                $pathNode = $pathNode.Children[$edgeKey]
+            }
+            [void] $pathNode.TargetKeys.Add($target.Key)
+        }
     }
 
     $survivors = [System.Collections.Generic.List[object]]::new()
     foreach ($candidate in $coalesced.Values) {
         $allRequestsSubsumed = $true
-        foreach ($ancestorSet in $candidate.AncestorSets) {
+        foreach ($path in $candidate.PathSets) {
             $requestSubsumed = $false
-            foreach ($ancestorKey in $ancestorSet) {
-                Add-YamlRemovalWork -State $State -Operation 'ancestor coalescing' `
+            $pathNode = $pathRoot
+            for ($pathIndex = 0; $pathIndex -lt $path.Count - 1; $pathIndex++) {
+                Add-YamlRemovalWork -State $State -Operation 'target path ancestry' `
                     -Node $candidate.Node
-                if ($selectedKeys.Contains($ancestorKey)) {
+                $edgeKey = $path[$pathIndex]
+                if (-not $pathNode.Children.ContainsKey($edgeKey)) {
+                    break
+                }
+                $pathNode = $pathNode.Children[$edgeKey]
+                if ($pathNode.TargetKeys.Count -gt 1 -or
+                    ($pathNode.TargetKeys.Count -eq 1 -and
+                    -not $pathNode.TargetKeys.Contains($candidate.Key))) {
                     $requestSubsumed = $true
                     break
                 }
