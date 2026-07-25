@@ -249,6 +249,67 @@ Describe 'Released yaml-test-suite corpus accounting' {
         $nonSpecificEvents | Should -Contain '=VAL|nonSpecificTag=true|value=value'
     }
 
+    It 'distinguishes implicit scalar tags without treating style as semantic' {
+        foreach ($mutation in @(
+                @{ Plain = 'true'; Quoted = '"true"'; Tag = 'tag:yaml.org,2002:bool' }
+                @{ Plain = '42'; Quoted = '"42"'; Tag = 'tag:yaml.org,2002:int' }
+                @{ Plain = '1.5'; Quoted = '"1.5"'; Tag = 'tag:yaml.org,2002:float' }
+                @{ Plain = '.inf'; Quoted = '".inf"'; Tag = 'tag:yaml.org,2002:float' }
+                @{ Plain = 'null'; Quoted = '"null"'; Tag = 'tag:yaml.org,2002:null' }
+            )) {
+            $plain = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+                -Arguments @($mutation.Plain)
+            $quoted = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+                -Arguments @($mutation.Quoted)
+            $plainEvents = ConvertTo-YamlSuiteActualEvent -Documents $plain.Value `
+                -IncludeEffectiveScalarTags
+            $quotedEvents = ConvertTo-YamlSuiteActualEvent -Documents $quoted.Value `
+                -IncludeEffectiveScalarTags
+
+            (Compare-YamlSuiteCanonicalList -Left $plainEvents -Right $quotedEvents) |
+                Should -BeFalse
+            $plainEvents | Should -Contain (
+                '=VAL|tag={0}|value={1}' -f $mutation.Tag, $mutation.Plain
+            )
+            $quotedEvents | Should -Contain (
+                '=VAL|tag=tag:yaml.org,2002:str|value={0}' -f $mutation.Plain
+            )
+        }
+
+        $singleQuoted = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @("'value'")
+        $doubleQuoted = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('"value"')
+        $singleEvents = ConvertTo-YamlSuiteActualEvent -Documents $singleQuoted.Value `
+            -IncludeEffectiveScalarTags
+        $doubleEvents = ConvertTo-YamlSuiteActualEvent -Documents $doubleQuoted.Value `
+            -IncludeEffectiveScalarTags
+
+        (Compare-YamlSuiteCanonicalList -Left $singleEvents -Right $doubleEvents) |
+            Should -BeTrue
+
+        $explicit = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('!!str value')
+        $unknown = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('!local value')
+        $nonSpecific = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('! value')
+        $explicitEvents = ConvertTo-YamlSuiteActualEvent -Documents $explicit.Value `
+            -IncludeEffectiveScalarTags
+        $unknownEvents = ConvertTo-YamlSuiteActualEvent -Documents $unknown.Value `
+            -IncludeEffectiveScalarTags
+        $nonSpecificEvents = ConvertTo-YamlSuiteActualEvent -Documents $nonSpecific.Value `
+            -IncludeEffectiveScalarTags
+
+        $explicitEvents |
+            Should -Contain '=VAL|tag=tag:yaml.org,2002:str|explicitTag=true|value=value'
+        $unknownEvents | Should -Contain '=VAL|tag=!local|explicitTag=true|value=value'
+        $nonSpecificEvents |
+            Should -Contain '=VAL|tag=tag:yaml.org,2002:str|nonSpecificTag=true|value=value'
+        (Compare-YamlSuiteCanonicalList -Left $explicitEvents -Right $doubleEvents) |
+            Should -BeFalse
+    }
+
     It 'detects altered ordered-map and alias semantics in out.yaml' {
         $mutatedSuitePath = Join-Path $TestDrive 'mutated-out-cases'
         $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force

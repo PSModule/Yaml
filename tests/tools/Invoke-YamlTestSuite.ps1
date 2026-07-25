@@ -632,12 +632,29 @@ function ConvertFrom-YamlSuiteEventText {
     [string[]] $canonical.ToArray()
 }
 
+function Get-YamlSuiteScalarEffectiveTag {
+    [OutputType([string])]
+    param (
+        [Parameter(Mandatory)]
+        [pscustomobject] $Node
+    )
+
+    Invoke-InYamlModule -ScriptBlock {
+        param ([pscustomobject] $ScalarNode)
+
+        $resolved = Resolve-YamlScalar -Node $ScalarNode
+        Get-YamlEffectiveTag -Node $ScalarNode -Value $resolved.Value
+    } -Arguments @($Node)
+}
+
 function ConvertTo-YamlSuiteActualEvent {
     [OutputType([string[]])]
     param (
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
-        [object[]] $Documents
+        [object[]] $Documents,
+
+        [switch] $IncludeEffectiveScalarTags
     )
 
     function ConvertTo-YamlSuiteEventEscapedText {
@@ -688,10 +705,19 @@ function ConvertTo-YamlSuiteActualEvent {
             if ($node.Kind -eq 'Scalar') {
                 $parts = [System.Collections.Generic.List[string]]::new()
                 $parts.Add('=VAL')
-                if ([string]::IsNullOrEmpty($node.Tag) -and $node.HasUnknownTag) {
-                    $parts.Add('nonSpecificTag=true')
-                } elseif ($node.Tag) {
-                    $parts.Add("tag=$($node.Tag)")
+                if ($IncludeEffectiveScalarTags) {
+                    $parts.Add("tag=$(Get-YamlSuiteScalarEffectiveTag -Node $node)")
+                    if (-not [string]::IsNullOrEmpty($node.Tag)) {
+                        $parts.Add('explicitTag=true')
+                    } elseif ($node.HasUnknownTag) {
+                        $parts.Add('nonSpecificTag=true')
+                    }
+                } else {
+                    if ([string]::IsNullOrEmpty($node.Tag) -and $node.HasUnknownTag) {
+                        $parts.Add('nonSpecificTag=true')
+                    } elseif ($node.Tag) {
+                        $parts.Add("tag=$($node.Tag)")
+                    }
                 }
                 if ($node.Anchor) {
                     $parts.Add("anchor=$(
@@ -1274,9 +1300,10 @@ foreach ($inputFile in $inputFiles) {
                 } else {
                     $formattedRepresentation = Invoke-InYamlModule `
                         -ScriptBlock $readYamlSuiteRepresentation -Arguments @($formatterText)
-                    $originalEvents = ConvertTo-YamlSuiteActualEvent -Documents $representation.Value
+                    $originalEvents = ConvertTo-YamlSuiteActualEvent -Documents $representation.Value `
+                        -IncludeEffectiveScalarTags
                     $formattedEvents = ConvertTo-YamlSuiteActualEvent `
-                        -Documents $formattedRepresentation.Value
+                        -Documents $formattedRepresentation.Value -IncludeEffectiveScalarTags
                     $formatterExpected = $originalEvents -join "`n"
                     $formatterActual = $formattedEvents -join "`n"
                     if (-not (
