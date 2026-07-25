@@ -106,6 +106,77 @@ Describe 'Import-Yaml' {
             $result[0].value | Should -Be 'once'
         }
 
+        It 'sorts by canonical identity regardless of duplicate path spelling' {
+            $firstPath = Join-Path $TestDrive 'canonical-a.yaml'
+            $secondPath = Join-Path $TestDrive 'canonical-b.yaml'
+            $secondAlias = $secondPath.ToUpperInvariant()
+            [System.IO.File]::WriteAllText($firstPath, 'value: first')
+            [System.IO.File]::WriteAllText($secondPath, 'value: second')
+            try {
+                $null = [System.IO.File]::GetAttributes($secondAlias)
+            } catch [System.IO.FileNotFoundException] {
+                Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
+                return
+            }
+
+            $result = @(Import-Yaml -Path @($secondAlias, $firstPath, $secondPath))
+
+            @($result.value) | Should -Be @('first', 'second')
+        }
+
+        It 'normalizes insensitive components around a case-sensitive directory' `
+            -Skip:(-not $IsWindows) {
+            $caseDirectory = Join-Path $TestDrive 'Sensitive'
+            $null = [System.IO.Directory]::CreateDirectory($caseDirectory)
+            $null = & fsutil.exe file SetCaseSensitiveInfo $caseDirectory enable 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Set-ItResult -Skipped -Because 'per-directory case sensitivity is unavailable'
+                return
+            }
+
+            $upperPath = Join-Path $caseDirectory 'Case.yaml'
+            $lowerPath = Join-Path $caseDirectory 'case.yaml'
+            $variantUpperPath = Join-Path (
+                Split-Path -Parent $caseDirectory
+            ) 'sensitive\Case.yaml'
+            [System.IO.File]::WriteAllText($upperPath, 'value: upper')
+            [System.IO.File]::WriteAllText($lowerPath, 'value: lower')
+
+            $result = @(Import-Yaml -Path @($upperPath, $variantUpperPath, $lowerPath))
+
+            @($result.value) | Should -Be @('upper', 'lower')
+        }
+
+        It 'resolves each relative pipeline path at the location where it arrives' {
+            $firstDirectory = Join-Path $TestDrive 'pipeline-a'
+            $secondDirectory = Join-Path $TestDrive 'pipeline-b'
+            $null = [System.IO.Directory]::CreateDirectory($firstDirectory)
+            $null = [System.IO.Directory]::CreateDirectory($secondDirectory)
+            [System.IO.File]::WriteAllText(
+                (Join-Path $firstDirectory 'config.yaml'),
+                'value: first'
+            )
+            [System.IO.File]::WriteAllText(
+                (Join-Path $secondDirectory 'config.yaml'),
+                'value: second'
+            )
+
+            $result = @(
+                & {
+                    Push-Location $firstDirectory
+                    try {
+                        Write-Output 'config.yaml'
+                        Set-Location $secondDirectory
+                        Write-Output 'config.yaml'
+                    } finally {
+                        Pop-Location
+                    }
+                } | Import-Yaml
+            )
+
+            @($result.value) | Should -Be @('first', 'second')
+        }
+
         It 'preserves deterministic file and document order together' {
             $firstPath = Join-Path $TestDrive '01.yaml'
             $secondPath = Join-Path $TestDrive '02.yaml'

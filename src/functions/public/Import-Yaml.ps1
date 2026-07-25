@@ -155,7 +155,7 @@ function Import-Yaml {
     )
 
     begin {
-        $requestedPaths = [System.Collections.Generic.List[string]]::new()
+        $resolvedPaths = [System.Collections.Generic.List[string]]::new()
     }
     process {
         $currentPaths = if ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
@@ -163,13 +163,7 @@ function Import-Yaml {
         } else {
             $Path
         }
-        foreach ($currentPath in $currentPaths) {
-            $requestedPaths.Add($currentPath)
-        }
-    }
-    end {
-        $resolvedPaths = [System.Collections.Generic.List[string]]::new()
-        foreach ($requestedPath in $requestedPaths) {
+        foreach ($requestedPath in $currentPaths) {
             if ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
                 try {
                     $provider = $null
@@ -426,74 +420,100 @@ function Import-Yaml {
                 $resolvedPaths.Add([System.IO.Path]::GetFullPath($pathInfo.ProviderPath))
             }
         }
+    }
+    end {
 
-        $caseSensitivePaths = [System.Collections.Generic.HashSet[string]]::new(
+        $pathsByIdentity = [System.Collections.Generic.Dictionary[string, string]]::new(
             [System.StringComparer]::Ordinal
         )
-        $caseInsensitivePaths = [System.Collections.Generic.HashSet[string]]::new(
-            [System.StringComparer]::OrdinalIgnoreCase
+        $directoryNameGroups = [System.Collections.Generic.Dictionary[string, object]]::new(
+            [System.StringComparer]::Ordinal
         )
         foreach ($resolvedPath in $resolvedPaths) {
-            $useCaseSensitiveIdentity = -not $IsWindows
-            if ($IsWindows) {
-                $identityPath = $resolvedPath
-                while (-not [string]::IsNullOrEmpty($identityPath)) {
-                    $directoryPath = [System.IO.Path]::GetDirectoryName($identityPath)
-                    if ([string]::IsNullOrEmpty($directoryPath)) {
-                        break
-                    }
-                    $leafName = [System.IO.Path]::GetFileName($identityPath)
-                    try {
-                        $caseVariantCount = 0
+            $identityComponents = [System.Collections.Generic.List[string]]::new()
+            $identityPath = $resolvedPath
+            $identityFailed = $false
+
+            while ($true) {
+                $directoryPath = [System.IO.Path]::GetDirectoryName($identityPath)
+                $leafName = [System.IO.Path]::GetFileName($identityPath)
+                if ([string]::IsNullOrEmpty($directoryPath) -or
+                    [string]::IsNullOrEmpty($leafName)) {
+                    break
+                }
+
+                $nameGroups = $null
+                try {
+                    if (-not $directoryNameGroups.TryGetValue(
+                            $directoryPath,
+                            [ref]$nameGroups
+                        )) {
+                        $nameGroups = (
+                            [System.Collections.Generic.Dictionary[string, object]]::new(
+                                [System.StringComparer]::OrdinalIgnoreCase
+                            )
+                        )
                         foreach ($directoryEntry in (
                                 [System.IO.Directory]::EnumerateFileSystemEntries($directoryPath)
                             )) {
-                            if ([string]::Equals(
-                                    [System.IO.Path]::GetFileName($directoryEntry),
-                                    $leafName,
-                                    [System.StringComparison]::OrdinalIgnoreCase
-                                )) {
-                                $caseVariantCount++
-                                if ($caseVariantCount -gt 1) {
-                                    $useCaseSensitiveIdentity = $true
-                                    break
-                                }
+                            $entryName = [System.IO.Path]::GetFileName($directoryEntry)
+                            $nameGroup = $null
+                            if ($nameGroups.TryGetValue($entryName, [ref]$nameGroup)) {
+                                $nameGroup.Count++
+                            } else {
+                                $nameGroups.Add(
+                                    $entryName,
+                                    [pscustomobject]@{
+                                        Count         = 1
+                                        CanonicalName = $entryName
+                                    }
+                                )
                             }
                         }
-                    } catch [System.UnauthorizedAccessException] {
-                        $useCaseSensitiveIdentity = $true
-                    } catch [System.IO.IOException] {
-                        $useCaseSensitiveIdentity = $true
+                        $directoryNameGroups.Add($directoryPath, $nameGroups)
                     }
-                    if ($useCaseSensitiveIdentity -or
-                        [string]::Equals(
-                            $identityPath,
-                            $directoryPath,
-                            [System.StringComparison]::Ordinal
-                        )) {
+
+                    $nameGroup = $null
+                    if (-not $nameGroups.TryGetValue($leafName, [ref]$nameGroup)) {
+                        $identityFailed = $true
                         break
                     }
-                    $identityPath = $directoryPath
+                    if ($nameGroup.Count -gt 1) {
+                        $identityComponents.Add($leafName)
+                    } else {
+                        $identityComponents.Add($nameGroup.CanonicalName)
+                    }
+                } catch [System.UnauthorizedAccessException] {
+                    $identityFailed = $true
+                    break
+                } catch [System.IO.IOException] {
+                    $identityFailed = $true
+                    break
                 }
+
+                $identityPath = $directoryPath
             }
 
-            if ($useCaseSensitiveIdentity) {
-                $null = $caseSensitivePaths.Add($resolvedPath)
+            if ($identityFailed) {
+                $identityKey = $resolvedPath
             } else {
-                $null = $caseInsensitivePaths.Add($resolvedPath)
+                $rootPath = [System.IO.Path]::GetPathRoot($resolvedPath)
+                if ($IsWindows) {
+                    $rootPath = $rootPath.ToUpperInvariant()
+                }
+                $identityComponents.Add($rootPath)
+                $identityComponents.Reverse()
+                $identityKey = $identityComponents -join [char]0x1F
             }
-        }
-        $uniquePaths = [System.Collections.Generic.List[string]]::new()
-        foreach ($uniquePath in $caseSensitivePaths) {
-            $uniquePaths.Add($uniquePath)
-        }
-        foreach ($uniquePath in $caseInsensitivePaths) {
-            $uniquePaths.Add($uniquePath)
-        }
-        [string[]] $orderedPaths = $uniquePaths
-        [System.Array]::Sort($orderedPaths, [System.StringComparer]::Ordinal)
 
-        foreach ($resolvedPath in $orderedPaths) {
+            $null = $pathsByIdentity.TryAdd($identityKey, $resolvedPath)
+        }
+
+        [string[]] $orderedIdentityKeys = $pathsByIdentity.Keys
+        [System.Array]::Sort($orderedIdentityKeys, [System.StringComparer]::Ordinal)
+
+        foreach ($identityKey in $orderedIdentityKeys) {
+            $resolvedPath = $pathsByIdentity[$identityKey]
             try {
                 $bytes = [System.IO.File]::ReadAllBytes($resolvedPath)
             } catch [System.UnauthorizedAccessException] {
