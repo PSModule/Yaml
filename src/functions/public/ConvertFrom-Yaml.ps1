@@ -61,6 +61,9 @@ function ConvertFrom-Yaml {
 
         .OUTPUTS
         System.Object
+
+        .LINK
+        https://github.com/PSModule/Yaml#parse-yaml
     #>
     [CmdletBinding()]
     [OutputType([object])]

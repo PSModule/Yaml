@@ -62,6 +62,9 @@ function Format-Yaml {
 
         .OUTPUTS
         System.String
+
+        .LINK
+        https://github.com/PSModule/Yaml#format-yaml-streams
     #>
     [CmdletBinding()]
     [OutputType([string])]
