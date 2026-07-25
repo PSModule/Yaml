@@ -85,15 +85,13 @@ function Import-Yaml {
     [OutputType([object])]
     [CmdletBinding(DefaultParameterSetName = 'Path')]
     param (
-        # Expands wildcard paths and accepts path values or FullName properties.
+        # Expands wildcard paths and accepts string pipeline values.
         [Parameter(
             Mandatory,
             Position = 0,
             ValueFromPipeline,
-            ValueFromPipelineByPropertyName,
             ParameterSetName = 'Path'
         )]
-        [Alias('FullName')]
         [string[]] $Path,
 
         # Resolves exact paths from LiteralPath, PSPath, or FullName properties.
@@ -102,7 +100,7 @@ function Import-Yaml {
             ValueFromPipelineByPropertyName,
             ParameterSetName = 'LiteralPath'
         )]
-        [Alias('PSPath')]
+        [Alias('PSPath', 'FullName')]
         [string[]] $LiteralPath,
 
         # Selects the fallback decoder when a file has no byte order mark.

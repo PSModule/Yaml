@@ -30,12 +30,13 @@ Describe 'Import-Yaml' {
             $pathParameter.IsMandatory | Should -BeTrue
             $pathParameter.Position | Should -Be 0
             $pathParameter.ValueFromPipeline | Should -BeTrue
-            $pathParameter.ValueFromPipelineByPropertyName | Should -BeTrue
+            $pathParameter.ValueFromPipelineByPropertyName | Should -BeFalse
             $literalPathParameter.IsMandatory | Should -BeTrue
             $literalPathParameter.ValueFromPipeline | Should -BeFalse
             $literalPathParameter.ValueFromPipelineByPropertyName | Should -BeTrue
-            $command.Parameters['Path'].Aliases | Should -Contain 'FullName'
+            $command.Parameters['Path'].Aliases | Should -Not -Contain 'FullName'
             $command.Parameters['LiteralPath'].Aliases | Should -Contain 'PSPath'
+            $command.Parameters['LiteralPath'].Aliases | Should -Contain 'FullName'
             $command.OutputType.Type | Should -Contain ([object])
         }
 
@@ -262,13 +263,22 @@ Describe 'Import-Yaml' {
             (Import-Yaml -LiteralPath $path).value | Should -Be 'literal'
         }
 
-        It 'accepts FileInfo pipeline input through Path' {
-            $path = Join-Path $TestDrive 'pipeline.yaml'
+        It 'resolves FileInfo pipeline input literally' {
+            $path = Join-Path $TestDrive 'config[production].yaml'
             [System.IO.File]::WriteAllText($path, 'value: pipeline')
 
             $result = Get-Item -LiteralPath $path | Import-Yaml
 
             $result.value | Should -Be 'pipeline'
+        }
+
+        It 'resolves FullName pipeline properties literally' {
+            $path = Join-Path $TestDrive 'full[name].yaml'
+            [System.IO.File]::WriteAllText($path, 'value: fullname')
+
+            $result = [pscustomobject]@{ FullName = $path } | Import-Yaml
+
+            $result.value | Should -Be 'fullname'
         }
 
         It 'accepts PSPath pipeline properties through LiteralPath' {
