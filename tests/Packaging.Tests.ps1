@@ -37,24 +37,9 @@ Describe 'Dependency-free package source' {
         Test-Path (Join-Path $repositoryRoot 'src\THIRD-PARTY-NOTICES.txt') | Should -BeFalse
     }
 
-    It 'keeps RequiredAssemblies out of the source manifest' {
-        $manifest = Import-PowerShellDataFile -Path (
-            Join-Path $repositoryRoot 'src\manifest.psd1'
-        )
-
-        $manifest.PowerShellVersion | Should -Be '7.6'
-        @($manifest.CompatiblePSEditions) | Should -Be @('Core')
-        @($manifest.CompatiblePSEditions) | Should -Not -Contain 'Desktop'
-        $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
-        $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
-    }
-
-    It 'declares the generated artifact runtime once in the module header' {
-        $requirementPath = Join-Path $repositoryRoot 'src\header.ps1'
-        $source = Get-Content -LiteralPath $requirementPath -Raw
-
-        $source | Should -Match '(?m)^#Requires -Version 7\.6\r?$'
-        $source | Should -Match '(?m)^#Requires -PSEdition Core\r?$'
+    It 'keeps runtime requirements out of removed source manifest and header files' {
+        Test-Path (Join-Path $repositoryRoot 'src\manifest.psd1') | Should -BeFalse
+        Test-Path (Join-Path $repositoryRoot 'src\header.ps1') | Should -BeFalse
     }
 
     It 'contains no external parser references or custom assembly loader' {
