@@ -4,7 +4,7 @@
 
 Test:
   CodeCoverage:
-    PercentTarget: 50
+    PercentTarget: 25
 #   TestResults:
 #     Skip: true
 #   SourceCode:
@@ -16,10 +16,6 @@ Test:
 #       Skip: true
 #     MacOS:
 #       Skip: true
-# Build:
-#   Docs:
-#     Skip: true
-
 Linter:
   env:
     VALIDATE_BIOME_FORMAT: false

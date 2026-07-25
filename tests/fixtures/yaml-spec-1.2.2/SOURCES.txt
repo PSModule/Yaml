@@ -1,0 +1,18 @@
+YAML 1.2.2 Chapter 2 examples
+================================
+
+Source repository:
+  https://github.com/yaml/yaml-spec
+Pinned commit:
+  1b1a1be43bd6e0cfec45caf0e40af3b5d2bb7f8a
+Source file:
+  spec/1.2.2/spec.md
+Published specification:
+  https://yaml.org/spec/1.2.2/
+
+The files in chapter-02 are exact YAML snippets from Examples 2.1 through
+2.28. They are named by example number.
+
+The specification states:
+
+  This document may be freely copied, provided it is not modified.
