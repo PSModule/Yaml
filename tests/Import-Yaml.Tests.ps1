@@ -104,10 +104,15 @@ Describe 'Import-Yaml' {
         It 'suppresses path case variants on case-insensitive filesystems' {
             $path = Join-Path $TestDrive 'CaseVariant.yaml'
             [System.IO.File]::WriteAllText($path, 'value: once')
-            $caseVariantPath = $path.ToLowerInvariant()
+            $caseVariantPath = Join-Path (
+                Split-Path -Parent $path
+            ) ([System.IO.Path]::GetFileName($path).ToLowerInvariant())
             try {
                 $null = [System.IO.File]::GetAttributes($caseVariantPath)
             } catch [System.IO.FileNotFoundException] {
+                Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
+                return
+            } catch [System.IO.DirectoryNotFoundException] {
                 Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
                 return
             }
@@ -156,12 +161,17 @@ Describe 'Import-Yaml' {
         It 'sorts by canonical identity regardless of duplicate path spelling' {
             $firstPath = Join-Path $TestDrive 'canonical-a.yaml'
             $secondPath = Join-Path $TestDrive 'canonical-b.yaml'
-            $secondAlias = $secondPath.ToUpperInvariant()
+            $secondAlias = Join-Path (
+                Split-Path -Parent $secondPath
+            ) ([System.IO.Path]::GetFileName($secondPath).ToUpperInvariant())
             [System.IO.File]::WriteAllText($firstPath, 'value: first')
             [System.IO.File]::WriteAllText($secondPath, 'value: second')
             try {
                 $null = [System.IO.File]::GetAttributes($secondAlias)
             } catch [System.IO.FileNotFoundException] {
+                Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
+                return
+            } catch [System.IO.DirectoryNotFoundException] {
                 Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
                 return
             }

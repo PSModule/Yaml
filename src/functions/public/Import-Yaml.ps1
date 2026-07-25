@@ -80,7 +80,7 @@ function Import-Yaml {
         Only FileSystem provider paths are supported.
 
         .LINK
-        ConvertFrom-Yaml
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [OutputType([object])]
     [CmdletBinding(DefaultParameterSetName = 'Path')]

@@ -88,7 +88,7 @@ function Export-Yaml {
         Only FileSystem provider destinations are supported.
 
         .LINK
-        ConvertTo-Yaml
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [OutputType([System.IO.FileInfo])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
