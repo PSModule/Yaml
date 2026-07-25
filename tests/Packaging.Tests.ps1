@@ -127,7 +127,13 @@ Describe 'Generated artifact package' {
         $manifest.ContainsKey('RequiredAssemblies') | Should -BeFalse
         $manifest.ContainsKey('DotNetFrameworkVersion') | Should -BeFalse
         @($manifest.FunctionsToExport | Sort-Object) |
-            Should -Be @('ConvertFrom-Yaml', 'ConvertTo-Yaml', 'Test-Yaml')
+            Should -Be @(
+                'ConvertFrom-Yaml',
+                'ConvertTo-Yaml',
+                'Export-Yaml',
+                'Import-Yaml',
+                'Test-Yaml'
+            )
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
         $packagedFiles = @(
             Get-ChildItem -Path $moduleBase -Recurse -File |
