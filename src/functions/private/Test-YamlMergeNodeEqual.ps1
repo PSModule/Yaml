@@ -80,7 +80,11 @@ function Test-YamlMergeNodeEqual {
         }
         $leftTag = Get-YamlMergeNodeTag -Node $left
         $rightTag = Get-YamlMergeNodeTag -Node $right
-        if ($leftTag -cne $rightTag) {
+        if (-not [string]::Equals(
+                $leftTag,
+                $rightTag,
+                [System.StringComparison]::Ordinal
+            )) {
             $State.Cache[$cacheKey] = $false
             return $false
         }

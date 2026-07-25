@@ -95,6 +95,63 @@ BeforeAll {
             Count  = [long] $Matches.WorkCount
         }
     }
+
+    function Test-RemoveYamlFingerprintCollision {
+        <#
+            .SYNOPSIS
+            Forces representation-key fingerprint candidates through exact graph equality.
+        #>
+        param (
+            [Parameter(Mandatory)]
+            [string] $Yaml
+        )
+
+        $implementation = {
+            param ([string] $YamlText)
+
+            $document = (Read-YamlStreamCore -Yaml $YamlText -Depth 100 -MaxNodes 100 `
+                    -MaxAliases 100 -MaxScalarLength 1048576 -MaxTagLength 1024 `
+                    -MaxTotalTagLength 65536 -MaxNumericLength 4096).Value[0]
+            $fingerprintCache = [System.Collections.Generic.Dictionary[int, string]]::new()
+            foreach ($entry in $document.Entries) {
+                $fingerprintCache[$entry.Key.Id] = 'forced-collision'
+            }
+            $hasher = [System.Security.Cryptography.SHA256]::Create()
+            try {
+                $equalityState = [pscustomobject]@{
+                    MaxNodes          = 100
+                    FingerprintHasher = $hasher
+                    WorkState         = [pscustomobject]@{ Count = 0L; MaxNodes = 100 }
+                    MutationState     = [pscustomobject]@{ Version = 0L }
+                    IndexDependents   = (
+                        [System.Collections.Generic.Dictionary[int, object]]::new()
+                    )
+                    Cache             = (
+                        [System.Collections.Generic.Dictionary[string, bool]]::new(
+                            [System.StringComparer]::Ordinal
+                        )
+                    )
+                    InputIndex        = 0
+                }
+                Test-YamlNodeGraph -Node $document `
+                    -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
+                    -FingerprintCache $fingerprintCache -FingerprintHasher $hasher `
+                    -EqualityState $equalityState `
+                    -EqualityFingerprintCache (
+                        [System.Collections.Generic.Dictionary[int, string]]::new()
+                    )
+            } finally {
+                $hasher.Dispose()
+            }
+            return $true
+        }
+
+        $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
+        if ($null -eq $loadedModule) {
+            return & $implementation $Yaml
+        }
+        return & $loadedModule $implementation $Yaml
+    }
 }
 
 Describe 'Remove-YamlEntry' {
@@ -781,6 +838,25 @@ ordered: !!omap
             $failure.FullyQualifiedErrorId |
                 Should -Be 'YamlDuplicateKey,Remove-YamlEntry'
         }
+
+        It 'confirms fingerprint candidates with exact graph equality' -ForEach @(
+            @{
+                Yaml = @'
+? { x: 1 }
+: first
+? { x: 2 }
+: second
+'@
+            }
+            @{
+                Yaml = @'
+!!str key: string
+!<tag:yaml.org,2002:st%C2%ADr> key: tagged
+'@
+            }
+        ) {
+            Test-RemoveYamlFingerprintCollision -Yaml $Yaml | Should -BeTrue
+        }
     }
 
     Context 'Validation and work limits' {
@@ -817,6 +893,27 @@ ordered: !!omap
             $failure.Exception.Data['YamlErrorId'] |
                 Should -BeExactly 'YamlRemovalWorkLimitExceeded'
             $failure.Exception.Data['YamlRemovalWorkLimit'] | Should -Be 5
+        }
+
+        It 'bounds duplicate-key graph equality with removal error classification' {
+            $pairs = 0..9 | ForEach-Object { "  key$($_): $($_)" }
+            $shared = @('shared: &shared') + $pairs + '  drop: true'
+            $literal = ($pairs | ForEach-Object Trim) -join ', '
+            $yaml = (@($shared) + '? *shared' + ': first' +
+                "? { $literal }" + ': second') -join "`n"
+            $failure = Get-RemoveYamlFailure {
+                Remove-YamlEntry $yaml '/shared/drop' -MaxNodes 80
+            }
+
+            $failure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly 'YamlRemovalWorkLimitExceeded'
+            $failure.FullyQualifiedErrorId |
+                Should -Be 'YamlRemovalWorkLimitExceeded,Remove-YamlEntry'
+            $failure.Exception.Data['YamlRemovalWorkLimit'] | Should -Be 80
+            $failure.Exception.Data['YamlRemovalWorkOperation'] |
+                Should -BeExactly 'duplicate-key graph comparison'
+            $failure.Exception.Message |
+                Should -Match 'duplicate-key graph comparison'
         }
 
         It 'reports deterministic work and produces a result within budget' {

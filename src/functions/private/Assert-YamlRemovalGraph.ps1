@@ -163,12 +163,47 @@ function Assert-YamlRemovalGraph {
         Count    = 0L
         MaxNodes = $MaxNodes
     }
+    $equalityWorkState = [pscustomobject]@{
+        Count    = 0L
+        MaxNodes = $MaxNodes
+    }
+    $equalityState = [pscustomobject]@{
+        MaxNodes          = $MaxNodes
+        FingerprintHasher = $fingerprintHasher
+        WorkState         = $equalityWorkState
+        MutationState     = [pscustomobject]@{ Version = 0L }
+        IndexDependents   = [System.Collections.Generic.Dictionary[int, object]]::new()
+        Cache             = [System.Collections.Generic.Dictionary[string, bool]]::new(
+            [System.StringComparer]::Ordinal
+        )
+        InputIndex        = 0
+    }
+    $equalityFingerprintCache = [System.Collections.Generic.Dictionary[int, string]]::new()
     try {
         foreach ($document in $Documents) {
-            Test-YamlNodeGraph -Node $document `
-                -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
-                -FingerprintCache $fingerprintCache -FingerprintHasher $fingerprintHasher `
-                -RemovalWorkState $fingerprintWorkState
+            try {
+                Test-YamlNodeGraph -Node $document `
+                    -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
+                    -FingerprintCache $fingerprintCache -FingerprintHasher $fingerprintHasher `
+                    -RemovalWorkState $fingerprintWorkState -EqualityState $equalityState `
+                    -EqualityFingerprintCache $equalityFingerprintCache
+            } catch {
+                if ($_.Exception.Data.Contains('YamlErrorId') -and
+                    $_.Exception.Data['YamlErrorId'] -ceq 'YamlMergeWorkLimitExceeded') {
+                    $exception = New-YamlRemovalException -Node $document `
+                        -ErrorId 'YamlRemovalWorkLimitExceeded' -Message (
+                        'Post-removal duplicate-key graph comparison exceeded the configured ' +
+                        "invocation work limit of $MaxNodes operations."
+                    )
+                    $exception.Data['YamlRemovalWorkCount'] = $equalityWorkState.Count
+                    $exception.Data['YamlRemovalWorkLimit'] = $MaxNodes
+                    $exception.Data['YamlRemovalWorkOperation'] = (
+                        'duplicate-key graph comparison'
+                    )
+                    throw $exception
+                }
+                throw
+            }
         }
     } finally {
         $fingerprintHasher.Dispose()

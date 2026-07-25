@@ -21,7 +21,15 @@ function Test-YamlNodeGraph {
 
         [Parameter()]
         [AllowNull()]
-        [pscustomobject] $RemovalWorkState
+        [pscustomobject] $RemovalWorkState,
+
+        [Parameter()]
+        [AllowNull()]
+        [pscustomobject] $EqualityState,
+
+        [Parameter()]
+        [AllowNull()]
+        [System.Collections.Generic.Dictionary[int, string]] $EqualityFingerprintCache
     )
 
     $scalarTags = [System.Collections.Generic.HashSet[string]]::new(
@@ -78,7 +86,7 @@ function Test-YamlNodeGraph {
 
             $isPairs = $tag -ceq 'tag:yaml.org,2002:pairs'
             $isOrderedMap = $tag -ceq 'tag:yaml.org,2002:omap'
-            $orderedKeys = [System.Collections.Generic.HashSet[string]]::new(
+            $orderedKeys = [System.Collections.Generic.Dictionary[string, object]]::new(
                 [System.StringComparer]::Ordinal
             )
             for ($index = $current.Items.Count - 1; $index -ge 0; $index--) {
@@ -95,18 +103,13 @@ function Test-YamlNodeGraph {
                             ))
                     }
                     if ($isOrderedMap) {
-                        $keyFingerprint = Get-YamlNodeFingerprint `
+                        Assert-YamlNodeKeyUnique `
                             -Node $entryNode.Entries[0].Key `
-                            -Active ([System.Collections.Generic.HashSet[int]]::new()) `
-                            -Cache $FingerprintCache -Hasher $FingerprintHasher `
-                            -RemovalWorkState $RemovalWorkState
-                        if (-not $orderedKeys.Add($keyFingerprint)) {
-                            $keyNode = $entryNode.Entries[0].Key
-                            throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
-                                    -ErrorId 'YamlDuplicateKey' -Message (
-                                    'A duplicate key was found in a YAML ordered mapping.'
-                                ))
-                        }
+                            -Buckets $orderedKeys -FingerprintCache $FingerprintCache `
+                            -FingerprintHasher $FingerprintHasher `
+                            -DuplicateMessage 'A duplicate key was found in a YAML ordered mapping.' `
+                            -RemovalWorkState $RemovalWorkState -EqualityState $EqualityState `
+                            -EqualityFingerprintCache $EqualityFingerprintCache
                     }
                 }
                 $stack.Push($item)
@@ -125,21 +128,16 @@ function Test-YamlNodeGraph {
                 ))
         }
 
-        $keys = [System.Collections.Generic.HashSet[string]]::new(
+        $keys = [System.Collections.Generic.Dictionary[string, object]]::new(
             [System.StringComparer]::Ordinal
         )
         for ($index = $current.Entries.Count - 1; $index -ge 0; $index--) {
             $entry = $current.Entries[$index]
-            $fingerprint = Get-YamlNodeFingerprint -Node $entry.Key `
-                -Active ([System.Collections.Generic.HashSet[int]]::new()) `
-                -Cache $FingerprintCache -Hasher $FingerprintHasher `
-                -RemovalWorkState $RemovalWorkState
-            if (-not $keys.Add($fingerprint)) {
-                throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End `
-                        -ErrorId 'YamlDuplicateKey' -Message (
-                        'A duplicate mapping key is not allowed.'
-                    ))
-            }
+            Assert-YamlNodeKeyUnique -Node $entry.Key -Buckets $keys `
+                -FingerprintCache $FingerprintCache -FingerprintHasher $FingerprintHasher `
+                -DuplicateMessage 'A duplicate mapping key is not allowed.' `
+                -RemovalWorkState $RemovalWorkState -EqualityState $EqualityState `
+                -EqualityFingerprintCache $EqualityFingerprintCache
 
             if ($tag -ceq 'tag:yaml.org,2002:set') {
                 $setValue = $entry.Value
