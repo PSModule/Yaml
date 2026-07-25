@@ -224,7 +224,7 @@ operation budget. Alias and expanded-tag budgets are also enforced on the result
 
 ```powershell
 $cleanYaml = Get-Content -Path '.\config.yaml' |
-    Remove-YamlEntry -Path @('/metadata/internalId', '/services/1/deprecated')
+    Remove-YamlEntry -Path @('/metadata/internalIdentifier', '/services/1/deprecated')
 ```
 
 Paths use [RFC 6901 JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901). An empty pointer selects a document root, `~0` addresses a tilde, and `~1` addresses a slash. Mapping tokens match only scalar YAML string keys by ordinal content, so numeric, complex, and unknown-tagged keys are never coerced or guessed. Sequence tokens must be `0` or a non-zero decimal index without signs or leading zeros.

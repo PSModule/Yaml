@@ -79,7 +79,7 @@ function Remove-YamlEntry {
         Aggregates file lines and removes one nested mapping entry from document zero.
 
         .EXAMPLE
-        $clean = Remove-YamlEntry -InputObject $yaml -Path @('/metadata/id', '/items/2')
+        $clean = Remove-YamlEntry -InputObject $yaml -Path @('/metadata/identifier', '/items/2')
 
         Resolves both paths against the original graph, then applies them atomically.
 
