@@ -177,15 +177,6 @@ $formatted = '{name: Ada, active: true}' | Format-Yaml
 if ($formatted -cne "---`n`"name`": `"Ada`"`n`"active`": true") {
     throw 'The imported formatter did not normalize YAML.'
 }
-$merged = Merge-Yaml -InputObject @(
-    'service: { image: example:v1, ports: [80] }',
-    'service: { image: example:v2, ports: [443] }'
-)
-$mergedValue = $merged | ConvertFrom-Yaml -AsHashtable
-if ($mergedValue['service']['image'] -cne 'example:v2' -or
-    $mergedValue['service']['ports'][0] -ne 443) {
-    throw 'The imported merge command did not apply later stream precedence.'
-}
 $shared = [ordered]@{ value = 1 }
 $roundTrip = [ordered]@{ first = $shared; second = $shared } |
     ConvertTo-Yaml |
@@ -217,6 +208,7 @@ if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
 '@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
 
         $output = @(& pwsh -NoLogo -NoProfile -Command $script)
+        $LASTEXITCODE | Should -Be 0
         $runtime = $output | Where-Object { $_ -like 'powershell-runtime=*' } |
             Select-Object -Last 1
 
@@ -228,6 +220,47 @@ if (-not (Test-Yaml -Yaml $deepYaml -Depth 128 -MaxNodes 300)) {
         ([version] $runtimeMatch.Groups['Version'].Value) -lt [version] '7.6' |
             Should -BeFalse
         Write-Information -MessageData $runtime -InformationAction Continue
+    }
+
+    It 'merges complete streams in a fresh PowerShell 7.6 Core process' `
+        -Skip:($skipArtifactTests -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+        $script = @'
+$ErrorActionPreference = 'Stop'
+$ps = $PSVersionTable.PSVersion
+if ($ps -lt [version] '7.6') {
+    throw "Expected PowerShell 7.6 or newer but got $ps."
+}
+if ($PSVersionTable.PSEdition -cne 'Core') {
+    throw "Expected PowerShell Core but got $($PSVersionTable.PSEdition)."
+}
+Import-Module -Name '__MANIFEST__' -Force
+$merged = Merge-Yaml -InputObject @(
+    'service: { image: example:v1, ports: [80] }',
+    'service: { image: example:v2, ports: [443] }'
+)
+if ($merged -match "`r" -or $merged.EndsWith("`n", [System.StringComparison]::Ordinal)) {
+    throw 'The imported merge command did not normalize its output contract.'
+}
+$mergedValue = $merged | ConvertFrom-Yaml -AsHashtable
+if ($mergedValue['service']['image'] -cne 'example:v2' -or
+    $mergedValue['service']['ports'][0] -ne 443) {
+    throw 'The imported merge command did not apply later stream precedence.'
+}
+"merge-runtime=$ps;edition=$($PSVersionTable.PSEdition)"
+'@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
+
+        $output = @(& pwsh -NoLogo -NoProfile -Command $script)
         $LASTEXITCODE | Should -Be 0
+        $runtime = $output | Where-Object { $_ -like 'merge-runtime=*' } |
+            Select-Object -Last 1
+
+        $runtimeMatch = [regex]::Match(
+            [string] $runtime,
+            '^merge-runtime=(?<Version>\d+(?:\.\d+){1,3});edition=Core$'
+        )
+        $runtimeMatch.Success | Should -BeTrue
+        ([version] $runtimeMatch.Groups['Version'].Value) -lt [version] '7.6' |
+            Should -BeFalse
+        Write-Information -MessageData $runtime -InformationAction Continue
     }
 }
