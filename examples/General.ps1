@@ -47,6 +47,20 @@ $normalizedYaml = @'
 '@ | Format-Yaml -Indent 4
 $normalizedYaml
 
+# Merge complete YAML streams without projecting their representation graphs.
+$baseYaml = @'
+service:
+  image: example:v1
+  ports: [80]
+'@
+$overlayYaml = @'
+service:
+  image: example:v2
+  ports: [443]
+'@
+$mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
+$mergedYaml
+
 # Atomically export one file, then import it with strict decoding.
 $configPath = Join-Path $env:TEMP 'yaml-example.yaml'
 $config | Export-Yaml -Path $configPath -PassThru

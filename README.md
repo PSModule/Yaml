@@ -32,6 +32,7 @@ The module exports:
 | `Export-Yaml` | Serialize values and atomically write one YAML file. |
 | `Format-Yaml` | Normalize YAML streams without projecting representation nodes to PowerShell values. |
 | `Import-Yaml` | Strictly decode and parse YAML files. |
+| `Merge-Yaml` | Merge complete YAML streams without losing representation graph details. |
 | `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
 
 ## Parse YAML
@@ -174,6 +175,47 @@ $normalized -ceq ($normalized | Format-Yaml -Indent 4)
 duplicate representation keys, undefined aliases, malformed tags, and resource
 limit violations terminate with the same classified YAML errors as parsing.
 
+## Merge YAML streams
+
+`Merge-Yaml` combines two or more complete YAML streams directly through their
+representation graphs. Every array element or pipeline record is one complete
+stream, and every stream must contain the same positive document count. Later
+streams have higher precedence, and documents merge pairwise by zero-based index.
+
+```powershell
+$baseYaml = Get-Content -LiteralPath '.\base.yaml' -Raw
+$overlayYaml = Get-Content -LiteralPath '.\overlay.yaml' -Raw
+$mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
+```
+
+Compatible mappings merge recursively by structural YAML key equality. Base key
+order remains stable, replacing a value retains its position, and new overlay
+keys append in overlay order. Complex and tagged keys are supported. Structural
+fingerprints select comparison candidates only; graph-aware equality makes the
+final key decision.
+
+Compatible sequences use `-SequenceAction Replace`, `Append`, or `Unique`.
+Unequal scalars, collection kinds, and incompatible effective tags use
+`-ConflictAction Replace` or `Error`. A later YAML null uses `-NullAction
+Replace` or `Ignore`; ignoring retains an existing prior node, including at a
+document root.
+
+```powershell
+$baseYaml, $environmentYaml, $secretYaml |
+    Merge-Yaml -SequenceAction Unique -ConflictAction Error -Indent 4
+```
+
+Tags, anchors, aliases, repeated nodes, cycles, mapping order, and selected
+representation nodes remain graph data. Inputs are immutable, and YAML 1.1 `<<`
+merge keys remain ordinary mapping entries rather than being expanded. Output is
+one deterministic string with LF line endings, explicit document starts, and no
+final newline.
+
+The parser safety parameters and defaults match `Format-Yaml`. `-MaxNodes`
+limits each parsed stream and invocation-wide cloning, equality, merge work, and
+the resulting stream graph. Alias and expanded-tag budgets are also enforced on
+the result.
+
 ## Export YAML files
 
 `Export-Yaml` aggregates pipeline records like `ConvertTo-Yaml`, serializes the
@@ -220,6 +262,8 @@ limit violations. Unexpected runtime failures are not suppressed.
   represent it.
 - YAML merge keys are not expanded; `<<` is ordinary mapping data under the
   YAML 1.2 core schema.
+- YAML stream merging compares effective tags and structural representation
+  values without projecting through PowerShell objects.
 - Parsing defaults to depth 100, 100000 nodes, 1000 aliases, 1048576 decoded
   characters per scalar, 1024 characters per expanded tag, 65536 cumulative
   expanded tag characters, and 4096 digits per numeric scalar. The
