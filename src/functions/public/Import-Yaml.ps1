@@ -457,12 +457,18 @@ function Import-Yaml {
                                 [System.IO.Directory]::EnumerateFileSystemEntries($directoryPath)
                             )) {
                             $entryName = [System.IO.Path]::GetFileName($directoryEntry)
+                            $entryIdentityName = $entryName.Normalize(
+                                [System.Text.NormalizationForm]::FormC
+                            )
                             $nameGroup = $null
-                            if ($nameGroups.TryGetValue($entryName, [ref]$nameGroup)) {
+                            if ($nameGroups.TryGetValue(
+                                    $entryIdentityName,
+                                    [ref]$nameGroup
+                                )) {
                                 $nameGroup.Count++
                             } else {
                                 $nameGroups.Add(
-                                    $entryName,
+                                    $entryIdentityName,
                                     [pscustomobject]@{
                                         Count         = 1
                                         CanonicalName = $entryName
@@ -474,7 +480,13 @@ function Import-Yaml {
                     }
 
                     $nameGroup = $null
-                    if (-not $nameGroups.TryGetValue($leafName, [ref]$nameGroup)) {
+                    $leafIdentityName = $leafName.Normalize(
+                        [System.Text.NormalizationForm]::FormC
+                    )
+                    if (-not $nameGroups.TryGetValue(
+                            $leafIdentityName,
+                            [ref]$nameGroup
+                        )) {
                         $identityFailed = $true
                         break
                     }
@@ -503,7 +515,13 @@ function Import-Yaml {
                 }
                 $identityComponents.Add($rootPath)
                 $identityComponents.Reverse()
-                $identityKey = $identityComponents -join [char]0x1F
+                $identityKeyBuilder = [System.Text.StringBuilder]::new()
+                foreach ($identityComponent in $identityComponents) {
+                    $null = $identityKeyBuilder.Append($identityComponent.Length)
+                    $null = $identityKeyBuilder.Append(':')
+                    $null = $identityKeyBuilder.Append($identityComponent)
+                }
+                $identityKey = $identityKeyBuilder.ToString()
             }
 
             $null = $pathsByIdentity.TryAdd($identityKey, $resolvedPath)

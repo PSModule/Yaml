@@ -85,25 +85,72 @@ Describe 'Import-Yaml' {
             @($result.value) | Should -Be @('first', 'second')
         }
 
-        It 'keeps case-distinct files separate on case-sensitive filesystems' -Skip:$IsWindows {
+        It 'keeps case-distinct files separate on case-sensitive filesystems' {
             $upperPath = Join-Path $TestDrive 'Case.yaml'
             $lowerPath = Join-Path $TestDrive 'case.yaml'
             [System.IO.File]::WriteAllText($upperPath, 'value: upper')
             [System.IO.File]::WriteAllText($lowerPath, 'value: lower')
+            if ([System.IO.File]::ReadAllText($upperPath) -eq
+                [System.IO.File]::ReadAllText($lowerPath)) {
+                Set-ItResult -Skipped -Because 'the test filesystem is case-insensitive'
+                return
+            }
 
             $result = @(Import-Yaml -Path @($upperPath, $lowerPath))
 
             @($result.value) | Should -Be @('upper', 'lower')
         }
 
-        It 'suppresses path case variants on case-insensitive filesystems' -Skip:(-not $IsWindows) {
+        It 'suppresses path case variants on case-insensitive filesystems' {
             $path = Join-Path $TestDrive 'CaseVariant.yaml'
             [System.IO.File]::WriteAllText($path, 'value: once')
+            $caseVariantPath = $path.ToLowerInvariant()
+            try {
+                $null = [System.IO.File]::GetAttributes($caseVariantPath)
+            } catch [System.IO.FileNotFoundException] {
+                Set-ItResult -Skipped -Because 'the test filesystem is case-sensitive'
+                return
+            }
 
-            $result = @(Import-Yaml -Path @($path, $path.ToLowerInvariant()))
+            $result = @(Import-Yaml -Path @($path, $caseVariantPath))
 
             $result.Count | Should -Be 1
             $result[0].value | Should -Be 'once'
+        }
+
+        It 'suppresses Unicode normalization aliases on matching filesystems' {
+            $composedPath = Join-Path $TestDrive "caf$([char] 0x00E9).yaml"
+            $decomposedPath = Join-Path $TestDrive "cafe$([char] 0x0301).yaml"
+            [System.IO.File]::WriteAllText($composedPath, 'value: once')
+            try {
+                $null = [System.IO.File]::GetAttributes($decomposedPath)
+            } catch [System.IO.FileNotFoundException] {
+                Set-ItResult -Skipped -Because (
+                    'the test filesystem distinguishes Unicode normalization forms'
+                )
+                return
+            }
+
+            $result = @(Import-Yaml -LiteralPath @($composedPath, $decomposedPath))
+
+            $result.Count | Should -Be 1
+            $result[0].value | Should -Be 'once'
+        }
+
+        It 'keeps delimiter-bearing Unix paths distinct' -Skip:$IsWindows {
+            $separator = [char] 0x001F
+            $firstDirectory = Join-Path $TestDrive 'identity-a'
+            $secondDirectory = Join-Path $TestDrive "identity-a${separator}identity-b"
+            $null = [System.IO.Directory]::CreateDirectory($firstDirectory)
+            $null = [System.IO.Directory]::CreateDirectory($secondDirectory)
+            $firstPath = Join-Path $firstDirectory "identity-b${separator}value.yaml"
+            $secondPath = Join-Path $secondDirectory 'value.yaml'
+            [System.IO.File]::WriteAllText($firstPath, 'value: first')
+            [System.IO.File]::WriteAllText($secondPath, 'value: second')
+
+            $result = @(Import-Yaml -LiteralPath @($firstPath, $secondPath))
+
+            @($result.value | Sort-Object) | Should -Be @('first', 'second')
         }
 
         It 'sorts by canonical identity regardless of duplicate path spelling' {
