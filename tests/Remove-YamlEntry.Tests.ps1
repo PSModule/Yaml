@@ -133,13 +133,14 @@ BeforeAll {
                     )
                     InputIndex        = 0
                 }
+                $equalityFingerprintCache = (
+                    [System.Collections.Generic.Dictionary[int, string]]::new()
+                )
                 Test-YamlNodeGraph -Node $document `
                     -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
                     -FingerprintCache $fingerprintCache -FingerprintHasher $hasher `
                     -EqualityState $equalityState `
-                    -EqualityFingerprintCache (
-                        [System.Collections.Generic.Dictionary[int, string]]::new()
-                    )
+                    -EqualityFingerprintCache $equalityFingerprintCache
             } finally {
                 $hasher.Dispose()
             }
