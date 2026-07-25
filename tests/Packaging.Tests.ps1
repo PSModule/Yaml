@@ -135,6 +135,7 @@ Describe 'Generated artifact package' {
                 'Format-Yaml',
                 'Import-Yaml',
                 'Merge-Yaml',
+                'Remove-YamlEntry',
                 'Test-Yaml'
             )
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
@@ -257,6 +258,56 @@ if ($mergedValue['service']['image'] -cne 'example:v2' -or
         $runtimeMatch = [regex]::Match(
             [string] $runtime,
             '^merge-runtime=(?<Version>\d+(?:\.\d+){1,3});edition=Core$'
+        )
+        $runtimeMatch.Success | Should -BeTrue
+        ([version] $runtimeMatch.Groups['Version'].Value) -lt [version] '7.6' |
+            Should -BeFalse
+        Write-Information -MessageData $runtime -InformationAction Continue
+    }
+
+    It 'removes representation entries in a fresh PowerShell 7.6 Core process' `
+        -Skip:($skipArtifactTests -or $null -eq (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+        $script = @'
+$ErrorActionPreference = 'Stop'
+$ps = $PSVersionTable.PSVersion
+if ($ps -lt [version] '7.6') {
+    throw "Expected PowerShell 7.6 or newer but got $ps."
+}
+if ($PSVersionTable.PSEdition -cne 'Core') {
+    throw "Expected PowerShell Core but got $($PSVersionTable.PSEdition)."
+}
+Import-Module -Name '__MANIFEST__' -Force
+$removed = @"
+root: &shared
+  keep: true
+  drop: false
+copy: *shared
+"@ | Remove-YamlEntry -Path '/copy/drop'
+if ($removed -match "`r" -or $removed.EndsWith("`n", [System.StringComparison]::Ordinal)) {
+    throw 'The imported removal command did not normalize its output contract.'
+}
+$value = $removed | ConvertFrom-Yaml -AsHashtable
+if ($value['root'].Contains('drop') -or $value['copy'].Contains('drop')) {
+    throw 'The imported removal command did not mutate the shared mapping.'
+}
+if (-not [object]::ReferenceEquals($value['root'], $value['copy'])) {
+    throw 'The imported removal command lost shared mapping identity.'
+}
+$empty = Remove-YamlEntry "---`nfirst: true`n---`nsecond: true" '' -AllDocuments
+if ($empty -cne '') {
+    throw 'The imported removal command did not remove every selected document.'
+}
+"remove-runtime=$ps;edition=$($PSVersionTable.PSEdition)"
+'@.Replace('__MANIFEST__', $artifactManifestPath.Replace("'", "''"))
+
+        $output = @(& pwsh -NoLogo -NoProfile -Command $script)
+        $LASTEXITCODE | Should -Be 0
+        $runtime = $output | Where-Object { $_ -like 'remove-runtime=*' } |
+            Select-Object -Last 1
+
+        $runtimeMatch = [regex]::Match(
+            [string] $runtime,
+            '^remove-runtime=(?<Version>\d+(?:\.\d+){1,3});edition=Core$'
         )
         $runtimeMatch.Success | Should -BeTrue
         ([version] $runtimeMatch.Groups['Version'].Value) -lt [version] '7.6' |
