@@ -228,6 +228,21 @@ tail: base
             $entry.Value['second'] | Should -Be 2
         }
 
+        It 'does not merge unequal complex keys that share a candidate bucket' {
+            $base = @'
+? [region, { port: 443 }]
+: first
+'@
+            $overlay = @'
+? [zone, { port: 443 }]
+: second
+'@
+            $result = Merge-Yaml $base, $overlay | ConvertFrom-Yaml -AsHashtable
+
+            $result.Count | Should -Be 2
+            @($result.Values) | Should -Be @('first', 'second')
+        }
+
         It 'keeps YAML 1.1 merge syntax as ordinary mapping data' {
             $base = @'
 <<:
@@ -298,6 +313,7 @@ items:
   - one
   - key: value
   - !item tagged
+  - !other tagged
   - &other { self: *other }
   - added
 '@
@@ -305,13 +321,14 @@ items:
             $result = $merged | ConvertFrom-Yaml -AsHashtable
             $facts = Get-MergeYamlGraphFact -Yaml $merged
 
-            $result['items'].Count | Should -Be 5
-            $result['items'][4] | Should -Be 'added'
+            $result['items'].Count | Should -Be 6
+            $result['items'][5] | Should -Be 'added'
             [object]::ReferenceEquals(
                 $result['items'][3],
                 $result['items'][3]['self']
             ) | Should -BeTrue
             @($facts.Tags) | Should -Contain '!item'
+            @($facts.Tags) | Should -Contain '!other'
         }
 
         It 'preserves overlay sharing and cycles while appending' {
@@ -361,6 +378,16 @@ items:
 
             (Merge-Yaml $base, $overlay -ConflictAction Error) |
                 Should -BeExactly ($base | Format-Yaml)
+        }
+
+        It 'does not apply sequence actions across incompatible effective tags' {
+            $failure = Get-MergeYamlFailure {
+                Merge-Yaml '!first [one]', '!second [two]' `
+                    -SequenceAction Append -ConflictAction Error
+            }
+
+            $failure.Exception.Data['YamlErrorId'] | Should -BeExactly 'YamlMergeConflict'
+            $failure.Exception.Message | Should -Match 'sequence tag'
         }
 
         It 'applies nested null replacement and ignoring' {
@@ -471,6 +498,17 @@ node: &cycle
             $documents[1]['second'] | Should -Be 'overlay'
         }
 
+        It 'keeps explicit empty documents as positive document records' {
+            $base = "---`nvalue: base`n---"
+            $overlay = "---`nvalue: overlay`n---"
+            $merged = Merge-Yaml $base, $overlay
+            $documents = @($merged | ConvertFrom-Yaml -AsHashtable)
+
+            $documents.Count | Should -Be 2
+            $documents[0]['value'] | Should -Be 'overlay'
+            $documents[1] | Should -BeNullOrEmpty
+        }
+
         It 'rejects no-document streams with their zero-based input index' -ForEach @(
             @{ Empty = '' }
             @{ Empty = "# comment only`n" }
@@ -505,6 +543,31 @@ node: &cycle
                 Should -BeExactly 'YamlInvalidFlowCollection'
             $failure.FullyQualifiedErrorId |
                 Should -Be 'YamlInvalidFlowCollection,Merge-Yaml'
+        }
+
+        It 'preserves every parser resource classification' -ForEach @(
+            @{ Yaml = "a:`n  b:`n    c: value"; Parameters = @{ Depth = 2 } }
+            @{ Yaml = '[one, two]'; Parameters = @{ MaxNodes = 2 } }
+            @{ Yaml = "a: &a value`nb: *a"; Parameters = @{ MaxAliases = 0 } }
+            @{ Yaml = 'value: long'; Parameters = @{ MaxScalarLength = 4 } }
+            @{ Yaml = '!long value'; Parameters = @{ MaxTagLength = 2 } }
+            @{
+                Yaml       = "!a one`n---`n!b two"
+                Parameters = @{ MaxTotalTagLength = 3 }
+            }
+            @{ Yaml = '123'; Parameters = @{ MaxNumericLength = 2 } }
+        ) {
+            $parseFailure = Get-MergeYamlFailure {
+                $Yaml | Format-Yaml @Parameters
+            }
+            $mergeFailure = Get-MergeYamlFailure {
+                Merge-Yaml 'valid: true', $Yaml @Parameters
+            }
+
+            $mergeFailure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly $parseFailure.Exception.Data['YamlErrorId']
+            $mergeFailure.FullyQualifiedErrorId |
+                Should -Be "$($parseFailure.Exception.Data['YamlErrorId']),Merge-Yaml"
         }
 
         It 'enforces clone and result node budgets' {
