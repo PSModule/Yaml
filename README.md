@@ -29,6 +29,8 @@ The module exports:
 | --- | --- |
 | `ConvertFrom-Yaml` | Parse one or more YAML documents into PowerShell values. |
 | `ConvertTo-Yaml` | Serialize supported PowerShell values as YAML 1.2-compatible text. |
+| `Export-Yaml` | Serialize values and atomically write one YAML file. |
+| `Import-Yaml` | Strictly decode and parse YAML files. |
 | `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
 
 ## Parse YAML
@@ -84,6 +86,24 @@ $mapping = @'
 '@ | ConvertFrom-Yaml -AsHashtable
 ```
 
+## Import YAML files
+
+`Import-Yaml` reads complete files with strict Unicode decoding and delegates
+parsing to `ConvertFrom-Yaml`. `-Path` expands wildcards and accepts `FileInfo`
+pipeline input; `-LiteralPath` preserves wildcard characters in filenames.
+Resolved files are deduplicated and read in deterministic path order.
+
+```powershell
+$configs = Import-Yaml -Path '.\config\*.yaml' -AsHashtable
+Get-ChildItem -Path '.\services' -Filter '*.yaml' | Import-Yaml
+Import-Yaml -LiteralPath '.\config[production].yaml'
+```
+
+UTF-8 without a byte order mark is the default. UTF-8, UTF-16, and UTF-32 byte
+order marks are detected automatically and override `-Encoding`. Malformed
+bytes terminate with a path-specific error. `-NoEnumerate` and all parser
+resource limits have the same behavior as `ConvertFrom-Yaml`.
+
 ## Serialize PowerShell values
 
 `ConvertTo-Yaml` supports `PSCustomObject` and explicit PSObject note-property
@@ -122,6 +142,25 @@ ConvertTo-Yaml -InputObject $items
 Repeated acyclic collection references are emitted with anchors and aliases.
 Cyclic graphs and unsupported runtime objects fail specifically; values are
 never silently truncated or converted with `ToString()`.
+
+## Export YAML files
+
+`Export-Yaml` aggregates pipeline records like `ConvertTo-Yaml`, serializes the
+complete value before changing the filesystem, and atomically publishes a
+same-directory temporary file. It writes UTF-8 without a byte order mark, LF
+line endings, and exactly one final newline by default.
+
+```powershell
+$config | Export-Yaml -Path '.\config.yaml'
+'one', 'two' | Export-Yaml -Path '.\items.yaml' -Encoding utf16LE
+$config | Export-Yaml -Path '.\generated\config.yaml' -CreateDirectory -PassThru
+```
+
+Use `-NewLine CRLF` or `-NoFinalNewline` to change presentation. `-NoClobber`
+prevents replacement, while `-Force` permits replacing a read-only destination
+and preserves its read-only state. The switches are mutually exclusive.
+`-WhatIf` creates no directory or temporary file. `-PassThru` is the only mode
+that emits the final `FileInfo`.
 
 ## Validate YAML
 

@@ -40,6 +40,13 @@ $outputYaml = [ordered]@{
 $outputYaml
 $outputYaml | ConvertFrom-Yaml
 
+# Atomically export one file, then import it with strict decoding.
+$configPath = Join-Path $env:TEMP 'yaml-example.yaml'
+$config | Export-Yaml -Path $configPath -PassThru
+$importedConfig = Import-Yaml -LiteralPath $configPath
+$importedConfig
+Remove-Item -LiteralPath $configPath
+
 # Test syntax, duplicate keys, tags, and resource limits without conversion.
 $isValid = $outputYaml | Test-Yaml
 $isValid
