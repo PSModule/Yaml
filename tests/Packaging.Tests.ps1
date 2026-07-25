@@ -134,6 +134,7 @@ Describe 'Generated artifact package' {
                 'Export-Yaml',
                 'Format-Yaml',
                 'Import-Yaml',
+                'Merge-Yaml',
                 'Test-Yaml'
             )
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
@@ -175,6 +176,15 @@ if (-not ('name: Ada' | Test-Yaml)) {
 $formatted = '{name: Ada, active: true}' | Format-Yaml
 if ($formatted -cne "---`n`"name`": `"Ada`"`n`"active`": true") {
     throw 'The imported formatter did not normalize YAML.'
+}
+$merged = Merge-Yaml -InputObject @(
+    'service: { image: example:v1, ports: [80] }',
+    'service: { image: example:v2, ports: [443] }'
+)
+$mergedValue = $merged | ConvertFrom-Yaml -AsHashtable
+if ($mergedValue['service']['image'] -cne 'example:v2' -or
+    $mergedValue['service']['ports'][0] -ne 443) {
+    throw 'The imported merge command did not apply later stream precedence.'
 }
 $shared = [ordered]@{ value = 1 }
 $roundTrip = [ordered]@{ first = $shared; second = $shared } |
