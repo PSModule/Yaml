@@ -47,8 +47,9 @@ function Merge-Yaml {
         Maximum YAML node nesting depth. The default is 100.
 
         .PARAMETER MaxNodes
-        Maximum nodes per parsed stream and the invocation-wide ceiling for
-        clone, equality, merge, and result work. The default is 100000.
+        Maximum nodes per parsed stream and the invocation-wide ceiling applied
+        independently to clone creation, merge operations, and the result graph.
+        The default is 100000.
 
         .PARAMETER MaxAliases
         Maximum aliases per parsed stream and in the result. The default is 1000.
@@ -206,25 +207,44 @@ function Merge-Yaml {
             }
 
             $fingerprintHasher = [System.Security.Cryptography.SHA256]::Create()
+            $workState = [pscustomobject]@{
+                Count    = 0L
+                MaxNodes = $MaxNodes
+            }
+            $mutationState = [pscustomobject]@{ Version = 0L }
+            $indexDependents = [System.Collections.Generic.Dictionary[int, object]]::new()
             $equalityState = [pscustomobject]@{
-                EqualityCount     = 0
                 MaxNodes          = $MaxNodes
                 FingerprintHasher = $fingerprintHasher
+                WorkState         = $workState
+                MutationState     = $mutationState
+                IndexDependents   = $indexDependents
+                Cache             = [System.Collections.Generic.Dictionary[string, bool]]::new(
+                    [System.StringComparer]::Ordinal
+                )
+                InputIndex        = 0
             }
-            $workState = [pscustomobject]@{
-                MergeCount = 0
-                MaxNodes   = $MaxNodes
-            }
+            $mappingIndexes = [System.Collections.Generic.Dictionary[int, object]]::new()
+            $sequenceIndexes = [System.Collections.Generic.Dictionary[int, object]]::new()
             for ($inputIndex = 1; $inputIndex -lt $parsedStreams.Count; $inputIndex++) {
                 $cloneCache = [System.Collections.Generic.Dictionary[int, object]]::new()
+                $overlayFingerprintCache = (
+                    [System.Collections.Generic.Dictionary[int, string]]::new()
+                )
+                $equalityState.InputIndex = $inputIndex
                 foreach ($documentIndex in 0..($expectedDocumentCount - 1)) {
                     $context = [pscustomobject]@{
-                        InputIndex    = $inputIndex
-                        DocumentIndex = $documentIndex
-                        CloneCache    = $cloneCache
-                        CloneState    = $cloneState
-                        EqualityState = $equalityState
-                        WorkState     = $workState
+                        InputIndex              = $inputIndex
+                        DocumentIndex           = $documentIndex
+                        CloneCache              = $cloneCache
+                        CloneState              = $cloneState
+                        EqualityState           = $equalityState
+                        WorkState               = $workState
+                        MutationState           = $mutationState
+                        MappingIndexes          = $mappingIndexes
+                        SequenceIndexes         = $sequenceIndexes
+                        IndexDependents         = $indexDependents
+                        OverlayFingerprintCache = $overlayFingerprintCache
                     }
                     $resultDocuments[$documentIndex] = Merge-YamlRepresentationNode `
                         -BaseNode $resultDocuments[$documentIndex] `
@@ -239,6 +259,7 @@ function Merge-Yaml {
                 -MaxAliases $MaxAliases -MaxScalarLength $MaxScalarLength `
                 -MaxTagLength $MaxTagLength -MaxTotalTagLength $MaxTotalTagLength
             $merged = ConvertTo-YamlRepresentationText -Documents $resultArray -Indent $Indent
+            Write-Debug "Merge-Yaml work operations: $($workState.Count)."
             $PSCmdlet.WriteObject($merged, $false)
         } catch {
             $failure = $_

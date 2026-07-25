@@ -94,6 +94,38 @@ BeforeAll {
         }
         return & $loadedModule $implementation $Yaml
     }
+
+    function Measure-MergeYamlWork {
+        <#
+            .SYNOPSIS
+            Captures the deterministic merge operation count from the debug stream.
+        #>
+        param (
+            [Parameter(Mandatory)]
+            [string[]] $InputObject,
+
+            [Parameter()]
+            [hashtable] $Parameters = @{}
+        )
+
+        $records = @(Merge-Yaml -InputObject $InputObject @Parameters -Debug 5>&1)
+        $debugText = $records |
+            ForEach-Object ToString |
+            Where-Object { $_ -like '*Merge-Yaml work operations:*' } |
+            Select-Object -Last 1
+        if ($null -eq $debugText -or
+            $debugText -notmatch 'Merge-Yaml work operations: (?<WorkCount>\d+)') {
+            throw 'Merge-Yaml did not report its deterministic work count.'
+        }
+        $output = $records |
+            Where-Object { $_ -isnot [System.Management.Automation.DebugRecord] } |
+            Select-Object -First 1
+
+        [pscustomobject]@{
+            Output = [string] $output
+            Count  = [long] $Matches.WorkCount
+        }
+    }
 }
 
 Describe 'Merge-Yaml' {
@@ -243,6 +275,53 @@ tail: base
             @($result.Values) | Should -Be @('first', 'second')
         }
 
+        It 're-buckets a shared structural key after its target is recursively mutated' `
+            -ForEach @(
+            @{ Action = 'Replace' }
+            @{ Action = 'Error' }
+        ) {
+            $base = "target: &key {x: 1}`n? *key`n: base"
+            $overlay = "target: {y: 2}`n? {x: 1, y: 2}`n: overlay"
+
+            if ($Action -eq 'Error') {
+                $failure = Get-MergeYamlFailure {
+                    Merge-Yaml $base, $overlay -ConflictAction Error
+                }
+
+                $failure.Exception.Data['YamlErrorId'] |
+                    Should -BeExactly 'YamlMergeConflict'
+                $failure.Exception.Message | Should -Match 'input index 1'
+                return
+            }
+
+            $result = Merge-Yaml $base, $overlay | ConvertFrom-Yaml -AsHashtable
+
+            $result.Count | Should -Be 2
+            $result['target'].Count | Should -Be 2
+            @($result.Values) | Should -Contain 'overlay'
+        }
+
+        It 're-buckets tagged shared keys across later overlay streams' {
+            $base = @'
+target: &key !item { x: 1 }
+? *key
+: base
+'@
+            $firstOverlay = 'target: !item { y: 2 }'
+            $secondOverlay = @'
+? !item { x: 1, y: 2 }
+: final
+'@
+
+            $merged = Merge-Yaml $base, $firstOverlay, $secondOverlay
+            $result = $merged | ConvertFrom-Yaml -AsHashtable
+            $facts = Get-MergeYamlGraphFact -Yaml $merged
+
+            $result.Count | Should -Be 2
+            @($result.Values) | Should -Contain 'final'
+            @($facts.Tags) | Should -Contain '!item'
+        }
+
         It 'keeps YAML 1.1 merge syntax as ordinary mapping data' {
             $base = @'
 <<:
@@ -348,6 +427,48 @@ items:
                 $result['items'][3],
                 $result['items'][3]['self']
             ) | Should -BeTrue
+        }
+
+        It 'invalidates a retained cyclic-item index after shared tagged-node mutation' {
+            $base = @'
+target: &cycle !cycle
+  self: *cycle
+  x: 1
+items: [*cycle]
+'@
+            $firstOverlay = 'items: [added]'
+            $secondOverlay = @'
+target: !cycle { y: 2 }
+items:
+  - &other !cycle
+    self: *other
+    x: 1
+    y: 2
+'@
+
+            $merged = Merge-Yaml $base, $firstOverlay, $secondOverlay `
+                -SequenceAction Unique
+            $result = $merged | ConvertFrom-Yaml -AsHashtable
+
+            $result['items'].Count | Should -Be 2
+            [object]::ReferenceEquals($result['target'], $result['items'][0]) |
+                Should -BeTrue
+            $result['target']['y'] | Should -Be 2
+        }
+
+        It 'deduplicates structurally equal cycles with different graph lengths' {
+            $base = 'items: [&self [*self]]'
+            $overlay = 'items: [&outer [&inner [*outer]], added]'
+
+            $merged = Merge-Yaml $base, $overlay -SequenceAction Unique
+            $result = $merged | ConvertFrom-Yaml -AsHashtable
+
+            $result['items'].Count | Should -Be 2
+            [object]::ReferenceEquals(
+                $result['items'][0],
+                $result['items'][0][0]
+            ) | Should -BeTrue
+            $result['items'][1] | Should -Be 'added'
         }
     }
 
@@ -570,16 +691,16 @@ node: &cycle
                 Should -Be "$($parseFailure.Exception.Data['YamlErrorId']),Merge-Yaml"
         }
 
-        It 'enforces clone and result node budgets' {
+        It 'enforces the invocation-wide clone node budget' {
             $failure = Get-MergeYamlFailure {
-                Merge-Yaml 'a: 1', 'b: 2' -MaxNodes 3
+                Merge-Yaml 'a: 1', '[overlay]' -MaxNodes 3
             }
 
             $failure.Exception.Data['YamlErrorId'] |
                 Should -BeExactly 'YamlMergeNodeLimitExceeded'
         }
 
-        It 'enforces cumulative equality work budgets' {
+        It 'charges equality and candidate scans to one invocation work budget' {
             $base = '[{ a: 1 }, { b: 2 }]'
             $overlay = '[{ b: 2 }, { a: 1 }]'
             $failure = Get-MergeYamlFailure {
@@ -587,7 +708,128 @@ node: &cycle
             }
 
             $failure.Exception.Data['YamlErrorId'] |
-                Should -BeExactly 'YamlMergeEqualityLimitExceeded'
+                Should -BeExactly 'YamlMergeWorkLimitExceeded'
+            $failure.Exception.Data['YamlMergeWorkCount'] | Should -Be 8
+            $failure.Exception.Data['YamlMergeWorkLimit'] | Should -Be 7
+        }
+
+        It 'keeps disjoint one-key overlay work linear' -ForEach @(
+            @{ Size = 200 }
+            @{ Size = 400 }
+            @{ Size = 800 }
+        ) {
+            $streams = [System.Collections.Generic.List[string]]::new()
+            $streams.Add('base: true')
+            foreach ($index in 1..$Size) {
+                $streams.Add("key${index}: ${index}")
+            }
+            $limit = 12 * $Size + 50
+
+            $measurement = Measure-MergeYamlWork -InputObject $streams.ToArray() `
+                -Parameters @{ MaxNodes = $limit }
+
+            $measurement.Count | Should -BeLessOrEqual (10 * $Size + 20)
+            $measurement.Output | Should -Not -BeNullOrEmpty
+        }
+
+        It 'keeps unique sequence append work linear' -ForEach @(
+            @{ Size = 200 }
+            @{ Size = 400 }
+            @{ Size = 800 }
+        ) {
+            $streams = [System.Collections.Generic.List[string]]::new()
+            $streams.Add('items: []')
+            foreach ($index in 1..$Size) {
+                $streams.Add("items: [value${index}]")
+            }
+            $limit = 31 * $Size + 100
+
+            $measurement = Measure-MergeYamlWork -InputObject $streams.ToArray() `
+                -Parameters @{ MaxNodes = $limit; SequenceAction = 'Unique' }
+
+            $measurement.Count | Should -BeLessOrEqual (30 * $Size + 20)
+            $measurement.Output | Should -Not -BeNullOrEmpty
+        }
+
+        It 'reuses fingerprints for shared complex keys throughout equality' -ForEach @(
+            @{ Size = 20 }
+            @{ Size = 40 }
+            @{ Size = 80 }
+        ) {
+            $values = (1..$Size | ForEach-Object { "value$_" }) -join ', '
+            $yaml = [System.Collections.Generic.List[string]]::new()
+            $yaml.Add("shared: &key [$values]")
+            $yaml.Add('maps:')
+            foreach ($index in 1..$Size) {
+                $yaml.Add('  - ? *key')
+                $yaml.Add("    : value${index}")
+            }
+            $text = $yaml -join "`n"
+
+            $measurement = Measure-MergeYamlWork -InputObject @($text, $text) `
+                -Parameters @{ MaxNodes = 100000; ConflictAction = 'Error' }
+
+            $measurement.Count | Should -BeLessOrEqual (20 * $Size + 50)
+            $measurement.Output | Should -Not -BeNullOrEmpty
+        }
+
+        It 'deduplicates cyclic alias candidates before fingerprint traversal' -ForEach @(
+            @{ Size = 20 }
+            @{ Size = 40 }
+            @{ Size = 80 }
+        ) {
+            $base = [System.Collections.Generic.List[string]]::new()
+            $base.Add('items:')
+            $base.Add('  - &shared')
+            $base.Add('    self: *shared')
+            foreach ($index in 1..$Size) {
+                $base.Add("    field${index}: ${index}")
+            }
+            foreach ($index in 2..$Size) {
+                $base.Add('  - *shared')
+            }
+            $overlay = [System.Collections.Generic.List[string]]::new()
+            foreach ($line in $base) {
+                $overlay.Add($line)
+            }
+            $overlay.Add('  - added')
+
+            $measurement = Measure-MergeYamlWork -InputObject @(
+                $base -join "`n"
+                $overlay -join "`n"
+            ) -Parameters @{ MaxNodes = 100000; SequenceAction = 'Unique' }
+
+            $measurement.Count | Should -BeLessOrEqual (21 * $Size + 100)
+            $measurement.Output | Should -Not -BeNullOrEmpty
+        }
+
+        It 'deduplicates hundreds of aliases before comparing one large mapping' {
+            $aliasCount = 300
+            $entryCount = 200
+            $base = [System.Collections.Generic.List[string]]::new()
+            $base.Add('shared: &shared')
+            foreach ($index in 1..$entryCount) {
+                $base.Add("  item${index}: ${index}")
+            }
+            foreach ($index in 1..$aliasCount) {
+                $base.Add("alias${index}: *shared")
+            }
+            $overlay = [System.Collections.Generic.List[string]]::new()
+            $overlay.Add('shared: &shared')
+            $overlay.Add('  added: true')
+            foreach ($index in 1..$aliasCount) {
+                $overlay.Add("alias${index}: *shared")
+            }
+
+            $measurement = Measure-MergeYamlWork -InputObject @(
+                $base -join "`n"
+                $overlay -join "`n"
+            ) -Parameters @{ MaxNodes = 12000 }
+            $result = $measurement.Output | ConvertFrom-Yaml -AsHashtable
+
+            $measurement.Count | Should -BeLessOrEqual 7000
+            [object]::ReferenceEquals($result['shared'], $result['alias300']) |
+                Should -BeTrue
         }
 
         It 'enforces resulting alias and tag budgets' -ForEach @(

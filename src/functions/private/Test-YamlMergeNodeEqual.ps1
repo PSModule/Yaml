@@ -13,8 +13,38 @@ function Test-YamlMergeNodeEqual {
         [pscustomobject] $OtherNode,
 
         [Parameter(Mandatory)]
-        [pscustomobject] $State
+        [pscustomobject] $State,
+
+        [Parameter()]
+        [AllowNull()]
+        [System.Collections.Generic.Dictionary[int, string]] $LeftFingerprintCache,
+
+        [Parameter()]
+        [AllowNull()]
+        [System.Collections.Generic.Dictionary[int, string]] $RightFingerprintCache
     )
+
+    if ($null -eq $LeftFingerprintCache) {
+        $LeftFingerprintCache = [System.Collections.Generic.Dictionary[int, string]]::new()
+    }
+    if ($null -eq $RightFingerprintCache) {
+        $RightFingerprintCache = [System.Collections.Generic.Dictionary[int, string]]::new()
+    }
+
+    $rootLeft = Get-YamlMergeNode -Node $Node
+    $rootRight = Get-YamlMergeNode -Node $OtherNode
+    $cacheKey = '{0}:{1}:{2}:{3}' -f @(
+        $State.MutationState.Version,
+        $State.InputIndex,
+        $rootLeft.Id,
+        $rootRight.Id
+    )
+    Add-YamlMergeWork -State $State.WorkState -Node $rootRight `
+        -Operation 'equality cache lookup'
+    $cached = $false
+    if ($State.Cache.TryGetValue($cacheKey, [ref] $cached)) {
+        return $cached
+    }
 
     $seen = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::Ordinal
@@ -24,26 +54,34 @@ function Test-YamlMergeNodeEqual {
 
     while ($pending.Count -gt 0) {
         $pair = $pending.Pop()
-        $left = Get-YamlMergeNode -Node $pair.Left
-        $right = Get-YamlMergeNode -Node $pair.Right
+        $left = $pair.Left
+        while ($left.Kind -eq 'Alias') {
+            Add-YamlMergeWork -State $State.WorkState -Node $left `
+                -Operation 'equality alias traversal'
+            $left = $left.Target
+        }
+        $right = $pair.Right
+        while ($right.Kind -eq 'Alias') {
+            Add-YamlMergeWork -State $State.WorkState -Node $right `
+                -Operation 'equality alias traversal'
+            $right = $right.Target
+        }
+        Add-YamlMergeWork -State $State.WorkState -Node $right `
+            -Operation 'equality pair comparison'
+
         $pairId = '{0}:{1}' -f $left.Id, $right.Id
         if (-not $seen.Add($pairId)) {
             continue
         }
 
-        $State.EqualityCount++
-        if ($State.EqualityCount -gt $State.MaxNodes) {
-            throw (New-YamlMergeException -Node $right -ErrorId 'YamlMergeEqualityLimitExceeded' -Message (
-                    "YAML structural equality exceeded the configured limit of $($State.MaxNodes) node pairs."
-                ))
-        }
-
         if ($left.Kind -cne $right.Kind) {
+            $State.Cache[$cacheKey] = $false
             return $false
         }
         $leftTag = Get-YamlMergeNodeTag -Node $left
         $rightTag = Get-YamlMergeNodeTag -Node $right
         if ($leftTag -cne $rightTag) {
+            $State.Cache[$cacheKey] = $false
             return $false
         }
 
@@ -52,6 +90,7 @@ function Test-YamlMergeNodeEqual {
             $rightValue = (Resolve-YamlScalar -Node $right).Value
             if ($null -eq $leftValue -or $null -eq $rightValue) {
                 if ($null -ne $leftValue -or $null -ne $rightValue) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 continue
@@ -59,10 +98,12 @@ function Test-YamlMergeNodeEqual {
             if ($leftValue -is [byte[]] -or $rightValue -is [byte[]]) {
                 if ($leftValue -isnot [byte[]] -or $rightValue -isnot [byte[]] -or
                     $leftValue.Count -ne $rightValue.Count) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 for ($index = 0; $index -lt $leftValue.Count; $index++) {
                     if ($leftValue[$index] -ne $rightValue[$index]) {
+                        $State.Cache[$cacheKey] = $false
                         return $false
                     }
                 }
@@ -85,6 +126,7 @@ function Test-YamlMergeNodeEqual {
                     $rightValue.Ticks
                 }
                 if ($leftTicks -ne $rightTicks) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 continue
@@ -95,18 +137,21 @@ function Test-YamlMergeNodeEqual {
                 $leftNumber = Get-YamlNormalizedFloat -Value $leftValue
                 $rightNumber = Get-YamlNormalizedFloat -Value $rightValue
                 if ($leftNumber -cne $rightNumber) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 continue
             }
             if ($leftValue -is [string] -and $rightValue -is [string]) {
                 if (-not $leftValue.Equals($rightValue, [System.StringComparison]::Ordinal)) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 continue
             }
             if ($leftValue -is [bool] -and $rightValue -is [bool]) {
                 if ($leftValue -ne $rightValue) {
+                    $State.Cache[$cacheKey] = $false
                     return $false
                 }
                 continue
@@ -114,6 +159,7 @@ function Test-YamlMergeNodeEqual {
             $leftText = $leftValue.ToString([System.Globalization.CultureInfo]::InvariantCulture)
             $rightText = $rightValue.ToString([System.Globalization.CultureInfo]::InvariantCulture)
             if ($leftText -cne $rightText) {
+                $State.Cache[$cacheKey] = $false
                 return $false
             }
             continue
@@ -121,6 +167,7 @@ function Test-YamlMergeNodeEqual {
 
         if ($left.Kind -eq 'Sequence') {
             if ($left.Items.Count -ne $right.Items.Count) {
+                $State.Cache[$cacheKey] = $false
                 return $false
             }
             for ($index = $left.Items.Count - 1; $index -ge 0; $index--) {
@@ -133,39 +180,70 @@ function Test-YamlMergeNodeEqual {
         }
 
         if ($left.Entries.Count -ne $right.Entries.Count) {
+            $State.Cache[$cacheKey] = $false
             return $false
         }
+        Add-YamlMergeWork -State $State.WorkState -Node $right `
+            -Operation 'equality mapping index build'
         $rightEntries = [System.Collections.Generic.Dictionary[string, object]]::new(
             [System.StringComparer]::Ordinal
         )
+        $rightIndexedIds = [System.Collections.Generic.HashSet[int]]::new()
         for ($index = 0; $index -lt $right.Entries.Count; $index++) {
-            $fingerprint = Get-YamlMergeFingerprint -Node $right.Entries[$index].Key -State $State
-            if (-not $rightEntries.ContainsKey($fingerprint)) {
-                $rightEntries[$fingerprint] = [System.Collections.Generic.List[object]]::new()
+            $rightKey = $right.Entries[$index].Key
+            Add-YamlMergeWork -State $State.WorkState -Node $rightKey `
+                -Operation 'equality mapping candidate identity'
+            $effectiveKey = Get-YamlMergeNode -Node $rightKey
+            if (-not $rightIndexedIds.Add($effectiveKey.Id)) {
+                continue
             }
-            $rightEntries[$fingerprint].Add([pscustomobject]@{
+            $fingerprint = Get-YamlMergeFingerprint -Node $rightKey -State $State `
+                -Cache $RightFingerprintCache
+            Add-YamlMergeWork -State $State.WorkState -Node $rightKey `
+                -Operation 'equality mapping bucket visit'
+            $bucket = $null
+            if (-not $rightEntries.TryGetValue($fingerprint, [ref] $bucket)) {
+                $bucket = [pscustomobject]@{
+                    Candidates = [System.Collections.Generic.List[object]]::new()
+                }
+                $rightEntries[$fingerprint] = $bucket
+            }
+            Add-YamlMergeWork -State $State.WorkState -Node $rightKey `
+                -Operation 'equality mapping candidate visit'
+            $bucket.Candidates.Add([pscustomobject]@{
                     Index = $index
                     Entry = $right.Entries[$index]
                 })
         }
+
         $matched = [System.Collections.Generic.HashSet[int]]::new()
         foreach ($leftEntry in $left.Entries) {
-            $fingerprint = Get-YamlMergeFingerprint -Node $leftEntry.Key -State $State
-            if (-not $rightEntries.ContainsKey($fingerprint)) {
+            $fingerprint = Get-YamlMergeFingerprint -Node $leftEntry.Key -State $State `
+                -Cache $LeftFingerprintCache
+            Add-YamlMergeWork -State $State.WorkState -Node $leftEntry.Key `
+                -Operation 'equality mapping bucket lookup'
+            $bucket = $null
+            if (-not $rightEntries.TryGetValue($fingerprint, [ref] $bucket)) {
+                $State.Cache[$cacheKey] = $false
                 return $false
             }
             $match = $null
-            foreach ($candidate in $rightEntries[$fingerprint]) {
+            foreach ($candidate in $bucket.Candidates) {
+                Add-YamlMergeWork -State $State.WorkState -Node $leftEntry.Key `
+                    -Operation 'equality mapping candidate comparison'
                 if ($matched.Contains($candidate.Index)) {
                     continue
                 }
-                if (Test-YamlMergeNodeEqual -Node $leftEntry.Key -OtherNode $candidate.Entry.Key `
-                        -State $State) {
+                if (Test-YamlMergeNodeEqual -Node $leftEntry.Key `
+                        -OtherNode $candidate.Entry.Key -State $State `
+                        -LeftFingerprintCache $LeftFingerprintCache `
+                        -RightFingerprintCache $RightFingerprintCache) {
                     $match = $candidate
                     break
                 }
             }
             if ($null -eq $match) {
+                $State.Cache[$cacheKey] = $false
                 return $false
             }
             [void] $matched.Add($match.Index)
@@ -176,5 +254,6 @@ function Test-YamlMergeNodeEqual {
         }
     }
 
+    $State.Cache[$cacheKey] = $true
     return $true
 }

@@ -35,29 +35,14 @@ function Merge-YamlRepresentationNode {
         [pscustomobject] $Context
     )
 
-    $Context.WorkState.MergeCount++
-    if ($Context.WorkState.MergeCount -gt $Context.WorkState.MaxNodes) {
-        throw (New-YamlMergeException -Node $OverlayNode -ErrorId 'YamlMergeNodeLimitExceeded' -Message (
-                "Merging input index $($Context.InputIndex) document index $($Context.DocumentIndex) " +
-                "exceeded the configured work limit of $($Context.WorkState.MaxNodes) nodes."
-            ))
-    }
+    Add-YamlMergeWork -State $Context.WorkState -Node $OverlayNode `
+        -Operation 'representation node merge'
 
     $base = Get-YamlMergeNode -Node $BaseNode
     $overlay = Get-YamlMergeNode -Node $OverlayNode
     $overlayTag = Get-YamlMergeNodeTag -Node $overlay
     if ($NullAction -eq 'Ignore' -and
         $overlayTag -ceq 'tag:yaml.org,2002:null') {
-        Write-Output -InputObject $BaseNode -NoEnumerate
-        return
-    }
-
-    if (Test-YamlMergeNodeEqual -Node $base -OtherNode $overlay `
-            -State $Context.EqualityState) {
-        if ($overlay.Kind -ne 'Scalar' -and
-            -not $Context.CloneCache.ContainsKey($overlay.Id)) {
-            $Context.CloneCache[$overlay.Id] = $base
-        }
         Write-Output -InputObject $BaseNode -NoEnumerate
         return
     }
@@ -77,6 +62,11 @@ function Merge-YamlRepresentationNode {
     }
 
     if ($base.Kind -eq 'Scalar') {
+        if (Test-YamlMergeNodeEqual -Node $base -OtherNode $overlay `
+                -State $Context.EqualityState) {
+            Write-Output -InputObject $BaseNode -NoEnumerate
+            return
+        }
         if ($ConflictAction -eq 'Error') {
             throw (New-YamlMergeException -Node $overlay -ErrorId 'YamlMergeConflict' -Message (
                     "YAML merge conflict at $Path in input index $($Context.InputIndex), " +
@@ -88,6 +78,14 @@ function Merge-YamlRepresentationNode {
     }
 
     if ($base.Kind -eq 'Sequence' -and $SequenceAction -eq 'Replace') {
+        if (Test-YamlMergeNodeEqual -Node $base -OtherNode $overlay `
+                -State $Context.EqualityState) {
+            if (-not $Context.CloneCache.ContainsKey($overlay.Id)) {
+                $Context.CloneCache[$overlay.Id] = $base
+            }
+            Write-Output -InputObject $BaseNode -NoEnumerate
+            return
+        }
         return Copy-YamlMergeNode -Node $OverlayNode -Cache $Context.CloneCache `
             -State $Context.CloneState
     }
@@ -100,88 +98,71 @@ function Merge-YamlRepresentationNode {
         Write-Output -InputObject $Context.CloneCache[$overlay.Id] -NoEnumerate
         return
     }
+
+    if (Test-YamlMergeNodeEqual -Node $base -OtherNode $overlay `
+            -State $Context.EqualityState) {
+        $Context.CloneCache[$overlay.Id] = $base
+        Write-Output -InputObject $BaseNode -NoEnumerate
+        return
+    }
     $Context.CloneCache[$overlay.Id] = $base
 
     if ($base.Kind -eq 'Sequence') {
         if ($SequenceAction -eq 'Append') {
+            $changed = $false
             foreach ($item in $overlay.Items) {
                 $copy = Copy-YamlMergeNode -Node $item -Cache $Context.CloneCache `
                     -State $Context.CloneState
                 $base.Items.Add($copy)
+                $changed = $true
+            }
+            if ($changed) {
+                Set-YamlMergeNodeChanged -Node $base -Context $Context
             }
             Write-Output -InputObject $BaseNode -NoEnumerate
             return
         }
 
-        $retained = [System.Collections.Generic.Dictionary[string, object]]::new(
-            [System.StringComparer]::Ordinal
-        )
-        foreach ($item in $base.Items) {
-            $fingerprint = Get-YamlMergeFingerprint -Node $item -State $Context.EqualityState
-            if (-not $retained.ContainsKey($fingerprint)) {
-                $retained[$fingerprint] = [System.Collections.Generic.List[object]]::new()
-            }
-            $retained[$fingerprint].Add($item)
-        }
+        $overlayItems = [System.Collections.Generic.HashSet[int]]::new()
         foreach ($item in $overlay.Items) {
-            $fingerprint = Get-YamlMergeFingerprint -Node $item -State $Context.EqualityState
-            $exists = $false
-            if ($retained.ContainsKey($fingerprint)) {
-                foreach ($candidate in $retained[$fingerprint]) {
-                    if (Test-YamlMergeNodeEqual -Node $candidate -OtherNode $item `
-                            -State $Context.EqualityState) {
-                        $exists = $true
-                        break
-                    }
-                }
+            Add-YamlMergeWork -State $Context.WorkState -Node $item `
+                -Operation 'unique overlay candidate identity'
+            $effectiveItem = Get-YamlMergeNode -Node $item
+            if (-not $overlayItems.Add($effectiveItem.Id)) {
+                continue
             }
-            if ($exists) {
+            $retained = Get-YamlMergeIndex -Node $base -Kind Sequence -Context $Context
+            $match = Find-YamlMergeIndexMatch -Index $retained -Node $item -Context $Context
+            if ($null -ne $match) {
                 continue
             }
             $copy = Copy-YamlMergeNode -Node $item -Cache $Context.CloneCache `
                 -State $Context.CloneState
             $base.Items.Add($copy)
-            if (-not $retained.ContainsKey($fingerprint)) {
-                $retained[$fingerprint] = [System.Collections.Generic.List[object]]::new()
-            }
-            $retained[$fingerprint].Add($copy)
+            Add-YamlMergeIndexCandidate -Index $retained -Candidate $copy -Context $Context
+            Set-YamlMergeNodeChanged -Node $base -Context $Context
         }
         Write-Output -InputObject $BaseNode -NoEnumerate
         return
     }
 
-    $entries = [System.Collections.Generic.Dictionary[string, object]]::new(
-        [System.StringComparer]::Ordinal
-    )
-    foreach ($entry in $base.Entries) {
-        $fingerprint = Get-YamlMergeFingerprint -Node $entry.Key -State $Context.EqualityState
-        if (-not $entries.ContainsKey($fingerprint)) {
-            $entries[$fingerprint] = [System.Collections.Generic.List[object]]::new()
-        }
-        $entries[$fingerprint].Add($entry)
-    }
-
     for ($index = 0; $index -lt $overlay.Entries.Count; $index++) {
         $overlayEntry = $overlay.Entries[$index]
-        $fingerprint = Get-YamlMergeFingerprint -Node $overlayEntry.Key `
-            -State $Context.EqualityState
-        $match = $null
-        if ($entries.ContainsKey($fingerprint)) {
-            foreach ($candidate in $entries[$fingerprint]) {
-                if (Test-YamlMergeNodeEqual -Node $candidate.Key -OtherNode $overlayEntry.Key `
-                        -State $Context.EqualityState) {
-                    $match = $candidate
-                    break
-                }
-            }
-        }
+        $entries = Get-YamlMergeIndex -Node $base -Kind Mapping -Context $Context
+        $match = Find-YamlMergeIndexMatch -Index $entries -Node $overlayEntry.Key `
+            -Context $Context
 
         if ($null -ne $match) {
             $childPath = Get-YamlMergePath -Parent $Path -Key $overlayEntry.Key -Index $index
-            $match.Value = Merge-YamlRepresentationNode -BaseNode $match.Value `
+            $previous = $match.Value
+            $merged = Merge-YamlRepresentationNode -BaseNode $previous `
                 -OverlayNode $overlayEntry.Value -SequenceAction $SequenceAction `
                 -ConflictAction $ConflictAction -NullAction $NullAction -Path $childPath `
                 -Context $Context
+            $match.Value = $merged
+            if (-not [object]::ReferenceEquals($previous, $merged)) {
+                Set-YamlMergeNodeChanged -Node $base -Context $Context
+            }
             continue
         }
 
@@ -191,10 +172,8 @@ function Merge-YamlRepresentationNode {
             -State $Context.CloneState
         $newEntry = [pscustomobject]@{ Key = $keyCopy; Value = $valueCopy }
         $base.Entries.Add($newEntry)
-        if (-not $entries.ContainsKey($fingerprint)) {
-            $entries[$fingerprint] = [System.Collections.Generic.List[object]]::new()
-        }
-        $entries[$fingerprint].Add($newEntry)
+        Add-YamlMergeIndexCandidate -Index $entries -Candidate $newEntry -Context $Context
+        Set-YamlMergeNodeChanged -Node $base -Context $Context
     }
 
     Write-Output -InputObject $BaseNode -NoEnumerate
