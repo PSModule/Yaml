@@ -67,6 +67,22 @@ Describe 'Export-Yaml' {
             $result | Should -Be @('one', 'two')
         }
 
+        It 'preserves an explicit one-element array as a sequence' {
+            $path = Join-Path $TestDrive 'one-element-array.yaml'
+
+            Export-Yaml -InputObject @(42) -Path $path
+
+            [System.IO.File]::ReadAllText($path) | Should -Be "- 42`n"
+        }
+
+        It 'preserves an explicit empty array as an empty sequence' {
+            $path = Join-Path $TestDrive 'empty-array.yaml'
+
+            Export-Yaml -InputObject @() -Path $path
+
+            [System.IO.File]::ReadAllText($path) | Should -Be "[]`n"
+        }
+
         It 'collects multiple pipeline records into one sequence' {
             $path = Join-Path $TestDrive 'pipeline.yaml'
 
@@ -74,6 +90,30 @@ Describe 'Export-Yaml' {
             $result = Import-Yaml -Path $path -NoEnumerate
 
             $result | Should -Be @('one', 'two', 'three')
+        }
+
+        It 'distinguishes one nested pipeline record from multiple records' {
+            $singlePath = Join-Path $TestDrive 'single-nested-record.yaml'
+            $multiplePath = Join-Path $TestDrive 'multiple-nested-records.yaml'
+            $firstRecord = [object[]]::new(1)
+            $firstRecord[0] = [object[]] @(1, 2)
+            $secondRecord = [object[]]::new(1)
+            $secondRecord[0] = [object[]] @(3, 4)
+
+            Write-Output -InputObject $firstRecord -NoEnumerate |
+                Export-Yaml -Path $singlePath
+            & {
+                Write-Output -InputObject $firstRecord -NoEnumerate
+                Write-Output -InputObject $secondRecord -NoEnumerate
+            } | Export-Yaml -Path $multiplePath
+
+            $singleExpected = ConvertTo-Yaml -InputObject $firstRecord
+            $multipleExpected = & {
+                Write-Output -InputObject $firstRecord -NoEnumerate
+                Write-Output -InputObject $secondRecord -NoEnumerate
+            } | ConvertTo-Yaml
+            [System.IO.File]::ReadAllText($singlePath) | Should -Be $singleExpected
+            [System.IO.File]::ReadAllText($multiplePath) | Should -Be $multipleExpected
         }
 
         It 'serializes an explicit null input' {

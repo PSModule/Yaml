@@ -412,10 +412,10 @@ function Export-Yaml {
             }
         }
 
-        $value = if ($values.Count -eq 1) {
-            [object] $values[0]
+        if ($values.Count -eq 1) {
+            $value = [object] $values[0]
         } else {
-            [object[]] $values.ToArray()
+            $value = [object[]] $values.ToArray()
         }
         $serializerParameters = @{
             InputObject           = $value
