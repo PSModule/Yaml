@@ -40,6 +40,13 @@ $outputYaml = [ordered]@{
 $outputYaml
 $outputYaml | ConvertFrom-Yaml
 
+# Normalize YAML presentation without projecting its representation graph.
+$normalizedYaml = @'
+# Presentation differences are removed.
+{ name: example, ports: [80, 443] }
+'@ | Format-Yaml -Indent 4
+$normalizedYaml
+
 # Atomically export one file, then import it with strict decoding.
 $configPath = Join-Path $env:TEMP 'yaml-example.yaml'
 $config | Export-Yaml -Path $configPath -PassThru

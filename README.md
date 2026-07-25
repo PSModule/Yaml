@@ -30,6 +30,7 @@ The module exports:
 | `ConvertFrom-Yaml` | Parse one or more YAML documents into PowerShell values. |
 | `ConvertTo-Yaml` | Serialize supported PowerShell values as YAML 1.2-compatible text. |
 | `Export-Yaml` | Serialize values and atomically write one YAML file. |
+| `Format-Yaml` | Normalize YAML streams without projecting representation nodes to PowerShell values. |
 | `Import-Yaml` | Strictly decode and parse YAML files. |
 | `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
 
@@ -143,6 +144,36 @@ Repeated acyclic collection references are emitted with anchors and aliases.
 Cyclic graphs and unsupported runtime objects fail specifically; values are
 never silently truncated or converted with `ToString()`.
 
+## Format YAML streams
+
+`Format-Yaml` normalizes existing YAML without converting it through
+`PSCustomObject` or dictionary values. It retains document order and empty
+documents, node kinds, scalar content, effective tags, anchors and aliases,
+recursive graphs, complex keys, collection structure, and mapping order.
+
+```powershell
+$normalized = Get-Content -Path '.\config.yaml' | Format-Yaml -Indent 4
+```
+
+Pipeline records are joined with LF and parsed as one stream. The output is one
+string with LF line endings and no final newline. Every document starts with
+`---`; document-end markers, comments, directives, flow presentation, scalar
+styles, and original anchor names are normalized. Effective standard tags use
+`!!` shorthand where possible, while local and global tags use a deterministic
+verbatim form.
+
+Formatting is byte-idempotent at the same options:
+
+```powershell
+$normalized -ceq ($normalized | Format-Yaml -Indent 4)
+```
+
+`-Indent` accepts 2 through 9 spaces. The `-Depth`, `-MaxNodes`, `-MaxAliases`,
+`-MaxScalarLength`, `-MaxTagLength`, `-MaxTotalTagLength`, and
+`-MaxNumericLength` defaults and ranges match `ConvertFrom-Yaml`. Invalid YAML,
+duplicate representation keys, undefined aliases, malformed tags, and resource
+limit violations terminate with the same classified YAML errors as parsing.
+
 ## Export YAML files
 
 `Export-Yaml` aggregates pipeline records like `ConvertTo-Yaml`, serializes the
@@ -217,6 +248,7 @@ The archive contains 402 inputs:
 | `out.yaml` projection | 241 | 1 | 0 | 160 |
 | Official `emit.yaml` fixtures | 55 | 0 | 0 | 347 |
 | Module self-round-trip | 305 | 3 | 0 | 94 |
+| `Format-Yaml` representation and idempotence | 400 | 0 | 0 | 2 |
 
 All 94 fixtures marked invalid are rejected. The valid `2JQS` and `X38W`
 inputs are syntactically recognized and produce matching representation
@@ -224,6 +256,13 @@ events, then are rejected during load validation because representation
 mapping keys must be unique. They are not unsupported grammar. Both are
 reported as policy differences for module self-round-trip; `X38W`, the one
 case with an `out.yaml` fixture, is also reported that way on that surface.
+
+The formatter surface directly compares representation events and graph
+identity before and after formatting, validates the emitted stream, and
+requires byte-identical second formatting. It passes all 306 loadable valid
+inputs and confirms that all 94 invalid inputs remain rejected. The two valid
+duplicate-key policy cases are not applicable because `Format-Yaml` applies
+the same representation-key uniqueness policy as `ConvertFrom-Yaml`.
 
 The two JSON projection differences are `565N`, where `!!binary` intentionally
 becomes `byte[]` instead of a Base64 string, and `J7PZ`, where legacy `!!omap`
