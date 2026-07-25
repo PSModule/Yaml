@@ -61,6 +61,11 @@ service:
 $mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
 $mergedYaml
 
+# Remove selected YAML entries without projecting the representation graph.
+$cleanedYaml = $mergedYaml |
+    Remove-YamlEntry -Path @('/service/image', '/service/ports/0')
+$cleanedYaml
+
 # Atomically export one file, then import it with strict decoding.
 $configPath = Join-Path $env:TEMP 'yaml-example.yaml'
 $config | Export-Yaml -Path $configPath -PassThru

@@ -33,6 +33,7 @@ The module exports:
 | `Format-Yaml` | Normalize YAML streams without projecting representation nodes to PowerShell values. |
 | `Import-Yaml` | Strictly decode and parse YAML files. |
 | `Merge-Yaml` | Merge complete YAML streams without losing representation graph details. |
+| `Remove-YamlEntry` | Remove selected entries or documents without losing representation graph details. |
 | `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
 
 ## Parse YAML
@@ -217,6 +218,29 @@ creation, charged merge operations, and the resulting stream graph. Index,
 fingerprint, candidate, alias-traversal, and equality work all consume the merge
 operation budget. Alias and expanded-tag budgets are also enforced on the result.
 
+## Remove YAML entries
+
+`Remove-YamlEntry` removes mapping entries, sequence items, or whole documents directly from a deep-cloned representation graph. Input array elements and pipeline records are joined with LF as one YAML stream, matching `Format-Yaml`.
+
+```powershell
+$cleanYaml = Get-Content -Path '.\config.yaml' |
+    Remove-YamlEntry -Path @('/metadata/internalId', '/services/1/deprecated')
+```
+
+Paths use [RFC 6901 JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901). An empty pointer selects a document root, `~0` addresses a tilde, and `~1` addresses a slash. Mapping tokens match only scalar YAML string keys by ordinal content, so numeric, complex, and unknown-tagged keys are never coerced or guessed. Sequence tokens must be `0` or a non-zero decimal index without signs or leading zeros.
+
+Document zero is selected by default. Use `-DocumentIndex` for another zero-based document, or `-AllDocuments` to apply every path independently to every original document. `-IgnoreMissing` skips only unresolved document/path combinations.
+
+```powershell
+$withoutTemporaryData = Remove-YamlEntry $stream '/temporary' `
+    -AllDocuments -IgnoreMissing -Indent 4
+$withoutSecondDocument = Remove-YamlEntry $stream '' -DocumentIndex 1
+```
+
+Every required target is resolved before mutation, duplicate logical targets are coalesced, and ancestors subsume descendants. Removing inside a shared mapping or sequence changes every alias to that node; removing an alias edge removes only that edge. Original sequence indexes and document roots are removed in descending order.
+
+Output preserves unaffected tags, anchors, aliases, shared and cyclic identity, complex keys, mapping order, and document order. It is one deterministic string with LF line endings and no final newline; removing every document returns an empty string. Parser limits are mirrored, while cloning, pointer and mutation work, and output validation use independent resource ceilings.
+
 ## Export YAML files
 
 `Export-Yaml` aggregates pipeline records like `ConvertTo-Yaml`, serializes the
@@ -265,6 +289,8 @@ limit violations. Unexpected runtime failures are not suppressed.
   YAML 1.2 core schema.
 - YAML stream merging compares effective tags and structural representation
   values without projecting through PowerShell objects.
+- YAML entry removal resolves JSON Pointers against an immutable representation
+  clone and mutates shared nodes by identity without object projection.
 - Parsing defaults to depth 100, 100000 nodes, 1000 aliases, 1048576 decoded
   characters per scalar, 1024 characters per expanded tag, 65536 cumulative
   expanded tag characters, and 4096 digits per numeric scalar. The
