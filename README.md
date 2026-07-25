@@ -191,8 +191,8 @@ $mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
 Compatible mappings merge recursively by structural YAML key equality. Base key
 order remains stable, replacing a value retains its position, and new overlay
 keys append in overlay order. Complex and tagged keys are supported. Structural
-fingerprints select comparison candidates only; graph-aware equality makes the
-final key decision.
+fingerprints select comparison candidates only; mutation-aware indexes are
+retained across overlays, and graph-aware equality makes the final key decision.
 
 Compatible sequences use `-SequenceAction Replace`, `Append`, or `Unique`.
 Unequal scalars, collection kinds, and incompatible effective tags use
@@ -212,9 +212,10 @@ one deterministic string with LF line endings, explicit document starts, and no
 final newline.
 
 The parser safety parameters and defaults match `Format-Yaml`. `-MaxNodes`
-limits each parsed stream and invocation-wide cloning, equality, merge work, and
-the resulting stream graph. Alias and expanded-tag budgets are also enforced on
-the result.
+limits each parsed stream and applies independently to invocation-wide clone
+creation, charged merge operations, and the resulting stream graph. Index,
+fingerprint, candidate, alias-traversal, and equality work all consume the merge
+operation budget. Alias and expanded-tag budgets are also enforced on the result.
 
 ## Export YAML files
 
