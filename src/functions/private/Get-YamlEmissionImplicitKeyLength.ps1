@@ -7,6 +7,7 @@ function Get-YamlEmissionImplicitKeyLength {
     [OutputType([int])]
     param (
         [Parameter(Mandatory)]
+        [AllowEmptyString()]
         [string] $RenderedText
     )
 

@@ -34,7 +34,8 @@ BeforeAll {
             -CompareEvents `
             -CompareOutYaml `
             -CompareEmitYaml `
-            -CompareSelfRoundTrip
+            -CompareSelfRoundTrip `
+            -CompareFormatter
     )
     $emptySuitePath = Join-Path $TestDrive 'empty-suite'
     $null = New-Item -Path $emptySuitePath -ItemType Directory
@@ -47,6 +48,7 @@ Describe 'Released yaml-test-suite corpus accounting' {
             $conformanceYamlModule | Should -Not -BeNullOrEmpty
             $command = Get-Command -Name ConvertFrom-Yaml
             $command.Module | Should -Be $conformanceYamlModule
+            (Get-Command -Name Format-Yaml).Module | Should -Be $conformanceYamlModule
             $conformanceYamlModule.ModuleBase |
                 Should -Not -Be (Join-Path $repositoryRoot 'src')
             $conformanceYamlModule.PowerShellVersion | Should -Be '7.6'
@@ -403,6 +405,46 @@ ship-to:
             'LegacyOrderedMapProjection',
             'RepresentationMappingKeyUniqueness'
         )
+    }
+
+    It 'formats every loadable case with representation and idempotence preserved' {
+        @($suiteResults | Where-Object FormatterResult -EQ 'Pass').Count |
+            Should -Be 400
+        @($suiteResults | Where-Object FormatterResult -EQ 'PolicyDifference').Count |
+            Should -Be 0
+        @($suiteResults | Where-Object FormatterResult -EQ 'Fail').Count |
+            Should -Be 0
+        @($suiteResults | Where-Object FormatterResult -EQ 'NotApplicable').Count |
+            Should -Be 2
+
+        $excluded = @(
+            $suiteResults |
+                Where-Object FormatterResult -EQ 'NotApplicable' |
+                Sort-Object Case
+        )
+        @($excluded.Case) | Should -Be @('2JQS', 'X38W')
+        @($excluded.FormatterReason | Select-Object -Unique) |
+            Should -Be @('RepresentationMappingKeyUniqueness')
+
+        $formatted = @(
+            $suiteResults |
+                Where-Object { -not $_.ExpectsError -and $_.FormatterResult -eq 'Pass' }
+        )
+        $formatted.Count | Should -Be 306
+        @($formatted | Where-Object FormatterReason).Count | Should -Be 0
+        @($formatted | Where-Object { $_.FormatterText -cne $_.FormatterSecond }).Count |
+            Should -Be 0
+        @($formatted | Where-Object { $_.FormatterExpected -cne $_.FormatterActual }).Count |
+            Should -Be 0
+    }
+
+    It 'keeps every invalid corpus input rejected by the formatter' {
+        $invalid = @($suiteResults | Where-Object ExpectsError)
+
+        $invalid.Count | Should -Be 94
+        @($invalid | Where-Object FormatterResult -NE 'Pass').Count | Should -Be 0
+        @($invalid.FormatterReason | Select-Object -Unique) |
+            Should -Be @('InvalidInputRejected')
     }
 
     It 'keeps the previously failing multi-document JSON cases green' {

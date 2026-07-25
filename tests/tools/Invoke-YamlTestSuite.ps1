@@ -12,7 +12,8 @@ param (
     [switch] $CompareEvents,
     [switch] $CompareOutYaml,
     [switch] $CompareEmitYaml,
-    [switch] $CompareSelfRoundTrip
+    [switch] $CompareSelfRoundTrip,
+    [switch] $CompareFormatter
 )
 
 . (Join-Path $PSScriptRoot '..\TestBootstrap.ps1')
@@ -21,12 +22,14 @@ if (-not $PSBoundParameters.ContainsKey('CompareJson') -and
     -not $PSBoundParameters.ContainsKey('CompareEvents') -and
     -not $PSBoundParameters.ContainsKey('CompareOutYaml') -and
     -not $PSBoundParameters.ContainsKey('CompareEmitYaml') -and
-    -not $PSBoundParameters.ContainsKey('CompareSelfRoundTrip')) {
+    -not $PSBoundParameters.ContainsKey('CompareSelfRoundTrip') -and
+    -not $PSBoundParameters.ContainsKey('CompareFormatter')) {
     $CompareJson = $true
     $CompareEvents = $true
     $CompareOutYaml = $true
     $CompareEmitYaml = $true
     $CompareSelfRoundTrip = $true
+    $CompareFormatter = $true
 }
 
 function Invoke-InYamlModule {
@@ -591,13 +594,10 @@ function ConvertFrom-YamlSuiteEventText {
                     ConvertFrom-YamlSuiteEventEscape -Value $value
                 )
             }
-
             $anchorToken = ''
             if ($anchor) {
-                if (-not $anchorMap.ContainsKey($anchor)) {
-                    $anchorCounter++
-                    $anchorMap[$anchor] = 'a{0:d3}' -f $anchorCounter
-                }
+                $anchorCounter++
+                $anchorMap[$anchor] = 'a{0:d3}' -f $anchorCounter
                 $anchorToken = $anchorMap[$anchor]
             }
             $parts = [System.Collections.Generic.List[string]]::new()
@@ -675,11 +675,7 @@ function ConvertTo-YamlSuiteActualEvent {
 
             $node = $frame.Node
             if ($node.Kind -eq 'Alias') {
-                $targetAnchorKey = if ([string]::IsNullOrEmpty($node.Target.Anchor)) {
-                    'id:{0}' -f $node.Target.Id
-                } else {
-                    $node.Target.Anchor
-                }
+                $targetAnchorKey = 'id:{0}' -f $node.Target.Id
                 $targetAnchor = Get-YamlSuiteAnchorToken -Key $targetAnchorKey `
                     -AnchorMap $anchorMap -AnchorCounter ([ref] $anchorCounter)
                 $events.Add("=ALI|target=$targetAnchor")
@@ -691,7 +687,7 @@ function ConvertTo-YamlSuiteActualEvent {
                 if ($node.Tag -and $node.Tag -ne '!') { $parts.Add("tag=$($node.Tag)") }
                 if ($node.Anchor) {
                     $parts.Add("anchor=$(
-                            Get-YamlSuiteAnchorToken -Key $node.Anchor -AnchorMap $anchorMap `
+                            Get-YamlSuiteAnchorToken -Key ('id:{0}' -f $node.Id) -AnchorMap $anchorMap `
                                 -AnchorCounter ([ref] $anchorCounter)
                         )")
                 }
@@ -708,7 +704,7 @@ function ConvertTo-YamlSuiteActualEvent {
             if ($node.Tag -and $node.Tag -ne '!') { $startParts.Add("tag=$($node.Tag)") }
             if ($node.Anchor) {
                 $startParts.Add("anchor=$(
-                        Get-YamlSuiteAnchorToken -Key $node.Anchor -AnchorMap $anchorMap `
+                        Get-YamlSuiteAnchorToken -Key ('id:{0}' -f $node.Id) -AnchorMap $anchorMap `
                             -AnchorCounter ([ref] $anchorCounter)
                     )")
             }
@@ -831,6 +827,12 @@ $testYamlSuiteText = {
         -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
         -MaxNumericLength 4096
 }
+$formatYamlSuiteText = {
+    param ([string] $YamlText)
+    Format-Yaml -InputObject $YamlText -Depth 128 -MaxNodes 100000 -MaxAliases 1000 `
+        -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 `
+        -MaxNumericLength 4096
+}
 
 $suiteRoot = (Resolve-Path -LiteralPath $Path).Path
 $inputFiles = @(
@@ -872,6 +874,8 @@ foreach ($inputFile in $inputFiles) {
     $emitYamlReason = ''
     $selfRoundTripResult = 'NotApplicable'
     $selfRoundTripReason = ''
+    $formatterResult = 'NotApplicable'
+    $formatterReason = ''
 
     $representation = $null
     $stream = $null
@@ -881,6 +885,7 @@ foreach ($inputFile in $inputFiles) {
     $projectedJsonCanonical = $null
     $projectedReference = ''
     $projectionError = ''
+    $streamError = ''
     $jsonOracleValues = $null
     $jsonOracleCanonical = $null
     $eventExpected = $null
@@ -895,6 +900,10 @@ foreach ($inputFile in $inputFiles) {
     $emitYamlActualReference = $null
     $selfRoundTripCanonical = $null
     $selfRoundTripReference = $null
+    $formatterExpected = $null
+    $formatterActual = $null
+    $formatterText = $null
+    $formatterSecond = $null
 
     try {
         $representation = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation -Arguments @($yaml)
@@ -923,7 +932,7 @@ foreach ($inputFile in $inputFiles) {
             }
             if ($expectsError) {
                 $syntaxResult = 'Pass'
-            } elseif ($casePath -cin @('2JQS', 'X38W') -and
+            } elseif ($null -ne $representation -and
                 $_.Exception.Data['YamlErrorId'] -eq 'YamlDuplicateKey') {
                 $syntaxResult = 'PolicyDifference'
                 $syntaxReason = 'RepresentationMappingKeyUniqueness'
@@ -931,6 +940,7 @@ foreach ($inputFile in $inputFiles) {
                 $syntaxResult = 'Fail'
                 $syntaxReason = [string] $_.Exception.Data['YamlErrorId']
             }
+            $streamError = [string] $_.Exception.Data['YamlErrorId']
         }
     }
 
@@ -1201,6 +1211,7 @@ foreach ($inputFile in $inputFiles) {
                             $selfRoundTripReason = 'SelfRoundTripMismatch'
                         }
                     }
+
                 }
             } catch [System.NotSupportedException] {
                 $selfRoundTripResult = 'Fail'
@@ -1209,6 +1220,76 @@ foreach ($inputFile in $inputFiles) {
                 if ($_.Exception.Data.Contains('IsYamlException')) {
                     $selfRoundTripResult = 'Fail'
                     $selfRoundTripReason = [string] $_.Exception.Data['YamlErrorId']
+                } else {
+                    throw
+                }
+            }
+        }
+    }
+
+    if ($CompareFormatter) {
+        if ($expectsError) {
+            try {
+                $formatterText = Invoke-InYamlModule -ScriptBlock $formatYamlSuiteText `
+                    -Arguments @($yaml)
+                $formatterResult = 'Fail'
+                $formatterReason = 'InvalidInputAccepted'
+            } catch {
+                if (-not $_.Exception.Data.Contains('IsYamlException')) {
+                    throw
+                }
+                $formatterResult = 'Pass'
+                $formatterReason = 'InvalidInputRejected'
+            }
+        } elseif ($null -eq $stream) {
+            if ($null -ne $representation -and $streamError -ceq 'YamlDuplicateKey') {
+                $formatterResult = 'NotApplicable'
+                $formatterReason = 'RepresentationMappingKeyUniqueness'
+            } else {
+                $formatterResult = 'Fail'
+                $formatterReason = if ($streamError) { $streamError } else { 'RepresentationUnavailable' }
+            }
+        } else {
+            try {
+                $formatterText = [string] (
+                    Invoke-InYamlModule -ScriptBlock $formatYamlSuiteText -Arguments @($yaml)
+                )
+                $isValidFormat = Invoke-InYamlModule -ScriptBlock $testYamlSuiteText `
+                    -Arguments @($formatterText)
+                if (-not $isValidFormat) {
+                    $formatterResult = 'Fail'
+                    $formatterReason = 'FormattedYamlInvalid'
+                } else {
+                    $formattedRepresentation = Invoke-InYamlModule `
+                        -ScriptBlock $readYamlSuiteRepresentation -Arguments @($formatterText)
+                    $originalEvents = ConvertTo-YamlSuiteActualEvent -Documents $representation.Value
+                    $formattedEvents = ConvertTo-YamlSuiteActualEvent `
+                        -Documents $formattedRepresentation.Value
+                    $formatterExpected = $originalEvents -join "`n"
+                    $formatterActual = $formattedEvents -join "`n"
+                    if (-not (
+                            Compare-YamlSuiteCanonicalList `
+                                -Left $formattedEvents -Right $originalEvents
+                        )) {
+                        $formatterResult = 'Fail'
+                        $formatterReason = 'RepresentationMismatch'
+                    } else {
+                        $formatterSecond = [string] (
+                            Invoke-InYamlModule -ScriptBlock $formatYamlSuiteText `
+                                -Arguments @($formatterText)
+                        )
+                        if ($formatterSecond -cne $formatterText) {
+                            $formatterResult = 'Fail'
+                            $formatterReason = 'FormatterNotIdempotent'
+                        } else {
+                            $formatterResult = 'Pass'
+                        }
+                    }
+                }
+            } catch {
+                if ($_.Exception.Data.Contains('IsYamlException')) {
+                    $formatterResult = 'Fail'
+                    $formatterReason = [string] $_.Exception.Data['YamlErrorId']
                 } else {
                     throw
                 }
@@ -1235,6 +1316,8 @@ foreach ($inputFile in $inputFiles) {
         EmitYamlReason       = $emitYamlReason
         SelfRoundTripResult  = $selfRoundTripResult
         SelfRoundTripReason  = $selfRoundTripReason
+        FormatterResult      = $formatterResult
+        FormatterReason      = $formatterReason
         EventExpected        = $eventExpected
         EventActual          = $eventActual
         JsonExpected         = $jsonExpected
@@ -1247,6 +1330,10 @@ foreach ($inputFile in $inputFiles) {
         EmitYamlActualRefs   = $emitYamlActualReference
         SelfRoundTripActual  = $selfRoundTripCanonical
         SelfRoundTripRefs    = $selfRoundTripReference
+        FormatterExpected    = $formatterExpected
+        FormatterActual      = $formatterActual
+        FormatterText        = $formatterText
+        FormatterSecond      = $formatterSecond
         ProjectedActual      = $projectedCanonical
         ProjectedRefs        = $projectedReference
     }
