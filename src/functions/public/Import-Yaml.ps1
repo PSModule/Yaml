@@ -75,6 +75,12 @@ function Import-Yaml {
 
         .OUTPUTS
         System.Object
+
+        .NOTES
+        Only FileSystem provider paths are supported.
+
+        .LINK
+        ConvertFrom-Yaml
     #>
     [OutputType([object])]
     [CmdletBinding(DefaultParameterSetName = 'Path')]
@@ -226,19 +232,9 @@ function Import-Yaml {
                     )
                     $PSCmdlet.ThrowTerminatingError($record)
                 }
-                if (-not [System.IO.File]::Exists($providerPath)) {
-                    if ([System.IO.Directory]::Exists($providerPath)) {
-                        $exception = [System.IO.IOException]::new(
-                            "Cannot import YAML from '$requestedPath': the path is not a file."
-                        )
-                        $record = [System.Management.Automation.ErrorRecord]::new(
-                            $exception,
-                            'YamlImportNotFile',
-                            [System.Management.Automation.ErrorCategory]::InvalidType,
-                            $requestedPath
-                        )
-                        $PSCmdlet.ThrowTerminatingError($record)
-                    }
+                try {
+                    $pathAttributes = [System.IO.File]::GetAttributes($providerPath)
+                } catch [System.IO.FileNotFoundException] {
                     $exception = [System.IO.FileNotFoundException]::new(
                         "Cannot import YAML from '$requestedPath': the path was not found."
                     )
@@ -246,6 +242,55 @@ function Import-Yaml {
                         $exception,
                         'YamlImportPathNotFound',
                         [System.Management.Automation.ErrorCategory]::ObjectNotFound,
+                        $requestedPath
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                } catch [System.IO.DirectoryNotFoundException] {
+                    $exception = [System.IO.FileNotFoundException]::new(
+                        "Cannot import YAML from '$requestedPath': the path was not found."
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportPathNotFound',
+                        [System.Management.Automation.ErrorCategory]::ObjectNotFound,
+                        $requestedPath
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                } catch [System.UnauthorizedAccessException] {
+                    $inspectionError = $_
+                    $exception = [System.IO.IOException]::new(
+                        "Cannot inspect YAML input path '$requestedPath': $($inspectionError.Exception.Message)",
+                        $inspectionError.Exception
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportPermissionDenied',
+                        [System.Management.Automation.ErrorCategory]::PermissionDenied,
+                        $requestedPath
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                } catch [System.IO.IOException] {
+                    $inspectionError = $_
+                    $exception = [System.IO.IOException]::new(
+                        "Cannot inspect YAML input path '$requestedPath': $($inspectionError.Exception.Message)",
+                        $inspectionError.Exception
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportPathInspectionFailed',
+                        [System.Management.Automation.ErrorCategory]::ReadError,
+                        $requestedPath
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                }
+                if (($pathAttributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
+                    $exception = [System.IO.IOException]::new(
+                        "Cannot import YAML from '$requestedPath': the path is not a file."
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportNotFile',
+                        [System.Management.Automation.ErrorCategory]::InvalidType,
                         $requestedPath
                     )
                     $PSCmdlet.ThrowTerminatingError($record)
@@ -337,7 +382,36 @@ function Import-Yaml {
                     )
                     $PSCmdlet.ThrowTerminatingError($record)
                 }
-                if (-not [System.IO.File]::Exists($pathInfo.ProviderPath)) {
+                try {
+                    $pathAttributes = [System.IO.File]::GetAttributes($pathInfo.ProviderPath)
+                } catch [System.UnauthorizedAccessException] {
+                    $inspectionError = $_
+                    $exception = [System.IO.IOException]::new(
+                        "Cannot inspect YAML input path '$($pathInfo.Path)': $($inspectionError.Exception.Message)",
+                        $inspectionError.Exception
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportPermissionDenied',
+                        [System.Management.Automation.ErrorCategory]::PermissionDenied,
+                        $pathInfo.Path
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                } catch [System.IO.IOException] {
+                    $inspectionError = $_
+                    $exception = [System.IO.IOException]::new(
+                        "Cannot inspect YAML input path '$($pathInfo.Path)': $($inspectionError.Exception.Message)",
+                        $inspectionError.Exception
+                    )
+                    $record = [System.Management.Automation.ErrorRecord]::new(
+                        $exception,
+                        'YamlImportPathInspectionFailed',
+                        [System.Management.Automation.ErrorCategory]::ReadError,
+                        $pathInfo.Path
+                    )
+                    $PSCmdlet.ThrowTerminatingError($record)
+                }
+                if (($pathAttributes -band [System.IO.FileAttributes]::Directory) -ne 0) {
                     $exception = [System.IO.IOException]::new(
                         "Cannot import YAML from '$($pathInfo.Path)': the path is not a file."
                     )
@@ -353,17 +427,71 @@ function Import-Yaml {
             }
         }
 
-        $pathComparer = if ($IsWindows) {
-            [System.StringComparer]::OrdinalIgnoreCase
-        } else {
+        $caseSensitivePaths = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::Ordinal
-        }
-        $uniquePaths = [System.Collections.Generic.HashSet[string]]::new($pathComparer)
+        )
+        $caseInsensitivePaths = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase
+        )
         foreach ($resolvedPath in $resolvedPaths) {
-            $null = $uniquePaths.Add($resolvedPath)
+            $useCaseSensitiveIdentity = -not $IsWindows
+            if ($IsWindows) {
+                $identityPath = $resolvedPath
+                while (-not [string]::IsNullOrEmpty($identityPath)) {
+                    $directoryPath = [System.IO.Path]::GetDirectoryName($identityPath)
+                    if ([string]::IsNullOrEmpty($directoryPath)) {
+                        break
+                    }
+                    $leafName = [System.IO.Path]::GetFileName($identityPath)
+                    try {
+                        $caseVariantCount = 0
+                        foreach ($directoryEntry in (
+                                [System.IO.Directory]::EnumerateFileSystemEntries($directoryPath)
+                            )) {
+                            if ([string]::Equals(
+                                    [System.IO.Path]::GetFileName($directoryEntry),
+                                    $leafName,
+                                    [System.StringComparison]::OrdinalIgnoreCase
+                                )) {
+                                $caseVariantCount++
+                                if ($caseVariantCount -gt 1) {
+                                    $useCaseSensitiveIdentity = $true
+                                    break
+                                }
+                            }
+                        }
+                    } catch [System.UnauthorizedAccessException] {
+                        $useCaseSensitiveIdentity = $true
+                    } catch [System.IO.IOException] {
+                        $useCaseSensitiveIdentity = $true
+                    }
+                    if ($useCaseSensitiveIdentity -or
+                        [string]::Equals(
+                            $identityPath,
+                            $directoryPath,
+                            [System.StringComparison]::Ordinal
+                        )) {
+                        break
+                    }
+                    $identityPath = $directoryPath
+                }
+            }
+
+            if ($useCaseSensitiveIdentity) {
+                $null = $caseSensitivePaths.Add($resolvedPath)
+            } else {
+                $null = $caseInsensitivePaths.Add($resolvedPath)
+            }
+        }
+        $uniquePaths = [System.Collections.Generic.List[string]]::new()
+        foreach ($uniquePath in $caseSensitivePaths) {
+            $uniquePaths.Add($uniquePath)
+        }
+        foreach ($uniquePath in $caseInsensitivePaths) {
+            $uniquePaths.Add($uniquePath)
         }
         [string[]] $orderedPaths = $uniquePaths
-        [System.Array]::Sort($orderedPaths, $pathComparer)
+        [System.Array]::Sort($orderedPaths, [System.StringComparer]::Ordinal)
 
         foreach ($resolvedPath in $orderedPaths) {
             try {

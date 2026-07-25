@@ -85,6 +85,27 @@ Describe 'Import-Yaml' {
             @($result.value) | Should -Be @('first', 'second')
         }
 
+        It 'keeps case-distinct files separate on case-sensitive filesystems' -Skip:$IsWindows {
+            $upperPath = Join-Path $TestDrive 'Case.yaml'
+            $lowerPath = Join-Path $TestDrive 'case.yaml'
+            [System.IO.File]::WriteAllText($upperPath, 'value: upper')
+            [System.IO.File]::WriteAllText($lowerPath, 'value: lower')
+
+            $result = @(Import-Yaml -Path @($upperPath, $lowerPath))
+
+            @($result.value) | Should -Be @('upper', 'lower')
+        }
+
+        It 'suppresses path case variants on case-insensitive filesystems' -Skip:(-not $IsWindows) {
+            $path = Join-Path $TestDrive 'CaseVariant.yaml'
+            [System.IO.File]::WriteAllText($path, 'value: once')
+
+            $result = @(Import-Yaml -Path @($path, $path.ToLowerInvariant()))
+
+            $result.Count | Should -Be 1
+            $result[0].value | Should -Be 'once'
+        }
+
         It 'preserves deterministic file and document order together' {
             $firstPath = Join-Path $TestDrive '01.yaml'
             $secondPath = Join-Path $TestDrive '02.yaml'
