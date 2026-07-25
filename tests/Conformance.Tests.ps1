@@ -228,6 +228,27 @@ Describe 'Released yaml-test-suite corpus accounting' {
             Should -Not -Be (ConvertTo-YamlSuiteReferenceSignature -Value $distinctKeyGraph)
     }
 
+    It 'distinguishes non-specific tags in canonical representation events' {
+        $plain = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('"value"')
+        $nonSpecific = Invoke-InYamlModule -ScriptBlock $readYamlSuiteRepresentation `
+            -Arguments @('! value')
+        $plainEvents = ConvertTo-YamlSuiteActualEvent -Documents $plain.Value
+        $nonSpecificEvents = ConvertTo-YamlSuiteActualEvent -Documents $nonSpecific.Value
+        $oracleEvents = ConvertFrom-YamlSuiteEventText -Text @'
++STR
++DOC
+=VAL <!> :value
+-DOC
+-STR
+'@
+
+        (Compare-YamlSuiteCanonicalList -Left $plainEvents -Right $nonSpecificEvents) |
+            Should -BeFalse
+        $nonSpecificEvents | Should -Be $oracleEvents
+        $nonSpecificEvents | Should -Contain '=VAL|nonSpecificTag=true|value=value'
+    }
+
     It 'detects altered ordered-map and alias semantics in out.yaml' {
         $mutatedSuitePath = Join-Path $TestDrive 'mutated-out-cases'
         $null = New-Item -Path $mutatedSuitePath -ItemType Directory -Force

@@ -602,7 +602,11 @@ function ConvertFrom-YamlSuiteEventText {
             }
             $parts = [System.Collections.Generic.List[string]]::new()
             $parts.Add($prefix)
-            if ($tag -and $tag -ne '!') { $parts.Add("tag=$tag") }
+            if ($tag -eq '!') {
+                $parts.Add('nonSpecificTag=true')
+            } elseif ($tag) {
+                $parts.Add("tag=$tag")
+            }
             if ($anchorToken) { $parts.Add("anchor=$anchorToken") }
             if ($prefix -eq '=VAL') { $parts.Add("value=$value") }
             $canonical.Add(($parts -join '|'))
@@ -684,7 +688,11 @@ function ConvertTo-YamlSuiteActualEvent {
             if ($node.Kind -eq 'Scalar') {
                 $parts = [System.Collections.Generic.List[string]]::new()
                 $parts.Add('=VAL')
-                if ($node.Tag -and $node.Tag -ne '!') { $parts.Add("tag=$($node.Tag)") }
+                if ([string]::IsNullOrEmpty($node.Tag) -and $node.HasUnknownTag) {
+                    $parts.Add('nonSpecificTag=true')
+                } elseif ($node.Tag) {
+                    $parts.Add("tag=$($node.Tag)")
+                }
                 if ($node.Anchor) {
                     $parts.Add("anchor=$(
                             Get-YamlSuiteAnchorToken -Key ('id:{0}' -f $node.Id) -AnchorMap $anchorMap `
@@ -701,7 +709,11 @@ function ConvertTo-YamlSuiteActualEvent {
             $startParts = [System.Collections.Generic.List[string]]::new()
             $startToken = if ($node.Kind -eq 'Sequence') { '+SEQ' } else { '+MAP' }
             $startParts.Add($startToken)
-            if ($node.Tag -and $node.Tag -ne '!') { $startParts.Add("tag=$($node.Tag)") }
+            if ([string]::IsNullOrEmpty($node.Tag) -and $node.HasUnknownTag) {
+                $startParts.Add('nonSpecificTag=true')
+            } elseif ($node.Tag) {
+                $startParts.Add("tag=$($node.Tag)")
+            }
             if ($node.Anchor) {
                 $startParts.Add("anchor=$(
                         Get-YamlSuiteAnchorToken -Key ('id:{0}' -f $node.Id) -AnchorMap $anchorMap `
