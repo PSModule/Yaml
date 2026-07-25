@@ -411,6 +411,30 @@ root:
             $documents[1]['drop'] | Should -Be 'second'
         }
 
+        It 'treats an explicitly false AllDocuments switch as default nested selection' {
+            $yaml = @'
+---
+root:
+  drop: first
+  keep: one
+---
+root:
+  drop: second
+  keep: two
+'@
+            $defaultResult = Remove-YamlEntry $yaml '/root/drop'
+            $falseResult = Remove-YamlEntry $yaml '/root/drop' -AllDocuments:$false
+            $allResult = Remove-YamlEntry $yaml '/root/drop' -AllDocuments
+            $defaultDocuments = @($defaultResult | ConvertFrom-Yaml -AsHashtable)
+            $allDocuments = @($allResult | ConvertFrom-Yaml -AsHashtable)
+
+            $falseResult | Should -BeExactly $defaultResult
+            $defaultDocuments[0]['root'].Contains('drop') | Should -BeFalse
+            $defaultDocuments[1]['root']['drop'] | Should -Be 'second'
+            $allDocuments[0]['root'].Contains('drop') | Should -BeFalse
+            $allDocuments[1]['root'].Contains('drop') | Should -BeFalse
+        }
+
         It 'selects one explicit document index' {
             $yaml = "---`ndrop: first`n---`ndrop: second"
             $documents = @(
@@ -457,6 +481,19 @@ root:
             $documents.Count | Should -Be 2
             $documents[0]['first'] | Should -BeTrue
             $documents[1]['third'] | Should -BeTrue
+        }
+
+        It 'treats an explicitly false AllDocuments switch as default root selection' {
+            $yaml = "---`nfirst: true`n---`nsecond: true"
+            $defaultResult = Remove-YamlEntry $yaml ''
+            $falseResult = Remove-YamlEntry $yaml '' -AllDocuments:$false
+            $allResult = Remove-YamlEntry $yaml '' -AllDocuments
+            $defaultDocuments = @($defaultResult | ConvertFrom-Yaml -AsHashtable)
+
+            $falseResult | Should -BeExactly $defaultResult
+            $defaultDocuments.Count | Should -Be 1
+            $defaultDocuments[0]['second'] | Should -BeTrue
+            $allResult | Should -BeExactly ''
         }
 
         It 'removes all documents with AllDocuments and an empty pointer' {

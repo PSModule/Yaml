@@ -176,9 +176,7 @@ function Remove-YamlEntry {
                 -MaxScalarLength $MaxScalarLength -MaxTagLength $MaxTagLength `
                 -MaxTotalTagLength $MaxTotalTagLength -MaxNumericLength $MaxNumericLength
             $sourceDocuments = [object[]] $documentBox.Value
-            $selectAllDocuments = $AllDocuments.IsPresent -or (
-                $PSCmdlet.ParameterSetName -ceq 'AllDocuments'
-            )
+            $selectAllDocuments = $AllDocuments.IsPresent
             if (-not $selectAllDocuments -and $DocumentIndex -ge $sourceDocuments.Count) {
                 throw (New-YamlRemovalException `
                         -ErrorId 'YamlRemovalDocumentIndexOutOfRange' -Message (
