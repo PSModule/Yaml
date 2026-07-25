@@ -613,6 +613,46 @@ root: !item
             $failure.Exception.Data['YamlErrorId'] |
                 Should -BeExactly 'YamlInvalidTaggedCollection'
         }
+
+        It 'rejects post-removal duplicate representation keys' -ForEach @(
+            @{
+                Yaml = @'
+cycle: &cycle { self: *cycle }
+shared: &shared { x: 1, y: 2 }
+? *shared
+: first
+? { x: 1 }
+: second
+'@
+            }
+            @{
+                Yaml = @'
+shared: &shared { x: 1, y: 2 }
+set: !!set
+  ? *shared
+  ? { x: 1 }
+'@
+            }
+            @{
+                Yaml = @'
+shared: &shared { x: 1, y: 2 }
+ordered: !!omap
+  - ? *shared
+    : first
+  - ? { x: 1 }
+    : second
+'@
+            }
+        ) {
+            $failure = Get-RemoveYamlFailure {
+                Remove-YamlEntry $Yaml '/shared/y'
+            }
+
+            $failure.Exception.Data['YamlErrorId'] |
+                Should -BeExactly 'YamlDuplicateKey'
+            $failure.FullyQualifiedErrorId |
+                Should -Be 'YamlDuplicateKey,Remove-YamlEntry'
+        }
     }
 
     Context 'Validation and work limits' {

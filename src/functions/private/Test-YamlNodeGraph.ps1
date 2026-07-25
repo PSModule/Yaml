@@ -17,7 +17,11 @@ function Test-YamlNodeGraph {
         [System.Collections.Generic.Dictionary[int, string]] $FingerprintCache,
 
         [Parameter(Mandatory)]
-        [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher
+        [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher,
+
+        [Parameter()]
+        [AllowNull()]
+        [pscustomobject] $RemovalWorkState
     )
 
     $scalarTags = [System.Collections.Generic.HashSet[string]]::new(
@@ -94,7 +98,8 @@ function Test-YamlNodeGraph {
                         $keyFingerprint = Get-YamlNodeFingerprint `
                             -Node $entryNode.Entries[0].Key `
                             -Active ([System.Collections.Generic.HashSet[int]]::new()) `
-                            -Cache $FingerprintCache -Hasher $FingerprintHasher
+                            -Cache $FingerprintCache -Hasher $FingerprintHasher `
+                            -RemovalWorkState $RemovalWorkState
                         if (-not $orderedKeys.Add($keyFingerprint)) {
                             $keyNode = $entryNode.Entries[0].Key
                             throw (New-YamlException -Start $keyNode.Start -End $keyNode.End `
@@ -127,7 +132,8 @@ function Test-YamlNodeGraph {
             $entry = $current.Entries[$index]
             $fingerprint = Get-YamlNodeFingerprint -Node $entry.Key `
                 -Active ([System.Collections.Generic.HashSet[int]]::new()) `
-                -Cache $FingerprintCache -Hasher $FingerprintHasher
+                -Cache $FingerprintCache -Hasher $FingerprintHasher `
+                -RemovalWorkState $RemovalWorkState
             if (-not $keys.Add($fingerprint)) {
                 throw (New-YamlException -Start $entry.Key.Start -End $entry.Key.End `
                         -ErrorId 'YamlDuplicateKey' -Message (

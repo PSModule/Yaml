@@ -18,7 +18,11 @@ function Get-YamlNodeFingerprint {
         [System.Collections.Generic.Dictionary[int, string]] $Cache,
 
         [Parameter(Mandatory)]
-        [System.Security.Cryptography.HashAlgorithm] $Hasher
+        [System.Security.Cryptography.HashAlgorithm] $Hasher,
+
+        [Parameter()]
+        [AllowNull()]
+        [pscustomobject] $RemovalWorkState
     )
 
     $root = [pscustomobject]@{ Value = '' }
@@ -47,6 +51,10 @@ function Get-YamlNodeFingerprint {
                 $frame.Holder.Value = $cached
                 [void] $stack.Pop()
                 continue
+            }
+            if ($null -ne $RemovalWorkState) {
+                Add-YamlRemovalWork -State $RemovalWorkState `
+                    -Operation 'duplicate-key fingerprint' -Node $effective
             }
             if (-not $Active.Add($effective.Id)) {
                 throw (New-YamlException -Start $effective.Start -End $effective.End `

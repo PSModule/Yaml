@@ -143,6 +143,7 @@ function Assert-YamlRemovalGraph {
                         ))
                 }
             }
+
         }
         for ($index = $node.Entries.Count - 1; $index -ge 0; $index--) {
             $pending.Push([pscustomobject]@{
@@ -154,5 +155,22 @@ function Assert-YamlRemovalGraph {
                     Depth = $item.Depth + 1
                 })
         }
+    }
+
+    $fingerprintCache = [System.Collections.Generic.Dictionary[int, string]]::new()
+    $fingerprintHasher = [System.Security.Cryptography.SHA256]::Create()
+    $fingerprintWorkState = [pscustomobject]@{
+        Count    = 0L
+        MaxNodes = $MaxNodes
+    }
+    try {
+        foreach ($document in $Documents) {
+            Test-YamlNodeGraph -Node $document `
+                -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
+                -FingerprintCache $fingerprintCache -FingerprintHasher $fingerprintHasher `
+                -RemovalWorkState $fingerprintWorkState
+        }
+    } finally {
+        $fingerprintHasher.Dispose()
     }
 }
