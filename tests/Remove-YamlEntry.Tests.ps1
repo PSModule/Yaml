@@ -223,6 +223,27 @@ keep: true
             $actual | Should -BeExactly ("name: lower`nkeep: true" | Format-Yaml)
         }
 
+        It 'matches mapping key code points ordinally' {
+            $composed = [string] [char] 0x00E9
+            $decomposed = 'e' + [char] 0x0301
+            $yaml = '"' + $decomposed + '": value' + "`nkeep: true"
+
+            Remove-YamlEntry $yaml ('/' + $composed) -IgnoreMissing |
+                Should -BeExactly ($yaml | Format-Yaml)
+
+            $result = Remove-YamlEntry $yaml ('/' + $decomposed) |
+                ConvertFrom-Yaml -AsHashtable
+            $result.Contains($decomposed) | Should -BeFalse
+            $result['keep'] | Should -BeTrue
+        }
+
+        It 'does not treat a linguistically equal unknown tag as a string tag' {
+            $yaml = "!<tag:yaml.org,2002:st%C2%ADr> key: tagged`nkeep: true"
+
+            Remove-YamlEntry $yaml '/key' -IgnoreMissing |
+                Should -BeExactly ($yaml | Format-Yaml)
+        }
+
         It 'treats explicit string keys as strings and plain numeric keys as numbers' {
             $yaml = @'
 1: numeric

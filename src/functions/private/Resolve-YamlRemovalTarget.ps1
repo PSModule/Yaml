@@ -67,11 +67,19 @@ function Resolve-YamlRemovalTarget {
 
                 $resolvedKey = (Resolve-YamlScalar -Node $keyNode).Value
                 $effectiveTag = Get-YamlEffectiveTag -Node $keyNode -Value $resolvedKey
-                if ($effectiveTag -cne 'tag:yaml.org,2002:str') {
+                if (-not [string]::Equals(
+                        $effectiveTag,
+                        'tag:yaml.org,2002:str',
+                        [System.StringComparison]::Ordinal
+                    )) {
                     $hasUnaddressableKey = $true
                     continue
                 }
-                if ([string] $keyNode.Value -ceq $token) {
+                if ([string]::Equals(
+                        [string] $keyNode.Value,
+                        $token,
+                        [System.StringComparison]::Ordinal
+                    )) {
                     $matchingIndexes.Add($entryIndex)
                 }
             }
