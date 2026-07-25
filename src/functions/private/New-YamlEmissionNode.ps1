@@ -16,15 +16,16 @@ function New-YamlEmissionNode {
     )
 
     $node = [pscustomobject]@{
-        PSTypeName  = 'PSModule.Yaml.EmissionNode'
-        Kind        = $Kind
-        Tag         = ''
-        Value       = ''
-        Style       = 'Plain'
-        Items       = [System.Collections.Generic.List[object]]::new()
-        Entries     = [System.Collections.Generic.List[object]]::new()
-        ReferenceId = [long] 0
-        Anchor      = ''
+        PSTypeName    = 'PSModule.Yaml.EmissionNode'
+        Kind          = $Kind
+        Tag           = ''
+        HasUnknownTag = $false
+        Value         = ''
+        Style         = 'Plain'
+        Items         = [System.Collections.Generic.List[object]]::new()
+        Entries       = [System.Collections.Generic.List[object]]::new()
+        ReferenceId   = [long] 0
+        Anchor        = ''
     }
     Write-Output -InputObject $node -NoEnumerate
 }

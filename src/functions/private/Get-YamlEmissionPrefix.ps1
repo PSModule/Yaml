@@ -15,12 +15,9 @@ function Get-YamlEmissionPrefix {
         $parts.Add("&$($Node.Anchor)")
     }
     if (-not [string]::IsNullOrEmpty($Node.Tag)) {
-        $prefix = 'tag:yaml.org,2002:'
-        if ($Node.Tag.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
-            $parts.Add("!!$($Node.Tag.Substring($prefix.Length))")
-        } else {
-            $parts.Add("!<$($Node.Tag)>")
-        }
+        $parts.Add((ConvertTo-YamlTagText -Tag $Node.Tag))
+    } elseif ($Node.HasUnknownTag) {
+        $parts.Add('!')
     }
     return $parts -join ' '
 }

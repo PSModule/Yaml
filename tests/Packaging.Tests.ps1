@@ -79,6 +79,7 @@ Describe 'Dependency-free package source' {
             'ConvertFrom-YamlNode.ps1',
             'Get-YamlSerializationShape.ps1',
             'ConvertTo-YamlNode.ps1',
+            'ConvertTo-YamlRepresentationNode.ps1',
             'Write-YamlNodeText.ps1'
         ) | ForEach-Object {
             $isPresent = Test-Path -LiteralPath (Join-Path $privatePath $_)
@@ -131,6 +132,7 @@ Describe 'Generated artifact package' {
                 'ConvertFrom-Yaml',
                 'ConvertTo-Yaml',
                 'Export-Yaml',
+                'Format-Yaml',
                 'Import-Yaml',
                 'Test-Yaml'
             )
@@ -169,6 +171,10 @@ if ($value['v'] -isnot [object[]] -or $value['v'].Count -ne 0) {
 }
 if (-not ('name: Ada' | Test-Yaml)) {
     throw 'The imported parser did not validate YAML.'
+}
+$formatted = '{name: Ada, active: true}' | Format-Yaml
+if ($formatted -cne "---`n`"name`": `"Ada`"`n`"active`": true") {
+    throw 'The imported formatter did not normalize YAML.'
 }
 $shared = [ordered]@{ value = 1 }
 $roundTrip = [ordered]@{ first = $shared; second = $shared } |
