@@ -15,7 +15,8 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'ConvertFrom-Yaml' {
+Describe 'Yaml' {
+    Describe 'ConvertFrom-Yaml' {
     Context 'YAML 1.2 core schema' {
         It 'resolves <Text> as <Type>' -ForEach @(
             @{ Text = ''; Type = 'null'; Expected = $null }
@@ -39,6 +40,7 @@ Describe 'ConvertFrom-Yaml' {
             $result.value | Should -Be $Expected
             if ($Type -ne 'null') {
                 $result.value.GetType().Name | Should -Be $Type
+                }
             }
         }
 
