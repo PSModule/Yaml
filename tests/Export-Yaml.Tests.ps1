@@ -15,7 +15,8 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'Export-Yaml' {
+Describe 'Yaml' {
+    Describe 'Export-Yaml' {
     Context 'Command contract' {
         It 'declares pipeline, ShouldProcess, and output metadata' {
             $command = Get-Command -Name Export-Yaml
@@ -39,6 +40,7 @@ Describe 'Export-Yaml' {
             $command.Parameters['Encoding'].Attributes.ValidValues |
                 Should -Be @('utf8', 'utf8BOM', 'utf16LE', 'utf16BE', 'utf32LE', 'utf32BE')
             $command.Parameters['NewLine'].Attributes.ValidValues | Should -Be @('LF', 'CRLF')
+            }
         }
 
         It 'provides complete command help' {
