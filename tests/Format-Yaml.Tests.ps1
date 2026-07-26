@@ -33,7 +33,8 @@ BeforeAll {
     }
 }
 
-Describe 'Format-Yaml' {
+Describe 'Yaml' {
+    Describe 'Format-Yaml' {
     Context 'Public contract' {
         It 'exposes the advanced string formatter contract' {
             $command = Get-Command -Name Format-Yaml
@@ -54,6 +55,7 @@ Describe 'Format-Yaml' {
             @($command.OutputType.Type) | Should -Contain ([string])
             $indentRange.MinRange | Should -Be 2
             $indentRange.MaxRange | Should -Be 9
+            }
         }
 
         It 'emits exactly one string without CR or a final newline' {
