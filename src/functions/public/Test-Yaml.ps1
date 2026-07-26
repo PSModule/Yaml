@@ -46,6 +46,9 @@ function Test-Yaml {
 
         .OUTPUTS
         System.Boolean
+
+        .LINK
+        https://github.com/PSModule/Yaml#validate-yaml
     #>
     [CmdletBinding()]
     [OutputType([bool])]

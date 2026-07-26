@@ -49,6 +49,9 @@ function ConvertTo-Yaml {
 
         .OUTPUTS
         System.String
+
+        .LINK
+        https://github.com/PSModule/Yaml#serialize-powershell-values
     #>
     [CmdletBinding()]
     [OutputType([string])]

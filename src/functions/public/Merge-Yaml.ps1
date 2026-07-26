@@ -96,7 +96,7 @@ function Merge-Yaml {
         YAML 1.1 merge keys are ordinary mapping data and are never expanded.
 
         .LINK
-        https://github.com/PSModule/Yaml#format-yaml-streams
+        https://github.com/PSModule/Yaml#merge-yaml-streams
     #>
     [OutputType([string])]
     [CmdletBinding()]
@@ -277,3 +277,4 @@ function Merge-Yaml {
         }
     }
 }
+

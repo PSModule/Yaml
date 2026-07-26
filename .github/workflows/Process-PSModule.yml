@@ -18,19 +18,39 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  pull-requests: write
-  statuses: write
-  pages: write
-  id-token: write
+permissions: {}
 
 jobs:
-  Process-PSModule:
+  Process-PSModule-PR:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
     uses: PSModule/Process-PSModule/.github/workflows/workflow.yml@fb1bdb8fefd243292f779d2a856a38db6fe6daf4 # v6.1.13
     with:
       ImportantFilePatterns: |
         ^src/
         ^tests/
         ^README\.md$
-    secrets: inherit
+    secrets:
+      APIKey: ${{ secrets.APIKey }}
+      TestData: ${{ secrets.TestData }}
+
+  Process-PSModule-Release:
+    if: github.event_name != 'pull_request' || github.event.action == 'closed'
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+      pages: write
+      id-token: write
+    uses: PSModule/Process-PSModule/.github/workflows/workflow.yml@fb1bdb8fefd243292f779d2a856a38db6fe6daf4 # v6.1.13
+    with:
+      ImportantFilePatterns: |
+        ^src/
+        ^tests/
+        ^README\.md$
+    secrets:
+      APIKey: ${{ secrets.APIKey }}
+      TestData: ${{ secrets.TestData }}
