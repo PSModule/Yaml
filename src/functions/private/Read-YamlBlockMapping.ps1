@@ -2,31 +2,57 @@ function Read-YamlBlockMapping {
     <#
         .SYNOPSIS
         Reads a block mapping, including explicit and complex keys.
+
+        .DESCRIPTION
+        Reads mapping entries at a fixed block indentation, handling explicit
+        keys, implicit keys, empty values, and nested block nodes. It produces
+        the mapping syntax node that later becomes representation graph entries.
+
+        .EXAMPLE
+        Read-YamlBlockMapping -Context $context -Indent 0 -Depth 1 -FirstText 'name: api' -FirstColumn 0
+
+        Returns a mapping node with the supplied compact first entry parsed.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser context positioned at the mapping or its compact first entry.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Required indentation column for entries in this mapping block.
         [Parameter(Mandatory)]
         [int] $Indent,
 
+        # Node depth assigned to the mapping for parser limit accounting.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Explicit tag to attach to the mapping, when supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Tag = '',
 
+        # Preserves whether the mapping tag is unknown to the schema.
+        [Parameter()]
         [bool] $HasUnknownTag = $false,
 
+        # Anchor name to register on the mapping node, when supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Anchor = '',
 
+        # Compact first mapping text already separated by a parent reader.
+        [Parameter()]
         [AllowNull()]
         [string] $FirstText,
 
+        # Source column of the compact first mapping text for diagnostics.
+        [Parameter()]
         [int] $FirstColumn = -1
     )
 

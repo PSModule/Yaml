@@ -2,16 +2,32 @@ function Resolve-YamlTag {
     <#
         .SYNOPSIS
         Expands, budgets, and classifies one YAML tag token.
+
+        .DESCRIPTION
+        Expands a raw YAML tag token through declared handles, validates URI text,
+        decodes escapes, and enforces tag-length budgets. It also marks tags
+        outside the supported YAML 1.2 standard set as unknown for safe fallback.
+
+        .EXAMPLE
+        Resolve-YamlTag -Token '!!str' -Context $context -Mark $mark
+
+        Returns an object whose Tag is tag:yaml.org,2002:str and IsUnknown is false.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Supplies the raw tag token exactly as scanned from the YAML stream.
         [Parameter(Mandatory)]
         [string] $Token,
 
+        # Provides declared tag handles and tag-length budgets needed for expansion.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Carries the source location used when malformed tags need diagnostics.
         [Parameter(Mandatory)]
         [pscustomobject] $Mark
     )

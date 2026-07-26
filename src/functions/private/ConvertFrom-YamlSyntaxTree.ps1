@@ -2,10 +2,25 @@ function ConvertFrom-YamlSyntaxTree {
     <#
         .SYNOPSIS
         Iteratively composes syntax tokens into a representation graph.
+
+        .DESCRIPTION
+        Builds the internal YAML node graph from parser syntax tokens while
+        preserving node identity, anchors, tags, scalar metadata, and aliases.
+        The iterative cache-based walk avoids recursion and keeps shared nodes
+        shared for the constructor pipeline.
+
+        .EXAMPLE
+        ConvertFrom-YamlSyntaxTree -Root $syntaxTree
+
+        Returns the composed representation graph rooted at the parsed syntax tree.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The parsed syntax root to compose into reusable representation nodes.
         [Parameter(Mandatory)]
         [pscustomobject] $Root
     )

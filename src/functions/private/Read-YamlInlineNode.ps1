@@ -2,28 +2,51 @@ function Read-YamlInlineNode {
     <#
         .SYNOPSIS
         Reads a quoted, alias, or flow node beginning on the current block line.
+
+        .DESCRIPTION
+        Creates a flow cursor at the current block line, delegates inline syntax
+        to the flow reader, and verifies that only trivia follows on that line.
+        This lets block parsing accept quoted scalars, aliases, and flow nodes.
+
+        .EXAMPLE
+        Read-YamlInlineNode -Context $context -Column 4 -ParentIndent 2 -Depth 3 -Anchor 'item'
+
+        Reads the inline node and advances the block reader past its line.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser state containing the current block line and source text.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Source column where the inline node starts on the current line.
         [Parameter(Mandatory)]
         [int] $Column,
 
+        # Surrounding block indent used to validate multiline inline scalars.
         [Parameter(Mandatory)]
         [int] $ParentIndent,
 
+        # Node depth assigned to the inline node for depth-limit accounting.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Explicit tag already parsed before the inline node, when present.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Tag = '',
 
+        # Preserves whether the pending tag is unknown to the schema.
+        [Parameter()]
         [bool] $HasUnknownTag = $false,
 
+        # Anchor name already parsed before the inline node, when present.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Anchor = ''
     )

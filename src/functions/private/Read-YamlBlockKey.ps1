@@ -2,23 +2,41 @@ function Read-YamlBlockKey {
     <#
         .SYNOPSIS
         Reads one single-line implicit block mapping key.
+
+        .DESCRIPTION
+        Parses a single-line implicit mapping key, including node properties and
+        flow or quoted key forms. Block mapping parsing uses it to validate key
+        syntax and length before reading the associated value.
+
+        .EXAMPLE
+        Read-YamlBlockKey -Context $context -Text 'name' -Line 0 -Column 0 -Depth 2
+
+        Returns a scalar key node for the implicit mapping entry.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser context that supplies source offsets, limits, and tag handles.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Key text sliced from the mapping entry before the value indicator.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Text,
 
+        # Source line containing the implicit key for mark calculation.
         [Parameter(Mandatory)]
         [int] $Line,
 
+        # Source column where the key text begins for diagnostics.
         [Parameter(Mandatory)]
         [int] $Column,
 
+        # Node depth assigned to the key for nesting-limit accounting.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth

@@ -2,20 +2,37 @@ function Read-YamlNodeProperty {
     <#
         .SYNOPSIS
         Reads tag and anchor properties from the start of a node segment.
+
+        .DESCRIPTION
+        Scans leading YAML node properties, resolves tag handles through the
+        current directive context, and returns the unconsumed node text. Block
+        node readers use the result before choosing the concrete node kind.
+
+        .EXAMPLE
+        Read-YamlNodeProperty -Text '!<tag:example.com,2026:thing> &item value' -Line 0 -Column 0 -Context $context
+
+        Returns the resolved tag, anchor name, remaining text, and consumed width.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Node segment whose leading tag and anchor properties are scanned.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Text,
 
+        # Source line used to locate property errors precisely.
         [Parameter(Mandatory)]
         [int] $Line,
 
+        # Source column where the segment starts for mark calculation.
         [Parameter(Mandatory)]
         [int] $Column,
 
+        # Parser context that supplies tag handles, limits, and source offsets.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

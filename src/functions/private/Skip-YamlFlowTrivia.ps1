@@ -2,6 +2,19 @@ function Skip-YamlFlowTrivia {
     <#
         .SYNOPSIS
         Skips separation whitespace and comments inside flow content.
+
+        .DESCRIPTION
+        Consumes spaces, tabs, comments, and allowed line breaks inside flow
+        collections. It validates comment separation, byte order marks, and
+        continuation indentation so flow parsing resumes at the next token safely.
+
+        .EXAMPLE
+        Skip-YamlFlowTrivia -Cursor $cursor -Context $context
+
+        Leaves the cursor positioned at the next non-trivia flow token.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,9 +22,11 @@ function Skip-YamlFlowTrivia {
     )]
     [CmdletBinding()]
     param (
+        # The active flow parser cursor to advance past trivia.
         [Parameter(Mandatory)]
         [pscustomobject] $Cursor,
 
+        # The reader context that provides text, parent indentation, and limits.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

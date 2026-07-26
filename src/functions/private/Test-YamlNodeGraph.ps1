@@ -2,31 +2,51 @@ function Test-YamlNodeGraph {
     <#
         .SYNOPSIS
         Iteratively validates tags and mapping-key uniqueness.
+
+        .DESCRIPTION
+        Traverses a composed YAML representation graph without recursion, resolving
+        scalar values and enforcing collection tag rules. It also checks mapping,
+        set, ordered-map, and pairs key requirements before projection.
+
+        .EXAMPLE
+        Test-YamlNodeGraph -Node $document.Root -Visited ([System.Collections.Generic.HashSet[int]]::new()) -FingerprintCache ([System.Collections.Generic.Dictionary[int,string]]::new()) -FingerprintHasher ([System.Security.Cryptography.SHA256]::Create())
+
+        Completes without output when the graph has compatible tags and unique mapping keys.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (
+        # Provides the graph root to validate before it is projected to PowerShell values.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Tracks visited node identities so aliases and cycles do not cause repeated work.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.HashSet[int]] $Visited,
 
+        # Reuses structural fingerprints while duplicate mapping keys are bucketed.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.Dictionary[int, string]] $FingerprintCache,
 
+        # Computes stable fingerprints for complex keys during uniqueness checks.
         [Parameter(Mandatory)]
         [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher,
 
+        # Shares removal work state used by structural key comparison helpers.
         [Parameter()]
         [AllowNull()]
         [pscustomobject] $RemovalWorkState,
 
+        # Shares graph equality state so alias-aware key comparisons stay iterative.
         [Parameter()]
         [AllowNull()]
         [pscustomobject] $EqualityState,
 
+        # Caches equality fingerprints separately from the primary uniqueness buckets.
         [Parameter()]
         [AllowNull()]
         [System.Collections.Generic.Dictionary[int, string]] $EqualityFingerprintCache

@@ -2,35 +2,66 @@ function Read-YamlBlockNode {
     <#
         .SYNOPSIS
         Reads one node in block context.
+
+        .DESCRIPTION
+        Selects the correct block-context node reader for the current line or
+        supplied segment, including mappings, sequences, block scalars, inline
+        nodes, plain scalars, and empty nodes. It carries pending tag and anchor
+        properties across lines in the YAML parser pipeline.
+
+        .EXAMPLE
+        Read-YamlBlockNode -Context $context -ParentIndent -1 -Depth 1
+
+        Reads the next block-context node from the current parser position.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser context positioned at the node or containing the source segment.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Indentation of the containing block that bounds this node.
         [Parameter(Mandatory)]
         [int] $ParentIndent,
 
+        # Node depth assigned to the selected node for nesting limits.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Pre-split line segment to parse instead of reading from the context.
+        [Parameter()]
         [AllowNull()]
         [string] $Segment,
 
+        # Source column of the supplied segment for marks and diagnostics.
+        [Parameter()]
         [int] $SegmentColumn = -1,
 
+        # Tag parsed on a previous property-only line and applied here.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $PendingTag = '',
 
+        # Carries unknown-tag state from a previous property-only line.
+        [Parameter()]
         [bool] $PendingUnknownTag = $false,
 
+        # Anchor parsed on a previous property-only line and applied here.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $PendingAnchor = '',
 
+        # Permits a sequence at the parent's indent for mapping values.
+        [Parameter()]
         [switch] $AllowIndentlessSequence,
 
+        # Prevents compact mapping parsing when a mapping value forbids it.
+        [Parameter()]
         [switch] $DisallowCompactMapping
     )
 

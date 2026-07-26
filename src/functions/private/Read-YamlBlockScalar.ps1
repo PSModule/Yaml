@@ -2,31 +2,55 @@ function Read-YamlBlockScalar {
     <#
         .SYNOPSIS
         Reads a literal or folded block scalar.
+
+        .DESCRIPTION
+        Parses the block-scalar header, detects or applies content indentation,
+        reads the scalar body, and performs YAML literal or folded chomping. The
+        block node reader uses it when a `|` or `>` scalar begins a node.
+
+        .EXAMPLE
+        Read-YamlBlockScalar -Context $context -Header '|-' -HeaderColumn 4 -ParentIndent 2 -Depth 3
+
+        Returns a scalar node containing the chomped literal block content.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser context positioned at the block-scalar header line.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Header text containing style, indentation, chomping, and comments.
         [Parameter(Mandatory)]
         [string] $Header,
 
+        # Source column of the header indicator for node marks and errors.
         [Parameter(Mandatory)]
         [int] $HeaderColumn,
 
+        # Indentation of the containing block used to detect scalar content.
         [Parameter(Mandatory)]
         [int] $ParentIndent,
 
+        # Node depth assigned to the scalar for resource-limit enforcement.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Explicit tag to attach to the scalar, when supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Tag = '',
 
+        # Preserves whether the scalar tag is unknown to the schema.
+        [Parameter()]
         [bool] $HasUnknownTag = $false,
 
+        # Anchor name to register on the scalar node, when supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Anchor = ''
     )

@@ -2,10 +2,24 @@ function ConvertFrom-YamlInteger {
     <#
         .SYNOPSIS
         Constructs the narrowest supported numeric value from a YAML integer.
+
+        .DESCRIPTION
+        Parses a YAML integer lexical value, including optional sign and octal or
+        hexadecimal prefixes, without losing precision. It returns Int32, Int64,
+        or BigInteger so constructed scalar values use the smallest safe type.
+
+        .EXAMPLE
+        ConvertFrom-YamlInteger -Value '0x2A'
+
+        Returns 42 as an Int32 value.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int], [long], [System.Numerics.BigInteger])]
     param (
+        # The normalized YAML integer text to construct as a numeric value.
         [Parameter(Mandatory)]
         [string] $Value
     )

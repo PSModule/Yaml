@@ -2,10 +2,24 @@ function Get-YamlNormalizedFloat {
     <#
         .SYNOPSIS
         Normalizes a finite CLR floating-point value to a decimal significand and exponent.
+
+        .DESCRIPTION
+        Converts Decimal, Single, and Double values to invariant YAML float tokens,
+        including NaN and infinities. Finite numbers become a trimmed decimal
+        significand plus exponent so emission is deterministic.
+
+        .EXAMPLE
+        Get-YamlNormalizedFloat -Value ([double]12.34)
+
+        Returns 1234e-2 as the normalized decimal significand and exponent.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # Supplies the CLR floating-point value that must be normalized for YAML output.
         [Parameter(Mandatory)]
         [object] $Value
     )

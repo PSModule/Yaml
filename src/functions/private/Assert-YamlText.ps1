@@ -2,9 +2,24 @@ function Assert-YamlText {
     <#
         .SYNOPSIS
         Validates YAML input characters before parsing.
+
+        .DESCRIPTION
+        Scans the stream for characters outside the YAML c-printable set or
+        unpaired UTF-16 surrogates and throws a classified YAML exception that
+        points at the offending line and column. Returns nothing when the text is
+        valid.
+
+        .EXAMPLE
+        Assert-YamlText -Yaml 'name: Ada'
+
+        Returns nothing because every character is c-printable.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (
+        # The raw YAML stream to validate before tokenization; may be empty.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Yaml

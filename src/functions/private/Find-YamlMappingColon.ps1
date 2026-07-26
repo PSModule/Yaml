@@ -2,14 +2,31 @@ function Find-YamlMappingColon {
     <#
         .SYNOPSIS
         Finds a block mapping value indicator outside quoted and flow content.
+
+        .DESCRIPTION
+        Scans a logical block line for the colon that separates a mapping key from
+        its value while ignoring quoted scalars, flow collections, tags, and
+        comments. Block readers use the returned index to split implicit key/value
+        text without misreading nested YAML syntax.
+
+        .EXAMPLE
+        Find-YamlMappingColon -Text 'name: value'
+
+        Returns the zero-based index of the mapping colon in the line.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]
     param (
+        # The logical block line to scan for a top-level mapping value indicator.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Text,
 
+        # Allows callers to use a colon candidate found while scanning a leading anchor or alias.
+        [Parameter()]
         [switch] $AllowAnchorFallback
     )
 

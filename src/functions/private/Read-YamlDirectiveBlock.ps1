@@ -2,10 +2,24 @@ function Read-YamlDirectiveBlock {
     <#
         .SYNOPSIS
         Scans one document's directive block and resolves tag handles.
+
+        .DESCRIPTION
+        Reads consecutive YAML directives before a document, validates supported
+        YAML and TAG declarations, and builds the tag-handle table for the next
+        document. The stream reader installs that table before node parsing.
+
+        .EXAMPLE
+        Read-YamlDirectiveBlock -Context $context
+
+        Returns directive state and the tag handles active for the document.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser context positioned at the possible start of a directive block.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

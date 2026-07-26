@@ -2,10 +2,24 @@ function Test-YamlReservedDirective {
     <#
         .SYNOPSIS
         Tests the YAML reserved-directive name and parameter productions.
+
+        .DESCRIPTION
+        Checks that a percent-led reserved directive has a non-empty name and only
+        separated tokens before any comment. This lets the scanner tolerate
+        application-specific directives while rejecting malformed directive lines.
+
+        .EXAMPLE
+        Test-YamlReservedDirective -Directive '%FOO one two # comment'
+
+        Returns true because the directive has a name and separated parameters.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param (
+        # Supplies the complete directive line so comments and token separation can be checked.
         [Parameter(Mandatory)]
         [string] $Directive
     )

@@ -2,17 +2,34 @@ function Test-YamlDocumentPrefix {
     <#
         .SYNOPSIS
         Tests whether text after a BOM is a legal YAML document prefix.
+
+        .DESCRIPTION
+        Walks the text after a document-boundary byte order mark, skipping blank
+        lines, comments, and allowed leading BOMs. The scanner uses it to decide
+        whether a BOM can start a document or must be rejected.
+
+        .EXAMPLE
+        Test-YamlDocumentPrefix -Text "$([char]0xFEFF)---`nname: value" -Index 1 -RequireDocumentStart
+
+        Returns true because the prefix after the BOM begins with a document-start marker.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param (
+        # Supplies the complete stream text because the legal prefix can span lines.
         [Parameter(Mandatory)]
         [string] $Text,
 
+        # Marks the zero-based offset immediately after the BOM being validated.
         [Parameter(Mandatory)]
         [ValidateRange(0, 2147483647)]
         [int] $Index,
 
+        # Forces validation to accept only prefixes that lead to an explicit document start.
+        [Parameter()]
         [switch] $RequireDocumentStart
     )
 

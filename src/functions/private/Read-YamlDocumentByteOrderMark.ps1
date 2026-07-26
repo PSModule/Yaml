@@ -2,6 +2,19 @@ function Read-YamlDocumentByteOrderMark {
     <#
         .SYNOPSIS
         Consumes a byte order mark while scanning an actual document prefix.
+
+        .DESCRIPTION
+        Removes leading byte order mark characters from the current physical
+        line only when the parser is positioned at an allowed document prefix.
+        The stream reader uses it to support BOMs without mutating source text.
+
+        .EXAMPLE
+        Read-YamlDocumentByteOrderMark -Context $context -RequireDocumentStart
+
+        Advances the current line start past an allowed document-prefix marker.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,11 +22,16 @@ function Read-YamlDocumentByteOrderMark {
     )]
     [CmdletBinding()]
     param (
+        # Parser context whose current line and line-start offset may advance.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Requires noninitial BOMs to be attached to an explicit document start.
+        [Parameter()]
         [switch] $RequireDocumentStart,
 
+        # Skips the location check when the caller has already validated it.
+        [Parameter()]
         [switch] $SkipValidation
     )
 

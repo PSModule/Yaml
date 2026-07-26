@@ -2,13 +2,28 @@ function Get-YamlEffectiveTag {
     <#
         .SYNOPSIS
         Gets the effective representation tag for a YAML node.
+
+        .DESCRIPTION
+        Returns the explicit node tag when one is present, otherwise derives the
+        standard YAML tag from node kind and resolved value. Format, merge, and
+        projection code use this to compare representation semantics consistently.
+
+        .EXAMPLE
+        Get-YamlEffectiveTag -Node $node -Value $resolved.Value
+
+        Returns the standard YAML tag that represents the node's effective value.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # Provides the representation node whose explicit tag or kind takes precedence.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Supplies the resolved scalar value so implicit scalar tags can be derived.
         [Parameter(Mandatory)]
         [AllowNull()]
         [object] $Value

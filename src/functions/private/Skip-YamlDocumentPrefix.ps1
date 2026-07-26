@@ -2,6 +2,19 @@ function Skip-YamlDocumentPrefix {
     <#
         .SYNOPSIS
         Advances across repeated YAML document prefixes.
+
+        .DESCRIPTION
+        Repeatedly consumes allowed byte order marks, blank lines, and comments
+        before a document body. This keeps the parser context positioned at the
+        next content line while enforcing explicit document-start requirements.
+
+        .EXAMPLE
+        Skip-YamlDocumentPrefix -Context $context -RequireDocumentStart
+
+        Advances the context line index past prefix trivia before reading the next document.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,9 +22,12 @@ function Skip-YamlDocumentPrefix {
     )]
     [CmdletBinding()]
     param (
+        # The reader context whose current line index is advanced over prefixes.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Requires prefix validation to honor an explicit document-start marker.
+        [Parameter()]
         [switch] $RequireDocumentStart
     )
 

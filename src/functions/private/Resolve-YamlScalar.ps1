@@ -2,10 +2,24 @@ function Resolve-YamlScalar {
     <#
         .SYNOPSIS
         Constructs and caches a safe PowerShell scalar using YAML 1.2 rules.
+
+        .DESCRIPTION
+        Resolves scalar node content according to an explicit tag or the YAML 1.2
+        core implicit rules and caches the result on the node. It validates numeric
+        limits, timestamps, and Base64 so projection uses safe .NET values.
+
+        .EXAMPLE
+        Resolve-YamlScalar -Node $node
+
+        Returns a value box containing the resolved scalar and caches it on the node.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Provides the scalar representation node whose tag and text must be constructed.
         [Parameter(Mandatory)]
         [pscustomobject] $Node
     )

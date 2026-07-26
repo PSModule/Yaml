@@ -2,14 +2,30 @@ function Test-YamlTagUriText {
     <#
         .SYNOPSIS
         Tests tag URI text without allocating a decoded copy.
+
+        .DESCRIPTION
+        Validates the character set and percent-escape pairs permitted in YAML tag
+        URI text. The check runs against the original token so tag resolution can
+        reject malformed tags before decoding or expanding them.
+
+        .EXAMPLE
+        Test-YamlTagUriText -Text 'tag:example.com,2026:settings'
+
+        Returns true because the text uses characters allowed in YAML tag URI text.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param (
+        # Supplies the raw tag URI text whose characters and escapes must be validated.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Text,
 
+        # Applies stricter shorthand-suffix exclusions before a tag handle is expanded.
+        [Parameter()]
         [switch] $Shorthand
     )
 

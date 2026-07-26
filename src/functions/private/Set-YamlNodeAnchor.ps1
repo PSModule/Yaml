@@ -2,6 +2,19 @@ function Set-YamlNodeAnchor {
     <#
         .SYNOPSIS
         Assigns deterministic anchors to repeated emission nodes.
+
+        .DESCRIPTION
+        Walks the tracked reference order and assigns stable generated anchor names
+        to nodes that are referenced more than once. The YAML pipeline uses these
+        anchors so repeated graph nodes can be represented consistently.
+
+        .EXAMPLE
+        Set-YamlNodeAnchor -State $state
+
+        Updates repeated nodes in the state with deterministic id-style anchor names.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,6 +22,7 @@ function Set-YamlNodeAnchor {
     )]
     [CmdletBinding()]
     param (
+        # The graph state containing reference order, reference counts, and nodes by id.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

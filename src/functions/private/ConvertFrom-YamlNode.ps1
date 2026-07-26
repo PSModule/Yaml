@@ -2,17 +2,35 @@ function ConvertFrom-YamlNode {
     <#
         .SYNOPSIS
         Iteratively projects an internal YAML graph through a value box.
+
+        .DESCRIPTION
+        Converts composed YAML representation nodes into PowerShell values while
+        resolving aliases and preserving shared collection identity through a
+        cache. It selects PSCustomObject projection by default, or ordered
+        dictionaries when requested or required by YAML collection tags.
+
+        .EXAMPLE
+        ConvertFrom-YamlNode -Node $document.Root -Cache ([System.Collections.Generic.Dictionary[int, object]]::new()) -AsHashtable
+
+        Projects the document root into a value box containing ordered dictionaries.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The representation node whose aliases and children must be projected.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # The node-id cache that preserves alias identity and stops repeated work.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.Dictionary[int, object]] $Cache,
 
+        # Requests dictionary projection so non-property YAML keys survive intact.
+        [Parameter()]
         [switch] $AsHashtable
     )
 

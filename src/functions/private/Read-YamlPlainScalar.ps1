@@ -2,31 +2,55 @@ function Read-YamlPlainScalar {
     <#
         .SYNOPSIS
         Reads a block-context plain scalar and its folded continuation lines.
+
+        .DESCRIPTION
+        Validates the first plain-scalar segment, folds eligible continuation
+        lines, and rejects block mapping indicators that would end the scalar.
+        The block parser uses it to produce scalar nodes from unquoted content.
+
+        .EXAMPLE
+        Read-YamlPlainScalar -Context $context -FirstText 'name value' -FirstColumn 2 -ParentIndent 0 -Depth 2
+
+        Returns a plain scalar node with the folded value from the current block.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser state containing source lines, cursor position, and limits.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # First source segment that starts the plain scalar value.
         [Parameter(Mandatory)]
         [string] $FirstText,
 
+        # Source column used to create marks for diagnostics and the node span.
         [Parameter(Mandatory)]
         [int] $FirstColumn,
 
+        # Indentation of the containing block that bounds scalar continuation.
         [Parameter(Mandatory)]
         [int] $ParentIndent,
 
+        # Node depth assigned to the scalar for depth-limit enforcement.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Explicit tag already parsed for this scalar, when one was supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Tag = '',
 
+        # Preserves whether the parsed tag was unknown to schema construction.
+        [Parameter()]
         [bool] $HasUnknownTag = $false,
 
+        # Anchor name to register on the scalar node, when one was supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Anchor = ''
     )

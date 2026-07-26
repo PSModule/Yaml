@@ -2,30 +2,56 @@ function Read-YamlFlowNode {
     <#
         .SYNOPSIS
         Reads one node from a character cursor, including flow collections.
+
+        .DESCRIPTION
+        Reads YAML flow collections, quoted scalars, aliases, and flow-context
+        plain scalars from a mutable source cursor. Block and key readers use it
+        whenever inline YAML syntax appears inside the parser pipeline.
+
+        .EXAMPLE
+        Read-YamlFlowNode -Cursor $cursor -Context $context -Depth 2 -InFlowCollection
+
+        Returns the next flow node and leaves the cursor at the following token.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Mutable source cursor that identifies where the next node begins.
         [Parameter(Mandatory)]
         [pscustomobject] $Cursor,
 
+        # Parser context that supplies source text, anchors, limits, and marks.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Node depth assigned to the produced node for nesting limits.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Tag inherited from an outer block-property line, when present.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $PendingTag = '',
 
+        # Carries unknown-tag state from a pending node property.
+        [Parameter()]
         [bool] $PendingUnknownTag = $false,
 
+        # Anchor inherited from an outer block-property line, when present.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $PendingAnchor = '',
 
+        # Treats flow delimiters and value indicators as node terminators.
+        [Parameter()]
         [switch] $InFlowCollection,
 
+        # Applies implicit-key termination rules while reading mapping keys.
+        [Parameter()]
         [switch] $InImplicitKey
     )
 

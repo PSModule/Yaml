@@ -2,31 +2,57 @@ function Read-YamlBlockSequence {
     <#
         .SYNOPSIS
         Reads a block sequence, including compact first items.
+
+        .DESCRIPTION
+        Reads sequence entries at a fixed block indentation, including an item
+        already split from a parent line. It creates empty items when needed and
+        delegates nested content back into the block node reader.
+
+        .EXAMPLE
+        Read-YamlBlockSequence -Context $context -Indent 0 -Depth 1 -FirstItemText 'name: api' -FirstItemColumn 2
+
+        Returns a sequence syntax node with the compact first item parsed.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Parser state positioned at the sequence or its compact first item.
         [Parameter(Mandatory)]
         [pscustomobject] $Context,
 
+        # Required indentation column for sequence indicators in this block.
         [Parameter(Mandatory)]
         [int] $Indent,
 
+        # Node depth assigned to the sequence for parser limit accounting.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Explicit tag to attach to the sequence, when one was parsed.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Tag = '',
 
+        # Preserves whether the sequence tag is unknown to the schema.
+        [Parameter()]
         [bool] $HasUnknownTag = $false,
 
+        # Anchor name to register on the sequence node, when supplied.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $Anchor = '',
 
+        # Compact first item text already separated from its dash indicator.
+        [Parameter()]
         [AllowNull()]
         [string] $FirstItemText,
 
+        # Source column of the compact first item for marks and diagnostics.
+        [Parameter()]
         [int] $FirstItemColumn = -1
     )
 

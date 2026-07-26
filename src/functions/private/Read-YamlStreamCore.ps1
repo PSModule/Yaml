@@ -2,42 +2,65 @@ function Read-YamlStreamCore {
     <#
         .SYNOPSIS
         Reads and validates all documents with the repository-owned YAML parser.
+
+        .DESCRIPTION
+        Creates the reader context, scans directives and document boundaries,
+        reads each document node, and converts syntax trees into representation
+        graph values. It is the core parser path behind ConvertFrom-Yaml.
+
+        .EXAMPLE
+        Read-YamlStreamCore -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
+
+        Reads all documents in the stream and returns them as a boxed array.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # Complete YAML source text to split into documents and parse.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Yaml,
 
+        # Maximum representation depth permitted while reading nested nodes.
         [Parameter(Mandatory)]
         [ValidateRange(1, 128)]
         [int] $Depth,
 
+        # Node budget used by syntax-node creation and graph validation.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes,
 
+        # Alias reference budget enforced while composing anchored nodes.
         [Parameter(Mandatory)]
         [ValidateRange(0, 2147483647)]
         [int] $MaxAliases,
 
+        # Maximum decoded scalar length allowed across scalar readers.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength,
 
+        # Per-token tag limit used when parsing directives and node properties.
         [Parameter(Mandatory)]
         [ValidateRange(1, 1048576)]
         [int] $MaxTagLength,
 
+        # Stream-wide expanded tag budget shared by tag resolution.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $MaxTotalTagLength,
 
+        # Maximum numeric scalar length passed to core schema construction.
         [Parameter(Mandatory)]
         [ValidateRange(1, 1048576)]
         [int] $MaxNumericLength,
 
+        # Allows callers that validate later to skip immediate graph validation.
+        [Parameter()]
         [switch] $SkipGraphValidation
     )
 

@@ -2,6 +2,19 @@ function New-YamlException {
     <#
         .SYNOPSIS
         Creates a location-aware YAML validation exception.
+
+        .DESCRIPTION
+        Formats a parser or constructor failure message with one-based start and
+        end line and column information. It stores YAML-specific metadata on the
+        exception so public cmdlets can later create classified ErrorRecords.
+
+        .EXAMPLE
+        New-YamlException -Start (New-YamlMark -Index 0 -Line 0 -Column 0) -End (New-YamlMark -Index 4 -Line 0 -Column 4) -Message 'Invalid YAML scalar.' -ErrorId 'YamlInvalidScalar'
+
+        Returns a FormatException with location text and YAML error metadata.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -10,15 +23,19 @@ function New-YamlException {
     [CmdletBinding()]
     [OutputType([System.FormatException])]
     param (
+        # The first source mark for the YAML construct that failed validation.
         [Parameter(Mandatory)]
         [pscustomobject] $Start,
 
+        # The final source mark for the YAML construct that failed validation.
         [Parameter(Mandatory)]
         [pscustomobject] $End,
 
+        # The human-readable YAML validation message to include before location.
         [Parameter(Mandatory)]
         [string] $Message,
 
+        # The stable YAML error identifier preserved for ErrorRecord creation.
         [Parameter(Mandatory)]
         [string] $ErrorId
     )

@@ -2,19 +2,36 @@ function ConvertFrom-YamlTagUriEscape {
     <#
         .SYNOPSIS
         Decodes YAML tag URI %xx escapes as UTF-8.
+
+        .DESCRIPTION
+        Converts percent-escaped byte sequences from a YAML tag token into strict
+        UTF-8 text while preserving unescaped characters. It reports malformed
+        escapes, invalid UTF-8, and decoded tag length overflows as YAML errors.
+
+        .EXAMPLE
+        ConvertFrom-YamlTagUriEscape -Text 'tag%3Atest' -Mark (New-YamlMark -Index 0 -Line 0 -Column 0) -Token '!<tag%3Atest>' -MaxLength 1024
+
+        Decodes the escaped colon and returns tag:test.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The tag URI text to decode before tag resolution continues.
         [Parameter(Mandatory)]
         [string] $Text,
 
+        # The token location to attach to any malformed escape or length error.
         [Parameter(Mandatory)]
         [pscustomobject] $Mark,
 
+        # The original tag token to include in diagnostics for invalid escapes.
         [Parameter(Mandatory)]
         [string] $Token,
 
+        # The decoded tag length budget that prevents oversized expanded tags.
         [Parameter(Mandatory)]
         [ValidateRange(1, 1048576)]
         [int] $MaxLength
