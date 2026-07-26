@@ -2,14 +2,32 @@ function Select-YamlRemovalTarget {
     <#
         .SYNOPSIS
         Coalesces duplicate targets and drops fully subsumed descendants.
+
+        .DESCRIPTION
+        Combines multiple resolved removal requests that address the same edge
+        and removes descendants already covered by ancestor removals. This
+        prevents duplicate mutation attempts and keeps transaction ordering
+        stable.
+
+        .EXAMPLE
+        Select-YamlRemovalTarget -Targets $resolvedTargets -State $state
+
+        Returns a boxed target list with duplicates coalesced and ancestor-covered descendants removed.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The resolved target set may contain duplicate edges or descendant paths
+        # that one ancestor mutation will already remove.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [object[]] $Targets,
 
+        # The work state accounts coalescing and ancestry indexing so target
+        # selection stays bounded.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

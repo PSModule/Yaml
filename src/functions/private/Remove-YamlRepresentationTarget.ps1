@@ -2,6 +2,20 @@ function Remove-YamlRepresentationTarget {
     <#
         .SYNOPSIS
         Applies resolved YAML removal targets in stable mutation order.
+
+        .DESCRIPTION
+        Mutates the cloned document list and container nodes for previously
+        resolved removal targets. It groups and sorts targets deepest-first and
+        descending by index so removing documents, sequence items, and mapping
+        entries does not shift later mutations.
+
+        .EXAMPLE
+        Remove-YamlRepresentationTarget -Documents $documents -Targets $targets -State $state
+
+        Detaches the resolved document, sequence, and mapping targets from the cloned representation graph.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,13 +23,19 @@ function Remove-YamlRepresentationTarget {
     )]
     [CmdletBinding()]
     param (
+        # The cloned document list is mutated when a target removes an entire
+        # YAML document.
         [Parameter(Mandatory)]
         [System.Collections.Generic.List[object]] $Documents,
 
+        # The resolved targets identify exact document, sequence, or mapping
+        # edges to detach.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [object[]] $Targets,
 
+        # The work state charges ordering and mutation steps so transaction
+        # application is budgeted.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

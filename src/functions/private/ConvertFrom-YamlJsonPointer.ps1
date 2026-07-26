@@ -2,14 +2,31 @@ function ConvertFrom-YamlJsonPointer {
     <#
         .SYNOPSIS
         Parses and strictly decodes one RFC 6901 JSON Pointer.
+
+        .DESCRIPTION
+        Validates that a removal path is an RFC 6901 JSON Pointer and decodes
+        each token's tilde escapes. Strict decoding prevents ambiguous or
+        non-standard paths from selecting unintended YAML graph edges.
+
+        .EXAMPLE
+        ConvertFrom-YamlJsonPointer -Pointer '/metadata/internal~1id' -State $state
+
+        Returns a boxed token array containing metadata and internal/id.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The raw removal path must be decoded once so later graph resolution
+        # uses canonical tokens.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Pointer,
 
+        # The work state charges parsing by pointer length to keep path
+        # processing bounded.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

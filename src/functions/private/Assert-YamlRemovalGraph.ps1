@@ -2,31 +2,61 @@ function Assert-YamlRemovalGraph {
     <#
         .SYNOPSIS
         Validates a removed representation graph and its resource budgets.
+
+        .DESCRIPTION
+        Traverses the post-removal representation graph to enforce depth, node,
+        alias, scalar, and tag limits before emitting YAML. It also rechecks
+        tagged collection invariants and duplicate-key comparisons so removed
+        output remains valid and deterministic.
+
+        .EXAMPLE
+        Assert-YamlRemovalGraph -Documents $documents -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -State $state
+
+        Validates the mutated documents and throws a classified removal exception if an output limit is exceeded.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [CmdletBinding()]
     param (
+        # The post-removal document roots are walked so validation covers exactly
+        # what will be emitted.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [object[]] $Documents,
 
+        # The depth limit prevents a removal result from producing an over-deep
+        # graph.
         [Parameter(Mandatory)]
         [int] $Depth,
 
+        # The node limit bounds traversal, duplicate-key comparison, and output
+        # graph size.
         [Parameter(Mandatory)]
         [int] $MaxNodes,
 
+        # The alias limit keeps emitted alias count within the caller's resource
+        # budget.
         [Parameter(Mandatory)]
         [int] $MaxAliases,
 
+        # The scalar length limit rejects oversized decoded scalar content after
+        # mutation.
         [Parameter(Mandatory)]
         [int] $MaxScalarLength,
 
+        # The per-tag limit prevents an emitted node from carrying an oversized
+        # expanded tag.
         [Parameter(Mandatory)]
         [int] $MaxTagLength,
 
+        # The cumulative tag limit bounds total expanded tag text across the
+        # output graph.
         [Parameter(Mandatory)]
         [int] $MaxTotalTagLength,
 
+        # The shared removal work state accounts validation operations against
+        # the invocation budget.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

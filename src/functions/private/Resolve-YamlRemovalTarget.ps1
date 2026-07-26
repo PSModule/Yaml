@@ -2,25 +2,49 @@ function Resolve-YamlRemovalTarget {
     <#
         .SYNOPSIS
         Resolves one decoded JSON Pointer against one YAML document.
+
+        .DESCRIPTION
+        Walks a single document's representation graph using decoded RFC 6901
+        tokens and returns the exact document, mapping, or sequence edge to
+        remove. It preserves YAML semantics by resolving aliases safely and
+        matching only scalar string mapping keys without coercion.
+
+        .EXAMPLE
+        Resolve-YamlRemovalTarget -Document $document -DocumentIndex 0 -Pointer '/service/obsolete' -Tokens @('service', 'obsolete') -State $state
+
+        Returns the parent edge that addresses /service/obsolete in document zero.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The document root provides the representation graph that the pointer
+        # is resolved against.
         [Parameter(Mandatory)]
         [pscustomobject] $Document,
 
+        # The document index is included in target keys and diagnostics so
+        # multi-document removals stay distinct.
         [Parameter(Mandatory)]
         [int] $DocumentIndex,
 
+        # The original pointer is preserved for diagnostics attached to
+        # unresolved or ambiguous paths.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Pointer,
 
+        # Decoded pointer tokens drive each mapping-key or sequence-index lookup
+        # without re-parsing the path.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [AllowEmptyString()]
         [string[]] $Tokens,
 
+        # The shared work state bounds token resolution, alias traversal, and
+        # mapping scans.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )
