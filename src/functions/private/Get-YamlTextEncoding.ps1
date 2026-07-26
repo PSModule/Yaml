@@ -4,22 +4,17 @@ function Get-YamlTextEncoding {
         Creates a strict text encoding for YAML file input or output.
 
         .DESCRIPTION
-        Returns an encoding that throws when bytes or characters cannot be
-        represented. The encoding preamble matches the public encoding name.
-
-        .PARAMETER Name
-        The public YAML file encoding name.
+        Maps the module's public encoding names to .NET encodings that throw on
+        invalid bytes or characters. This keeps Import-Yaml file reads strict
+        while preserving the selected byte-order-mark policy for callers.
 
         .EXAMPLE
         Get-YamlTextEncoding -Name utf8
 
         Returns strict UTF-8 without a byte order mark.
 
-        .INPUTS
-        None.
-
-        .OUTPUTS
-        System.Text.Encoding
+        .LINK
+        https://psmodule.io/Yaml/Functions/Import-Yaml/
     #>
     [OutputType(
         [System.Text.UTF8Encoding],
@@ -28,7 +23,8 @@ function Get-YamlTextEncoding {
     )]
     [CmdletBinding()]
     param (
-        # Selects the strict decoder and its output preamble policy.
+        # The public encoding token selects strict decoder behavior and the BOM
+        # preamble policy required by file commands.
         [Parameter(Mandatory)]
         [ValidateSet('utf8', 'utf8BOM', 'utf16LE', 'utf16BE', 'utf32LE', 'utf32BE')]
         [string] $Name
