@@ -9,7 +9,8 @@ function Read-YamlStreamCore {
         graph values. It is the core parser path behind ConvertFrom-Yaml.
 
         .EXAMPLE
-        Read-YamlStreamCore -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
+        Read-YamlStreamCore -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 `
+            -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
 
         Reads all documents in the stream and returns them as a boxed array.
 

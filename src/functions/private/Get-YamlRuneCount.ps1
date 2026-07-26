@@ -9,9 +9,9 @@ function Get-YamlRuneCount {
         Unicode scalar values instead of UTF-16 code units.
 
         .EXAMPLE
-        Get-YamlRuneCount -Text 'a😀'
+        Get-YamlRuneCount -Text "a$([char]::ConvertFromUtf32(0x1F600))"
 
-        Returns 2 because the emoji is one Unicode scalar value.
+        Returns 2 because the emoji surrogate pair counts as one Unicode scalar value.
 
         .LINK
         https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/

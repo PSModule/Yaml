@@ -9,7 +9,8 @@ function New-YamlReaderContext {
         this context as shared state while scanner and reader helpers build nodes.
 
         .EXAMPLE
-        New-YamlReaderContext -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
+        New-YamlReaderContext -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 `
+            -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
 
         Returns a reader context containing normalized text, line starts, parser limits, and initial counters.
 

@@ -10,7 +10,8 @@ function Assert-YamlNodeKeyUnique {
         graph comparison before throwing a duplicate-key YAML error.
 
         .EXAMPLE
-        Assert-YamlNodeKeyUnique -Node $keyNode -Buckets $buckets -FingerprintCache $fingerprints -FingerprintHasher ([System.Security.Cryptography.SHA256]::Create()) -DuplicateMessage 'Duplicate mapping key.'
+        Assert-YamlNodeKeyUnique -Node $keyNode -Buckets $buckets -FingerprintCache $fingerprints `
+            -FingerprintHasher ([System.Security.Cryptography.SHA256]::Create()) -DuplicateMessage 'Duplicate mapping key.'
 
         Returns nothing and indexes the key when no equal mapping key is present.
 

@@ -10,7 +10,8 @@ function Get-YamlNodeFingerprint {
         duplicate-key detection.
 
         .EXAMPLE
-        Get-YamlNodeFingerprint -Node $keyNode -Active ([System.Collections.Generic.HashSet[int]]::new()) -Cache ([System.Collections.Generic.Dictionary[int, string]]::new()) -Hasher ([System.Security.Cryptography.SHA256]::Create())
+        Get-YamlNodeFingerprint -Node $keyNode -Active ([System.Collections.Generic.HashSet[int]]::new()) `
+            -Cache ([System.Collections.Generic.Dictionary[int, string]]::new()) -Hasher ([System.Security.Cryptography.SHA256]::Create())
 
         Returns a stable hash string for comparing mapping-key candidates.
 

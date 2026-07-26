@@ -9,7 +9,8 @@ function Read-YamlStream {
         strict while preserving the public command's safety budgets.
 
         .EXAMPLE
-        Read-YamlStream -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
+        Read-YamlStream -Yaml $yaml -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 `
+            -MaxTagLength 1024 -MaxTotalTagLength 65536 -MaxNumericLength 4096
 
         Parses the supplied YAML stream and returns the boxed document collection.
 

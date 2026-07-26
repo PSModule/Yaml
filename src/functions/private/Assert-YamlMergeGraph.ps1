@@ -10,7 +10,8 @@ function Assert-YamlMergeGraph {
         after merging.
 
         .EXAMPLE
-        Assert-YamlMergeGraph -Documents $mergedDocuments -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536
+        Assert-YamlMergeGraph -Documents $mergedDocuments -Depth 100 -MaxNodes 100000 `
+            -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536
 
         Validates the merged document graph and throws a classified YAML merge
         exception if any limit is exceeded.

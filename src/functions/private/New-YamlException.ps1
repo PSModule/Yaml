@@ -9,7 +9,8 @@ function New-YamlException {
         exception so public cmdlets can later create classified ErrorRecords.
 
         .EXAMPLE
-        New-YamlException -Start (New-YamlMark -Index 0 -Line 0 -Column 0) -End (New-YamlMark -Index 4 -Line 0 -Column 4) -Message 'Invalid YAML scalar.' -ErrorId 'YamlInvalidScalar'
+        New-YamlException -Start (New-YamlMark -Index 0 -Line 0 -Column 0) -End (New-YamlMark -Index 4 -Line 0 -Column 4) `
+            -Message 'Invalid YAML scalar.' -ErrorId 'YamlInvalidScalar'
 
         Returns a FormatException with location text and YAML error metadata.
 

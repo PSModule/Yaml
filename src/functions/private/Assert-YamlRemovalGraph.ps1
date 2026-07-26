@@ -10,7 +10,8 @@ function Assert-YamlRemovalGraph {
         output remains valid and deterministic.
 
         .EXAMPLE
-        Assert-YamlRemovalGraph -Documents $documents -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -State $state
+        Assert-YamlRemovalGraph -Documents $documents -Depth 100 -MaxNodes 100000 -MaxAliases 1000 `
+            -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536 -State $state
 
         Validates the mutated documents and throws a classified removal exception if an output limit is exceeded.
 

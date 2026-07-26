@@ -9,7 +9,9 @@ function Test-YamlNodeGraph {
         set, ordered-map, and pairs key requirements before projection.
 
         .EXAMPLE
-        Test-YamlNodeGraph -Node $document.Root -Visited ([System.Collections.Generic.HashSet[int]]::new()) -FingerprintCache ([System.Collections.Generic.Dictionary[int,string]]::new()) -FingerprintHasher ([System.Security.Cryptography.SHA256]::Create())
+        Test-YamlNodeGraph -Node $document.Root -Visited ([System.Collections.Generic.HashSet[int]]::new()) `
+            -FingerprintCache ([System.Collections.Generic.Dictionary[int,string]]::new()) `
+            -FingerprintHasher ([System.Security.Cryptography.SHA256]::Create())
 
         Completes without output when the graph has compatible tags and unique mapping keys.
 

@@ -10,7 +10,8 @@ function Merge-YamlRepresentationNode {
         identity, indexes, and mutation tracking for subsequent overlays.
 
         .EXAMPLE
-        Merge-YamlRepresentationNode -BaseNode $baseClone -OverlayNode $overlayDocument -SequenceAction Unique -ConflictAction Error -NullAction Ignore -Path '$' -Context $mergeContext
+        Merge-YamlRepresentationNode -BaseNode $baseClone -OverlayNode $overlayDocument -SequenceAction Unique `
+            -ConflictAction Error -NullAction Ignore -Path '$' -Context $mergeContext
 
         Merges the overlay document into the cloned base graph, reusing compatible
         nodes and throwing on conflicts.
