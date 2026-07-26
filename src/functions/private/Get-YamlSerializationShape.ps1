@@ -2,19 +2,38 @@ function Get-YamlSerializationShape {
     <#
         .SYNOPSIS
         Classifies one PowerShell value for safe YAML graph normalization.
+
+        .DESCRIPTION
+        Classifies a PowerShell value as scalar, mapping, sequence, binary, or unsupported before
+        graph normalization. This lets the serializer reserve node budget, reject lossy mixed
+        semantics, and choose the correct YAML node shape without mutating the input.
+
+        .EXAMPLE
+        Get-YamlSerializationShape -Value @{ name = 'Ada' } -State $state -EnumsAsStrings
+
+        Returns a mapping shape that the serializer can normalize into YAML emission nodes.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The candidate value is inspected so the serializer can choose a safe YAML shape.
         [Parameter()]
         [AllowNull()]
         [object] $Value,
 
+        # The serializer state carries node and scalar limits that shape inspection must honor.
         [Parameter(Mandatory)]
         [pscustomobject] $State,
 
+        # Preserves enum names when the public command requests string-form enum output.
+        [Parameter()]
         [switch] $EnumsAsStrings,
 
+        # Allows callers to validate or reserve shape without materializing child emission nodes.
+        [Parameter()]
         [switch] $InspectOnly
     )
 

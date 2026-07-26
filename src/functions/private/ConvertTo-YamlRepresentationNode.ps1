@@ -2,13 +2,28 @@ function ConvertTo-YamlRepresentationNode {
     <#
         .SYNOPSIS
         Converts one representation graph to a lossless emission graph.
+
+        .DESCRIPTION
+        Copies a parsed representation graph into the emission graph shape expected
+        by the writer while preserving node identity, tags, anchors, and aliases.
+        It assigns deterministic anchor names so formatted YAML remains stable.
+
+        .EXAMPLE
+        ConvertTo-YamlRepresentationNode -Node $document.Root -State $emissionState
+
+        Returns an emission node graph for the representation document.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The representation graph root that must be copied for emission.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Carries anchor numbering so names stay unique across emitted documents.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

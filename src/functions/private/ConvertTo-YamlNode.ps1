@@ -2,21 +2,39 @@ function ConvertTo-YamlNode {
     <#
         .SYNOPSIS
         Iteratively normalizes a supported PowerShell value to an emission graph.
+
+        .DESCRIPTION
+        Walks a supported PowerShell object graph without recursion and produces
+        the internal emission nodes consumed by the YAML writer. The state object
+        enforces resource limits, reference identity, anchors, and duplicate-key checks.
+
+        .EXAMPLE
+        ConvertTo-YamlNode -Value $inputObject -State $serializationState -Depth 1 -EnumsAsStrings
+
+        Returns the root emission node for the input object graph, using enum names when requested.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The PowerShell value that needs a YAML-safe emission representation.
         [Parameter(Mandatory)]
         [AllowNull()]
         [object] $Value,
 
+        # Carries serialization limits, reference tracking, and shared caches.
         [Parameter(Mandatory)]
         [pscustomobject] $State,
 
+        # Current graph depth used to enforce the configured maximum depth.
         [Parameter(Mandatory)]
         [ValidateRange(1, 2147483647)]
         [int] $Depth,
 
+        # Allows enum values to be emitted by name instead of underlying number.
+        [Parameter()]
         [switch] $EnumsAsStrings
     )
 

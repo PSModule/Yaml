@@ -2,21 +2,38 @@ function Get-YamlEmissionNodeFingerprint {
     <#
         .SYNOPSIS
         Iteratively fingerprints a normalized emission node.
+
+        .DESCRIPTION
+        Walks scalar, sequence, and mapping emission nodes without recursion to create a stable
+        digest for a normalized YAML node. The serializer uses the digest to detect structurally
+        identical values and decide when an anchor can be reused or a cycle must be reported.
+
+        .EXAMPLE
+        Get-YamlEmissionNodeFingerprint -Node $node -Cache $fingerprintCache -Active $activeReferences -Hasher $sha256
+
+        Returns the stable fingerprint used to compare the normalized emission node with other nodes.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The normalized node is fingerprinted so anchors can be deduplicated safely.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Previously fingerprinted reference IDs are reused to avoid hashing shared nodes twice.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.Dictionary[long, string]] $Cache,
 
+        # Active reference IDs detect cycles while the graph is being fingerprinted.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.HashSet[long]] $Active,
 
+        # The reusable hash algorithm keeps every nested fingerprint on the same digest scheme.
         [Parameter(Mandatory)]
         [System.Security.Cryptography.HashAlgorithm] $Hasher
     )

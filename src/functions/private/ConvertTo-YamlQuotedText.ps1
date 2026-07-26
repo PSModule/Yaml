@@ -2,10 +2,24 @@ function ConvertTo-YamlQuotedText {
     <#
         .SYNOPSIS
         Encodes a string as a YAML double-quoted scalar.
+
+        .DESCRIPTION
+        Escapes string content for a YAML double-quoted scalar, including control
+        characters and invalid UTF-16 surrogate detection. It is used when plain
+        scalar output would be ambiguous or unsafe.
+
+        .EXAMPLE
+        ConvertTo-YamlQuotedText -Value "line`nbreak"
+
+        Returns a YAML double-quoted scalar with required escape sequences.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The scalar content to quote while preserving empty strings exactly.
         [Parameter(Mandatory)]
         [AllowEmptyString()]
         [string] $Value

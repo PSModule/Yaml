@@ -2,6 +2,19 @@ function Write-YamlNodeText {
     <#
         .SYNOPSIS
         Iteratively writes an emission graph in deterministic YAML block form.
+
+        .DESCRIPTION
+        Appends deterministic block-style YAML for an emission graph to a
+        StringBuilder without recursive calls. The writer manages indentation,
+        anchors, aliases, sequence items, and mapping entries for ConvertTo-Yaml.
+
+        .EXAMPLE
+        Write-YamlNodeText -Builder $builder -Node $emissionNode -Level 0 -Indent 2 -EmittedReferences $emittedReferences
+
+        Appends the YAML block text for the emission node to the builder.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -9,24 +22,31 @@ function Write-YamlNodeText {
     )]
     [CmdletBinding()]
     param (
+        # Accumulates emitted YAML text without writing partial strings to the pipeline.
         [Parameter(Mandatory)]
         [System.Text.StringBuilder] $Builder,
 
+        # The emission graph root or child node currently being written.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Current indentation depth needed to place nested YAML block content.
         [Parameter(Mandatory)]
         [ValidateRange(0, 128)]
         [int] $Level,
 
+        # Number of spaces per nesting level for deterministic block output.
         [Parameter(Mandatory)]
         [ValidateRange(2, 9)]
         [int] $Indent,
 
+        # Tracks reference ids already written so aliases are emitted correctly.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.HashSet[long]] $EmittedReferences,
 
+        # Prefixes the node with a sequence marker or mapping key when needed.
+        [Parameter()]
         [AllowEmptyString()]
         [string] $LeadingText = ''
     )

@@ -2,14 +2,29 @@ function Get-YamlScalarFingerprint {
     <#
         .SYNOPSIS
         Creates a canonical fingerprint for a resolved YAML scalar.
+
+        .DESCRIPTION
+        Converts a resolved scalar value into a type-aware canonical string and hashes it. The
+        fingerprint prevents equivalent YAML scalars from being treated as different anchor
+        candidates because of presentation differences.
+
+        .EXAMPLE
+        Get-YamlScalarFingerprint -Value ([datetime]'2024-01-01T00:00:00Z') -Hasher $sha256
+
+        Returns the canonical scalar fingerprint for the resolved timestamp value.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The resolved scalar value is canonicalized so equal YAML values hash identically.
         [Parameter(Mandatory)]
         [AllowNull()]
         [object] $Value,
 
+        # The reusable hash algorithm keeps scalar fingerprints compatible with node fingerprints.
         [Parameter(Mandatory)]
         [System.Security.Cryptography.HashAlgorithm] $Hasher
     )

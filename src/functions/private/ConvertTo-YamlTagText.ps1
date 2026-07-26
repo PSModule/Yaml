@@ -2,10 +2,24 @@ function ConvertTo-YamlTagText {
     <#
         .SYNOPSIS
         Encodes an effective tag as canonical YAML tag text.
+
+        .DESCRIPTION
+        Escapes an expanded effective tag as YAML tag presentation text, using
+        standard shorthand when possible. This keeps representation graph output
+        deterministic while preserving local and application tags verbatim.
+
+        .EXAMPLE
+        ConvertTo-YamlTagText -Tag 'tag:yaml.org,2002:str'
+
+        Returns !!str for the standard YAML string tag.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The expanded effective tag URI that must be encoded for YAML output.
         [Parameter(Mandatory)]
         [string] $Tag
     )

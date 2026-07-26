@@ -2,10 +2,24 @@ function ConvertTo-YamlTimestampText {
     <#
         .SYNOPSIS
         Formats a representable CLR timestamp for YAML emission.
+
+        .DESCRIPTION
+        Formats DateTime and DateTimeOffset values with invariant timestamp text
+        accepted by the YAML emitter. It preserves explicit or local offsets when
+        representable and normalizes unspecified timestamps to UTC-style text.
+
+        .EXAMPLE
+        ConvertTo-YamlTimestampText -Value ([datetimeoffset] '2026-07-26T20:51:03+00:00')
+
+        Returns invariant YAML timestamp text for the supplied CLR timestamp.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The CLR timestamp value to validate and format for YAML output.
         [Parameter(Mandatory)]
         [object] $Value
     )

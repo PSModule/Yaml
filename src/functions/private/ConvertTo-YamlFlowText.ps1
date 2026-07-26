@@ -2,13 +2,28 @@ function ConvertTo-YamlFlowText {
     <#
         .SYNOPSIS
         Iteratively renders one emission graph in flow form.
+
+        .DESCRIPTION
+        Renders an emission node graph as a single flow-style YAML fragment for
+        scalar values, empty collections, implicit keys, and aliases. It tracks
+        already-emitted references so repeated nodes become aliases when needed.
+
+        .EXAMPLE
+        ConvertTo-YamlFlowText -Node $entry.Key -EmittedReferences $emittedReferences
+
+        Returns flow-style text for the mapping key, using an alias when already emitted.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The emission node that must be rendered inline as flow YAML.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Tracks reference ids already written so aliases are emitted correctly.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.HashSet[long]] $EmittedReferences
