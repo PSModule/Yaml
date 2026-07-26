@@ -114,7 +114,8 @@ namespace YamlTests
     }
 }
 
-Describe 'ConvertTo-Yaml' {
+Describe 'Yaml' {
+    Describe 'ConvertTo-Yaml' {
     Context 'Supported values' {
         It 'serializes mappings, sequences, and core scalars to valid YAML' {
             $inputObject = [ordered]@{
@@ -124,6 +125,7 @@ Describe 'ConvertTo-Yaml' {
                 ratio   = 1.5
                 nothing = $null
                 items   = @('one', 'two')
+                }
             }
 
             $yaml = ConvertTo-Yaml -InputObject $inputObject
