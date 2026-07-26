@@ -2,6 +2,21 @@ function Copy-YamlMergeNode {
     <#
         .SYNOPSIS
         Deep-clones a YAML representation graph with identity memoization.
+
+        .DESCRIPTION
+        Deep-clones a representation node and descendants into the merge working
+        graph so overlays never mutate caller-owned input graphs. Identity
+        memoization preserves shared and cyclic references while enforcing clone
+        creation budgets.
+
+        .EXAMPLE
+        Copy-YamlMergeNode -Node $overlayNode -Cache $mergeContext.CloneCache -State $mergeContext.CloneState
+
+        Returns an independent clone of the overlay node registered in the merge
+        clone cache.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -10,13 +25,16 @@ function Copy-YamlMergeNode {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The representation graph root to clone into merge-owned storage.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Memoizes source-to-clone identity so aliases, sharing, and cycles are preserved.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [System.Collections.Generic.Dictionary[int, object]] $Cache,
 
+        # Tracks clone IDs and creation limits for the isolated working graph.
         [Parameter(Mandatory)]
         [pscustomobject] $State
     )

@@ -2,28 +2,50 @@ function Assert-YamlMergeGraph {
     <#
         .SYNOPSIS
         Validates the merged representation graph and its resource budgets.
+
+        .DESCRIPTION
+        Walks merged documents to enforce final depth, node, alias, scalar, and
+        tag budgets before emission. It also delegates graph validation so
+        recursive or shared representation structures remain safe and well-formed
+        after merging.
+
+        .EXAMPLE
+        Assert-YamlMergeGraph -Documents $mergedDocuments -Depth 100 -MaxNodes 100000 -MaxAliases 1000 -MaxScalarLength 1048576 -MaxTagLength 1024 -MaxTotalTagLength 65536
+
+        Validates the merged document graph and throws a classified YAML merge
+        exception if any limit is exceeded.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     param (
+        # The merged document roots to validate as one resulting YAML stream.
         [Parameter(Mandatory)]
         [AllowEmptyCollection()]
         [object[]] $Documents,
 
+        # Limits traversal depth so deeply nested results cannot exhaust consumers.
         [Parameter(Mandatory)]
         [int] $Depth,
 
+        # Caps unique representation nodes in the result graph.
         [Parameter(Mandatory)]
         [int] $MaxNodes,
 
+        # Caps alias nodes after merge to keep reference expansion bounded.
         [Parameter(Mandatory)]
         [int] $MaxAliases,
 
+        # Caps decoded scalar size before the merged stream is emitted.
         [Parameter(Mandatory)]
         [int] $MaxScalarLength,
 
+        # Caps each expanded tag length in the merged graph.
         [Parameter(Mandatory)]
         [int] $MaxTagLength,
 
+        # Caps cumulative expanded tag text across the result graph.
         [Parameter(Mandatory)]
         [int] $MaxTotalTagLength
     )

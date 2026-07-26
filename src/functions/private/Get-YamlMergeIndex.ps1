@@ -2,17 +2,35 @@ function Get-YamlMergeIndex {
     <#
         .SYNOPSIS
         Gets or rebuilds a mutation-aware structural candidate index.
+
+        .DESCRIPTION
+        Retrieves the cached structural candidate index for a mapping or sequence,
+        rebuilding it when mutations invalidated prior buckets. It lets recursive
+        merge operations reuse fingerprint buckets while remaining correct after
+        graph changes.
+
+        .EXAMPLE
+        Get-YamlMergeIndex -Node $baseMapping -Kind Mapping -Context $mergeContext
+
+        Returns a valid mapping index for matching overlay keys against retained
+        entries.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The mapping or sequence node whose retained candidates need indexing.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Selects whether entries or items are indexed for this node.
         [Parameter(Mandatory)]
         [ValidateSet('Mapping', 'Sequence')]
         [string] $Kind,
 
+        # Provides index caches, dependency tracking, and work accounting.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

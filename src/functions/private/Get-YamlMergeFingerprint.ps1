@@ -2,20 +2,40 @@ function Get-YamlMergeFingerprint {
     <#
         .SYNOPSIS
         Creates a deterministic structural candidate index for merge comparisons.
+
+        .DESCRIPTION
+        Computes a deterministic structural fingerprint for a representation
+        subgraph, resolving aliases and accounting for cycles without requiring
+        object projection. The fingerprint narrows candidate comparisons for
+        indexes and equality, while collision safety is provided by subsequent
+        graph equality checks.
+
+        .EXAMPLE
+        Get-YamlMergeFingerprint -Node $entry.Key -State $mergeContext.EqualityState -Cache $fingerprintCache -CandidateIndex $mappingIndex
+
+        Returns a deterministic hash used to place the key in a structural
+        candidate bucket.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The subgraph root whose structure needs a candidate fingerprint.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Provides hashing resources, work accounting, and index dependency maps.
         [Parameter(Mandatory)]
         [pscustomobject] $State,
 
+        # Reuses fingerprints for acyclic nodes to avoid repeated traversal work.
         [Parameter()]
         [AllowNull()]
         [System.Collections.Generic.Dictionary[int, string]] $Cache,
 
+        # Records node dependencies so mutations can invalidate this index.
         [Parameter()]
         [AllowNull()]
         [pscustomobject] $CandidateIndex

@@ -2,6 +2,21 @@ function Merge-YamlRepresentationNode {
     <#
         .SYNOPSIS
         Merges one later YAML representation node into an existing cloned node.
+
+        .DESCRIPTION
+        Applies an overlay node to a cloned base node according to merge policies
+        for nulls, scalar conflicts, sequences, and mappings. It keeps the merge
+        working graph isolated while preserving structural key equality, clone
+        identity, indexes, and mutation tracking for subsequent overlays.
+
+        .EXAMPLE
+        Merge-YamlRepresentationNode -BaseNode $baseClone -OverlayNode $overlayDocument -SequenceAction Unique -ConflictAction Error -NullAction Ignore -Path '$' -Context $mergeContext
+
+        Merges the overlay document into the cloned base graph, reusing compatible
+        nodes and throwing on conflicts.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -10,27 +25,34 @@ function Merge-YamlRepresentationNode {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The cloned destination node to update so original input graphs remain immutable.
         [Parameter(Mandatory)]
         [pscustomobject] $BaseNode,
 
+        # The later-precedence node to merge into the cloned graph.
         [Parameter(Mandatory)]
         [pscustomobject] $OverlayNode,
 
+        # Selects how compatible sequences are combined when both sides are sequences.
         [Parameter(Mandatory)]
         [ValidateSet('Replace', 'Append', 'Unique')]
         [string] $SequenceAction,
 
+        # Controls whether incompatible kinds/tags or unequal scalars replace or stop the merge.
         [Parameter(Mandatory)]
         [ValidateSet('Replace', 'Error')]
         [string] $ConflictAction,
 
+        # Controls whether overlay nulls intentionally replace or leave prior nodes intact.
         [Parameter(Mandatory)]
         [ValidateSet('Replace', 'Ignore')]
         [string] $NullAction,
 
+        # Carries the current diagnostic location for classified conflict errors.
         [Parameter(Mandatory)]
         [string] $Path,
 
+        # Shared merge context supplies clone caches, indexes, equality state, and budgets.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

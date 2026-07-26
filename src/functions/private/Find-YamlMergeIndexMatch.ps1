@@ -2,16 +2,33 @@ function Find-YamlMergeIndexMatch {
     <#
         .SYNOPSIS
         Finds a collision-safe structural match in a YAML merge candidate index.
+
+        .DESCRIPTION
+        Looks up a node's structural fingerprint in a candidate index and verifies
+        any bucket collisions with full graph equality. This makes mapping-key and
+        unique-sequence matching fast without trusting hashes as equality.
+
+        .EXAMPLE
+        Find-YamlMergeIndexMatch -Index $retainedIndex -Node $overlayEntry.Key -Context $mergeContext
+
+        Returns the matching retained entry when the overlay key is structurally
+        equal, or nothing when no match exists.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param (
+        # The retained candidate index narrows possible structural matches.
         [Parameter(Mandatory)]
         [pscustomobject] $Index,
 
+        # The overlay key or sequence item to match against retained candidates.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # Shared merge context supplies fingerprint caches, equality state, and work limits.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

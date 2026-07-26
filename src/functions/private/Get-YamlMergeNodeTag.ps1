@@ -2,10 +2,25 @@ function Get-YamlMergeNodeTag {
     <#
         .SYNOPSIS
         Gets the effective tag used for YAML merge compatibility.
+
+        .DESCRIPTION
+        Resolves aliases and returns the effective YAML tag used to decide merge
+        compatibility. Scalars are resolved first so implicit tags reflect
+        constructed values rather than presentation text.
+
+        .EXAMPLE
+        Get-YamlMergeNodeTag -Node $candidateNode
+
+        Returns the effective tag, such as tag:yaml.org,2002:str, for merge
+        comparisons.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The representation node whose effective compatibility tag is needed.
         [Parameter(Mandatory)]
         [pscustomobject] $Node
     )

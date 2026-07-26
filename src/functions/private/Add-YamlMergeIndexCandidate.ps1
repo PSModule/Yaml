@@ -2,15 +2,33 @@ function Add-YamlMergeIndexCandidate {
     <#
         .SYNOPSIS
         Adds one mapping key or sequence item to a structural candidate index.
+
+        .DESCRIPTION
+        Adds a mapping entry or sequence item to an index bucket keyed by a
+        structural fingerprint. It tracks effective node identities and
+        dependencies so later mutations can invalidate only indexes that may be
+        stale.
+
+        .EXAMPLE
+        Add-YamlMergeIndexCandidate -Index $mappingIndex -Candidate $entry -Context $mergeContext
+
+        Indexes the entry's key as a candidate for future structural equality
+        lookups.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     param (
+        # The candidate index receiving the mapping key or sequence item.
         [Parameter(Mandatory)]
         [pscustomobject] $Index,
 
+        # The entry or item to index for later structural equality lookup.
         [Parameter(Mandatory)]
         [pscustomobject] $Candidate,
 
+        # Shared merge context provides work accounting and fingerprint/equality state.
         [Parameter(Mandatory)]
         [pscustomobject] $Context
     )

@@ -2,23 +2,43 @@ function Test-YamlMergeNodeEqual {
     <#
         .SYNOPSIS
         Compares YAML representation graphs with collision-safe structural equality.
+
+        .DESCRIPTION
+        Compares two YAML representation graphs by effective tags, scalar values,
+        sequence order, mapping key equality, and graph identity, resolving aliases
+        and cycles safely. It caches results by mutation version so merge indexing
+        can verify hash collisions without repeating full comparisons unnecessarily.
+
+        .EXAMPLE
+        Test-YamlMergeNodeEqual -Node $retainedKey -OtherNode $overlayKey -State $mergeContext.EqualityState
+
+        Returns true when the retained and overlay keys are structurally equal for
+        merge matching.
+
+        .LINK
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param (
+        # The left representation graph used as the retained comparison side.
         [Parameter(Mandatory)]
         [pscustomobject] $Node,
 
+        # The right representation graph being tested against the retained side.
         [Parameter(Mandatory)]
         [pscustomobject] $OtherNode,
 
+        # Holds equality cache, work budget, and mutation-version context.
         [Parameter(Mandatory)]
         [pscustomobject] $State,
 
+        # Optionally reuses fingerprints for left-side mapping keys during recursive comparison.
         [Parameter()]
         [AllowNull()]
         [System.Collections.Generic.Dictionary[int, string]] $LeftFingerprintCache,
 
+        # Optionally reuses fingerprints for right-side mapping keys during recursive comparison.
         [Parameter()]
         [AllowNull()]
         [System.Collections.Generic.Dictionary[int, string]] $RightFingerprintCache
