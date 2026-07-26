@@ -21,13 +21,7 @@ if ($null -eq $yamlModule) {
 }
 
 if ($null -eq $yamlModule) {
-    Get-ChildItem -Path (Join-Path $PSScriptRoot '..\src\functions\private') -Filter '*.ps1' |
-        Sort-Object Name |
-        ForEach-Object { . $_.FullName }
-
-    Get-ChildItem -Path (Join-Path $PSScriptRoot '..\src\functions\public') -Filter '*.ps1' |
-        Sort-Object Name |
-        ForEach-Object { . $_.FullName }
+    throw 'The Yaml module is not loaded. Test-ModuleLocal must import the built module before tests run.'
 }
 
 function Get-TestYamlFingerprintLength {
