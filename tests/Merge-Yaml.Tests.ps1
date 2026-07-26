@@ -128,7 +128,8 @@ BeforeAll {
     }
 }
 
-Describe 'Merge-Yaml' {
+Describe 'Yaml' {
+    Describe 'Merge-Yaml' {
     Context 'Public contract' {
         It 'exposes the documented advanced string merge contract' {
             $command = Get-Command -Name Merge-Yaml
@@ -162,6 +163,7 @@ Describe 'Merge-Yaml' {
             $help.Synopsis | Should -Not -BeNullOrEmpty
             $help.Description.Text | Should -Match 'complete YAML stream'
             @($help.Examples.Example).Count | Should -BeGreaterOrEqual 2
+            }
         }
 
         It 'mirrors every parser safety range' -ForEach @(
