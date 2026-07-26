@@ -26,52 +26,6 @@ function Remove-YamlEntry {
         endings, has no final newline, and explicitly starts every remaining
         document.
 
-        .PARAMETER InputObject
-        YAML text. Multiple array elements or pipeline records are joined with a
-        line feed and parsed as one YAML stream.
-
-        .PARAMETER Path
-        One or more RFC 6901 JSON Pointers. An empty string selects a document root.
-        Every non-empty pointer must start with slash.
-
-        .PARAMETER DocumentIndex
-        Zero-based document index to modify. The default is 0.
-
-        .PARAMETER AllDocuments
-        Applies every path independently to every document in the original stream.
-
-        .PARAMETER IgnoreMissing
-        Skips unresolved document and path combinations. Invalid pointer syntax,
-        invalid sequence index tokens, ambiguous matches, and an unavailable
-        DocumentIndex still terminate.
-
-        .PARAMETER Indent
-        Block indentation from 2 through 9 spaces. The default is 2.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum YAML nodes in the input and result, and the invocation-wide ceiling
-        applied independently to clone creation, removal work, and output validation.
-        The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum aliases in the input and result. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is 1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters. The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in an implicitly or explicitly typed number. The default is
-        4096.
-
         .EXAMPLE
         Get-Content -Path '.\config.yaml' |
             Remove-YamlEntry -Path '/service/obsolete'
@@ -96,11 +50,15 @@ function Remove-YamlEntry {
         .INPUTS
         System.String[]
 
+        The YAML text to transform. Multiple pipeline records are joined with a line feed.
+
         .OUTPUTS
         System.String
 
+        The YAML stream emitted after the removal transaction is applied.
+
         .LINK
-        https://github.com/PSModule/Yaml#remove-yaml-entries
+        https://psmodule.io/Yaml/Functions/Remove-YamlEntry/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
@@ -109,52 +67,67 @@ function Remove-YamlEntry {
     [OutputType([string])]
     [CmdletBinding(DefaultParameterSetName = 'Document')]
     param (
+        # The YAML text to transform. Multiple array elements or pipeline records
+        # are joined with a line feed and parsed as a single stream.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowEmptyString()]
         [string[]] $InputObject,
 
+        # One or more RFC 6901 JSON Pointers to remove. An empty string selects a
+        # document root; every non-empty pointer must start with a slash.
         [Parameter(Mandatory, Position = 1)]
         [AllowEmptyString()]
         [string[]] $Path,
 
+        # Zero-based index of the single document to modify.
         [Parameter(ParameterSetName = 'Document')]
         [ValidateRange(0, 2147483647)]
         [int] $DocumentIndex = 0,
 
+        # Apply every path independently to every document in the stream.
         [Parameter(Mandatory, ParameterSetName = 'AllDocuments')]
         [switch] $AllDocuments,
 
+        # Skip unresolved document and path combinations instead of terminating.
         [Parameter()]
         [switch] $IgnoreMissing,
 
+        # Number of spaces per block-indentation level in the emitted YAML.
         [Parameter()]
         [ValidateRange(2, 9)]
         [int] $Indent = 2,
 
+        # Cap YAML node nesting depth so hostile input can't exhaust the stack.
         [Parameter()]
         [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
+        # Cap the total node count across parse, clone, removal, and validation.
         [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes = 100000,
 
+        # Cap alias nodes in the input and result.
         [Parameter()]
         [ValidateRange(0, 2147483647)]
         [int] $MaxAliases = 1000,
 
+        # Cap decoded characters per scalar to bound per-node memory.
         [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength = 1048576,
 
+        # Cap expanded characters for a single tag.
         [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxTagLength = 1024,
 
+        # Cap cumulative expanded tag characters across the stream.
         [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxTotalTagLength = 65536,
 
+        # Cap the digit count of an implicitly or explicitly typed number.
         [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxNumericLength = 4096

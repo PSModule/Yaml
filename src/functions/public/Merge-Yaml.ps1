@@ -21,53 +21,6 @@ function Merge-Yaml {
         streams, not individual lines. Use Get-Content -Raw or Import-Yaml file
         handling as appropriate.
 
-        .PARAMETER InputObject
-        Two or more complete YAML stream strings. Each array element or pipeline
-        record is parsed independently as one stream.
-
-        .PARAMETER SequenceAction
-        Action for unequal sequences with compatible effective tags. Replace uses
-        the later sequence, Append concatenates entries, and Unique appends only
-        structurally new entries. The default is Replace.
-
-        .PARAMETER ConflictAction
-        Action for unequal scalars, collection-kind differences, or incompatible
-        effective tags. Replace uses the later node and Error terminates with
-        document, path, and input context. The default is Replace.
-
-        .PARAMETER NullAction
-        Action when a later existing node has the YAML null effective tag.
-        Replace applies normal merge and conflict behavior; Ignore retains the
-        prior node. The default is Replace.
-
-        .PARAMETER Indent
-        Block indentation from 2 through 9 spaces. The default is 2.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum nodes per parsed stream and the invocation-wide ceiling applied
-        independently to clone creation, merge operations, and the result graph.
-        The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum aliases per parsed stream and in the result. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is 1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters per input and in the result.
-        The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in an implicitly or explicitly typed number. The default
-        is 4096.
-
         .EXAMPLE
         $merged = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
 
@@ -89,14 +42,18 @@ function Merge-Yaml {
         .INPUTS
         System.String[]
 
+        The complete YAML streams to merge. Each pipeline record is parsed as one stream.
+
         .OUTPUTS
         System.String
+
+        The merged YAML stream emitted from the combined representation graphs.
 
         .NOTES
         YAML 1.1 merge keys are ordinary mapping data and are never expanded.
 
         .LINK
-        https://github.com/PSModule/Yaml#merge-yaml-streams
+        https://psmodule.io/Yaml/Functions/Merge-Yaml/
     #>
     [OutputType([string])]
     [CmdletBinding()]

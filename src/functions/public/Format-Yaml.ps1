@@ -16,36 +16,6 @@ function Format-Yaml {
         Pipeline strings are joined with a line feed and parsed as one stream,
         matching ConvertFrom-Yaml.
 
-        .PARAMETER InputObject
-        YAML text. Multiple pipeline records are joined with a line feed and
-        parsed as one YAML stream.
-
-        .PARAMETER Indent
-        Block indentation from 2 through 9 spaces. The default is 2.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of YAML nodes in the stream. The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum number of alias nodes in the stream. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is
-        1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters. The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in an implicitly or explicitly typed number. The
-        default is 4096.
-
         .EXAMPLE
         Get-Content -Path '.\config.yaml' | Format-Yaml
 
@@ -60,40 +30,62 @@ function Format-Yaml {
         .INPUTS
         System.String[]
 
+        The YAML text to normalize. Multiple pipeline records are joined with a line feed.
+
         .OUTPUTS
         System.String
 
+        The normalized YAML stream emitted from the representation graph.
+
         .LINK
-        https://github.com/PSModule/Yaml#format-yaml-streams
+        https://psmodule.io/Yaml/Functions/Format-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The YAML text to normalize. Multiple pipeline records are joined with
+        # a line feed and parsed as a single stream, matching ConvertFrom-Yaml.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowEmptyString()]
         [string[]] $InputObject,
 
+        # Number of spaces per block-indentation level in the emitted YAML.
+        [Parameter()]
         [ValidateRange(2, 9)]
         [int] $Indent = 2,
 
+        # Cap YAML node nesting depth so hostile input can't exhaust the stack.
+        [Parameter()]
         [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
+        # Cap the total node count to bound memory for a single stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes = 100000,
 
+        # Cap alias nodes to prevent alias-expansion amplification.
+        [Parameter()]
         [ValidateRange(0, 2147483647)]
         [int] $MaxAliases = 1000,
 
+        # Cap decoded characters per scalar to bound per-node memory.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength = 1048576,
 
+        # Cap expanded characters for a single tag.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxTagLength = 1024,
 
+        # Cap cumulative expanded tag characters across the stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxTotalTagLength = 65536,
 
+        # Cap the digit count of an implicitly or explicitly typed number.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxNumericLength = 4096
     )

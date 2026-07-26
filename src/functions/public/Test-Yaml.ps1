@@ -11,31 +11,6 @@ function Test-Yaml {
 
         Pipeline strings are joined with a line feed and tested as one stream.
 
-        .PARAMETER Yaml
-        YAML text. Multiple pipeline records are joined with a line feed.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of YAML nodes in the stream. The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum number of alias nodes in the stream. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is
-        1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters. The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in a constructed number. The default is 4096.
-
         .EXAMPLE
         'name: Ada' | Test-Yaml
 
@@ -44,37 +19,57 @@ function Test-Yaml {
         .INPUTS
         System.String[]
 
+        The YAML text to test. Multiple pipeline records are joined with a line feed.
+
         .OUTPUTS
         System.Boolean
 
+        True when the stream parses within limits; false for a classified YAML failure.
+
         .LINK
-        https://github.com/PSModule/Yaml#validate-yaml
+        https://psmodule.io/Yaml/Functions/Test-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]
     param (
+        # The YAML text to test. Multiple pipeline records are joined with a
+        # line feed and tested as a single stream.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowEmptyString()]
         [string[]] $Yaml,
 
+        # Cap YAML node nesting depth so hostile input can't exhaust the stack.
+        [Parameter()]
         [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
+        # Cap the total node count to bound memory for a single stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes = 100000,
 
+        # Cap alias nodes to prevent alias-expansion amplification.
+        [Parameter()]
         [ValidateRange(0, 2147483647)]
         [int] $MaxAliases = 1000,
 
+        # Cap decoded characters per scalar to bound per-node memory.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength = 1048576,
 
+        # Cap expanded characters for a single tag.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxTagLength = 1024,
 
+        # Cap cumulative expanded tag characters across the stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxTotalTagLength = 65536,
 
+        # Cap the digit count of a constructed number.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxNumericLength = 4096
     )

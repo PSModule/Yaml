@@ -12,28 +12,6 @@ function ConvertTo-Yaml {
 
         Multiple pipeline records are collected into one top-level sequence.
 
-        .PARAMETER InputObject
-        A value to serialize. Multiple pipeline records become one sequence.
-
-        .PARAMETER Depth
-        Maximum object-graph nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of traversed nodes. The default is 100000.
-
-        .PARAMETER MaxScalarLength
-        Maximum character count for one emitted scalar. The default is
-        1048576.
-
-        .PARAMETER Indent
-        Block indentation from 2 through 9 spaces. The default is 2.
-
-        .PARAMETER ExplicitDocumentStart
-        Emits an explicit `---` document start marker.
-
-        .PARAMETER EnumsAsStrings
-        Emits enum names as strings instead of underlying numeric values.
-
         .EXAMPLE
         [ordered]@{ name = 'Ada'; active = $true } | ConvertTo-Yaml
 
@@ -47,33 +25,52 @@ function ConvertTo-Yaml {
         .INPUTS
         System.Object
 
+        The value to serialize. Multiple pipeline records are collected into one sequence.
+
         .OUTPUTS
         System.String
 
+        The YAML 1.2-compatible text emitted for the input values.
+
         .LINK
-        https://github.com/PSModule/Yaml#serialize-powershell-values
+        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param (
+        # The value to serialize. Multiple pipeline records are collected into
+        # a single top-level YAML sequence.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowNull()]
         [object] $InputObject,
 
+        # Cap object-graph nesting depth so deep or hostile graphs can't exhaust
+        # the stack.
+        [Parameter()]
         [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
+        # Cap the total number of traversed nodes to bound memory and time.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes = 100000,
 
+        # Cap the character count of any single emitted scalar.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength = 1048576,
 
+        # Number of spaces per block-indentation level in the emitted YAML.
+        [Parameter()]
         [ValidateRange(2, 9)]
         [int] $Indent = 2,
 
+        # Emit an explicit `---` document-start marker ahead of the content.
+        [Parameter()]
         [switch] $ExplicitDocumentStart,
 
+        # Emit enum names as strings instead of their underlying numeric values.
+        [Parameter()]
         [switch] $EnumsAsStrings
     )
 

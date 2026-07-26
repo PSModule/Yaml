@@ -12,40 +12,6 @@ function ConvertFrom-Yaml {
         Pipeline strings are joined with a line feed and parsed as one stream,
         which supports Get-Content. Each YAML document is written separately.
 
-        .PARAMETER Yaml
-        YAML text. Multiple pipeline records are joined with a line feed and
-        parsed as one YAML stream.
-
-        .PARAMETER AsHashtable
-        Returns mappings as insertion-ordered dictionaries. Use this for
-        complex, non-string, empty, or case-colliding mapping keys.
-
-        .PARAMETER NoEnumerate
-        Writes each top-level YAML sequence as one array pipeline record.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of YAML nodes in the stream. The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum number of alias nodes in the stream. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is
-        1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters. The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in an implicitly or explicitly typed number. The
-        default is 4096.
-
         .EXAMPLE
         'name: Ada' | ConvertFrom-Yaml
 
@@ -59,41 +25,67 @@ function ConvertFrom-Yaml {
         .INPUTS
         System.String[]
 
+        The YAML text to parse. Multiple pipeline records are joined with a line feed.
+
         .OUTPUTS
         System.Object
 
+        The PowerShell value constructed from each YAML document in the stream.
+
         .LINK
-        https://github.com/PSModule/Yaml#parse-yaml
+        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([object])]
     param (
+        # The YAML text to parse. Multiple pipeline records are joined with a
+        # line feed and parsed as a single stream, which supports Get-Content.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [AllowEmptyString()]
         [string[]] $Yaml,
 
+        # Return mappings as insertion-ordered dictionaries so complex, non-string,
+        # empty, or case-colliding keys survive intact.
+        [Parameter()]
         [switch] $AsHashtable,
 
+        # Write each top-level sequence as a single array record instead of
+        # enumerating its items onto the pipeline.
+        [Parameter()]
         [switch] $NoEnumerate,
 
+        # Cap YAML node nesting depth so hostile input can't exhaust the stack.
+        [Parameter()]
         [ValidateRange(1, 128)]
         [int] $Depth = 100,
 
+        # Cap the total node count to bound memory for a single stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxNodes = 100000,
 
+        # Cap alias nodes to prevent alias-expansion amplification.
+        [Parameter()]
         [ValidateRange(0, 2147483647)]
         [int] $MaxAliases = 1000,
 
+        # Cap decoded characters per scalar to bound per-node memory.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxScalarLength = 1048576,
 
+        # Cap expanded characters for a single tag.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxTagLength = 1024,
 
+        # Cap cumulative expanded tag characters across the stream.
+        [Parameter()]
         [ValidateRange(1, 2147483647)]
         [int] $MaxTotalTagLength = 65536,
 
+        # Cap the digit count of an implicitly or explicitly typed number.
+        [Parameter()]
         [ValidateRange(1, 1048576)]
         [int] $MaxNumericLength = 4096
     )

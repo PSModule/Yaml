@@ -13,47 +13,6 @@ function Import-Yaml {
         automatically and override Encoding. Files without a byte order mark
         default to strict UTF-8.
 
-        .PARAMETER Path
-        One or more FileSystem paths. Wildcards are expanded. Resolved files
-        are sorted deterministically and duplicates are suppressed.
-
-        .PARAMETER LiteralPath
-        One or more literal FileSystem paths. Wildcard characters are not
-        expanded.
-
-        .PARAMETER Encoding
-        Encoding for files without a byte order mark. The default is utf8,
-        which is strict UTF-8 without a byte order mark.
-
-        .PARAMETER AsHashtable
-        Returns mappings as insertion-ordered dictionaries.
-
-        .PARAMETER NoEnumerate
-        Writes each top-level YAML sequence as one array pipeline record.
-
-        .PARAMETER Depth
-        Maximum YAML node nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of YAML nodes in each file. The default is 100000.
-
-        .PARAMETER MaxAliases
-        Maximum number of alias nodes in each file. The default is 1000.
-
-        .PARAMETER MaxScalarLength
-        Maximum decoded character count for one scalar. The default is
-        1048576.
-
-        .PARAMETER MaxTagLength
-        Maximum expanded character count for one tag. The default is 1024.
-
-        .PARAMETER MaxTotalTagLength
-        Maximum cumulative expanded tag characters. The default is 65536.
-
-        .PARAMETER MaxNumericLength
-        Maximum digits in an implicitly or explicitly typed number. The
-        default is 4096.
-
         .EXAMPLE
         Import-Yaml -Path '.\config.yaml'
 
@@ -71,16 +30,24 @@ function Import-Yaml {
 
         .INPUTS
         System.String
+
+        A FileSystem path to a YAML file, piped in.
+
+        .INPUTS
         System.IO.FileInfo
+
+        A file whose path is resolved from its FullName property, piped in.
 
         .OUTPUTS
         System.Object
+
+        The PowerShell value constructed from each imported YAML document.
 
         .NOTES
         Only FileSystem provider paths are supported.
 
         .LINK
-        https://github.com/PSModule/Yaml#import-yaml-files
+        https://psmodule.io/Yaml/Functions/Import-Yaml/
     #>
     [OutputType([object])]
     [CmdletBinding(DefaultParameterSetName = 'Path')]

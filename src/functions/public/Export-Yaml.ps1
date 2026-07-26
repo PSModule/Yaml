@@ -13,56 +13,6 @@ function Export-Yaml {
         replaces or moves to the destination. Existing files are never
         truncated before serialization and writing succeed.
 
-        .PARAMETER InputObject
-        A value to serialize. Multiple pipeline records become one YAML
-        sequence. A directly supplied array is one input value.
-
-        .PARAMETER Path
-        One literal FileSystem destination path. Wildcard characters are not
-        expanded.
-
-        .PARAMETER Depth
-        Maximum object-graph nesting depth. The default is 100.
-
-        .PARAMETER MaxNodes
-        Maximum number of traversed nodes. The default is 100000.
-
-        .PARAMETER MaxScalarLength
-        Maximum character count for one emitted scalar. The default is
-        1048576.
-
-        .PARAMETER Indent
-        Block indentation from 2 through 9 spaces. The default is 2.
-
-        .PARAMETER ExplicitDocumentStart
-        Emits an explicit `---` document start marker.
-
-        .PARAMETER EnumsAsStrings
-        Emits enum names as strings instead of underlying numeric values.
-
-        .PARAMETER Encoding
-        Strict output encoding. utf8 omits a byte order mark; utf8BOM and the
-        UTF-16 and UTF-32 encodings include their corresponding byte order mark.
-
-        .PARAMETER NewLine
-        Line ending used for emitted YAML structure. The default is LF.
-
-        .PARAMETER NoFinalNewline
-        Omits the final line ending. By default, exactly one is written.
-
-        .PARAMETER NoClobber
-        Fails when the destination already exists.
-
-        .PARAMETER Force
-        Permits atomic replacement of a read-only destination and preserves its
-        read-only attribute. Force cannot be combined with NoClobber.
-
-        .PARAMETER CreateDirectory
-        Creates missing parent directories after ShouldProcess approval.
-
-        .PARAMETER PassThru
-        Writes the final FileInfo after a successful export.
-
         .EXAMPLE
         $config | Export-Yaml -Path '.\config.yaml'
 
@@ -81,14 +31,18 @@ function Export-Yaml {
         .INPUTS
         System.Object
 
+        The value to serialize. Multiple pipeline records are collected into one sequence.
+
         .OUTPUTS
         System.IO.FileInfo
+
+        The destination file, returned only when PassThru is set.
 
         .NOTES
         Only FileSystem provider destinations are supported.
 
         .LINK
-        https://github.com/PSModule/Yaml#export-yaml-files
+        https://psmodule.io/Yaml/Functions/Export-Yaml/
     #>
     [OutputType([System.IO.FileInfo])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
