@@ -155,7 +155,8 @@ BeforeAll {
     }
 }
 
-Describe 'Remove-YamlEntry' {
+Describe 'Yaml' {
+    Describe 'Remove-YamlEntry' {
     Context 'Public contract' {
         It 'exposes one advanced string transformation contract' {
             $command = Get-Command -Name Remove-YamlEntry
@@ -198,6 +199,7 @@ Describe 'Remove-YamlEntry' {
             $help.Synopsis | Should -Not -BeNullOrEmpty
             $help.Description.Text | Should -Match 'JSON Pointer'
             @($help.Examples.Example).Count | Should -BeGreaterOrEqual 3
+            }
         }
 
         It 'separates one-document and all-document selection' {
