@@ -65,19 +65,34 @@ Describe 'Dependency-free package source' {
     It 'keeps the owned processor layers explicit and source-level' {
         $privatePath = Join-Path $repositoryRoot 'src\functions\private'
         @(
-            'New-YamlReaderContext.ps1',
-            'Read-YamlDirectiveBlock.ps1',
-            'New-YamlSyntaxNode.ps1',
-            'ConvertFrom-YamlSyntaxTree.ps1',
-            'Resolve-YamlScalar.ps1',
-            'ConvertFrom-YamlNode.ps1',
-            'Get-YamlSerializationShape.ps1',
-            'ConvertTo-YamlNode.ps1',
-            'ConvertTo-YamlRepresentationNode.ps1',
-            'Write-YamlNodeText.ps1'
+            'Engine\New-YamlReaderContext.ps1',
+            'Engine\Read-YamlDirectiveBlock.ps1',
+            'Engine\New-YamlSyntaxNode.ps1',
+            'Engine\ConvertFrom-YamlSyntaxTree.ps1',
+            'Engine\Resolve-YamlScalar.ps1',
+            'Conversion\ConvertFrom-YamlNode.ps1',
+            'Engine\Get-YamlSerializationShape.ps1',
+            'Conversion\ConvertTo-YamlNode.ps1',
+            'Streams\ConvertTo-YamlRepresentationNode.ps1',
+            'Engine\Write-YamlNodeText.ps1'
         ) | ForEach-Object {
             $isPresent = Test-Path -LiteralPath (Join-Path $privatePath $_)
             $isPresent | Should -BeTrue -Because "$_ defines a required processor layer"
+        }
+    }
+
+    It 'groups every function file under a domain folder' {
+        $functionsPath = Join-Path $repositoryRoot 'src\functions'
+        foreach ($scope in @('public', 'private')) {
+            $scopePath = Join-Path $functionsPath $scope
+            @(Get-ChildItem -LiteralPath $scopePath -File -Filter '*.ps1').Count |
+                Should -Be 0 -Because "$scope function files belong in a domain folder"
+
+            foreach ($file in (Get-ChildItem -LiteralPath $scopePath -Recurse -File -Filter '*.ps1')) {
+                $relative = [IO.Path]::GetRelativePath($scopePath, $file.FullName)
+                ($relative -split '[\\/]').Count |
+                    Should -Be 2 -Because "$relative is nested deeper than one domain folder"
+            }
         }
     }
 
