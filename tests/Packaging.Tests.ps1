@@ -82,12 +82,12 @@ Describe 'Dependency-free package source' {
         }
     }
 
-    It 'uses Process-PSModule 6.1.14 and treats tests as important changes' {
+    It 'uses Process-PSModule 6.1.15 and treats tests as important changes' {
         $workflow = Get-Content -Path (
             Join-Path $repositoryRoot '.github\workflows\Process-PSModule.yml'
         ) -Raw
 
-        $workflow | Should -Match 'workflow\.yml@b11b310e461f08ee99055b0827ef7909dea7110a # v6\.1\.14'
+        $workflow | Should -Match 'workflow\.yml@688896dc3ef70fb35bd74ae5328e76d5e57fe08a # v6\.1\.15'
         $workflow | Should -Match '\^src/'
         $workflow | Should -Match '\^tests/'
     }
