@@ -39,7 +39,6 @@ Describe 'Yaml' {
             $command.Parameters['LiteralPath'].Aliases | Should -Contain 'PSPath'
             $command.Parameters['LiteralPath'].Aliases | Should -Contain 'FullName'
             $command.OutputType.Type | Should -Contain ([object])
-            }
         }
 
         It 'provides complete command help' {
@@ -531,4 +530,5 @@ Describe 'Yaml' {
             }
         }
     }
+}
 }
