@@ -23,22 +23,31 @@ Install-PSResource -Name Yaml
 Import-Module -Name Yaml
 ```
 
-The module exports:
+## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `ConvertFrom-Yaml` | Parse one or more YAML documents into PowerShell values. |
-| `ConvertTo-Yaml` | Serialize supported PowerShell values as YAML 1.2-compatible text. |
-| `Export-Yaml` | Serialize values and atomically write one YAML file. |
-| `Format-Yaml` | Normalize YAML streams without projecting representation nodes to PowerShell values. |
-| `Import-Yaml` | Strictly decode and parse YAML files. |
-| `Merge-Yaml` | Merge complete YAML streams without losing representation graph details. |
-| `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
+The seven exported commands fall into three groups. Each group has an in-depth
+guide with runnable examples.
 
-## Parse YAML
+| Group | Command | Purpose |
+| --- | --- | --- |
+| [Conversion](src/functions/public/Conversion/Conversion.md) | `ConvertFrom-Yaml` | Parse one or more YAML documents into PowerShell values. |
+| [Conversion](src/functions/public/Conversion/Conversion.md) | `ConvertTo-Yaml` | Serialize supported PowerShell values as YAML 1.2-compatible text. |
+| [Files](src/functions/public/Files/Files.md) | `Import-Yaml` | Strictly decode and parse YAML files. |
+| [Files](src/functions/public/Files/Files.md) | `Export-Yaml` | Serialize values and atomically write one YAML file. |
+| [Streams](src/functions/public/Streams/Streams.md) | `Test-Yaml` | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
+| [Streams](src/functions/public/Streams/Streams.md) | `Format-Yaml` | Normalize YAML streams without projecting representation nodes to PowerShell values. |
+| [Streams](src/functions/public/Streams/Streams.md) | `Merge-Yaml` | Merge complete YAML streams without losing representation graph details. |
 
-Ordinary string-key mappings become ordered `PSCustomObject` values. A
-top-level sequence writes its items to the pipeline by default.
+`Conversion` moves data between YAML text and PowerShell values. `Files` adds
+path resolution, strict decoding, and atomic writes on top of that. `Streams`
+works on YAML text at the representation level and never projects to PowerShell
+objects, which is what lets it keep tags, anchors, complex keys, and mapping
+order intact.
+
+## Convert YAML to PowerShell values
+
+Ordinary string-key mappings become ordered `PSCustomObject` values. A top-level
+sequence writes its items to the pipeline by default.
 
 ```powershell
 $config = @'
@@ -47,206 +56,67 @@ enabled: true
 ports: [80, 443]
 '@ | ConvertFrom-Yaml
 
-$config.name
-$config.ports[0]
+$config.name        # example
+$config.ports[0]    # 80
 ```
 
-Pipeline strings are joined with LF and parsed as one stream. This makes
-line-oriented input work as expected:
+Use `-AsHashtable` for insertion-ordered dictionaries and mappings with complex,
+non-string, empty, or case-colliding keys, and `-NoEnumerate` to keep a top-level
+sequence as one pipeline record. Every document in a multi-document stream is
+returned separately.
+
+The [Conversion](src/functions/public/Conversion/Conversion.md) guide is the full
+projection reference: which YAML scalars produce which .NET types, how anchors
+preserve object identity, what `!!set`, `!!omap`, `!!pairs`, and `!!binary`
+produce, and which cases deliberately fail instead of losing data.
+
+## Serialize PowerShell values as YAML
 
 ```powershell
-$config = Get-Content -Path '.\config.yaml' | ConvertFrom-Yaml
-```
-
-Use `-NoEnumerate` when a top-level sequence must remain one pipeline record:
-
-```powershell
-$servers = @'
-- name: web-1
-- name: web-2
-'@ | ConvertFrom-Yaml -NoEnumerate
-```
-
-Every YAML document is returned separately:
-
-```powershell
-$documents = @(@'
----
-name: first
----
-name: second
-'@ | ConvertFrom-Yaml)
-```
-
-Use `-AsHashtable` for insertion-ordered dictionaries and mappings with
-complex, non-string, empty, or case-colliding keys:
-
-```powershell
-$mapping = @'
-? [region, port]
-: eu-1
-'@ | ConvertFrom-Yaml -AsHashtable
-```
-
-## Import YAML files
-
-`Import-Yaml` reads complete files with strict Unicode decoding and delegates
-parsing to `ConvertFrom-Yaml`. `-Path` expands wildcards and accepts `FileInfo`
-pipeline input; `-LiteralPath` preserves wildcard characters in filenames.
-Resolved files are deduplicated and read in deterministic path order.
-
-```powershell
-$configs = Import-Yaml -Path '.\config\*.yaml' -AsHashtable
-Get-ChildItem -Path '.\services' -Filter '*.yaml' | Import-Yaml
-Import-Yaml -LiteralPath '.\config[production].yaml'
-```
-
-UTF-8 without a byte order mark is the default. UTF-8, UTF-16, and UTF-32 byte
-order marks are detected automatically and override `-Encoding`. Malformed
-bytes terminate with a path-specific error. `-NoEnumerate` and all parser
-resource limits have the same behavior as `ConvertFrom-Yaml`.
-
-## Serialize PowerShell values
-
-`ConvertTo-Yaml` supports `PSCustomObject` and explicit PSObject note-property
-bags, dictionaries, sequences, strings, characters, Booleans, integer and
-floating-point numbers, `BigInteger`, `DateTime`, `DateTimeOffset`, enums,
-null, and byte arrays.
-
-```powershell
-$yaml = [ordered]@{
+[ordered]@{
     name    = 'example'
     enabled = $true
     ports   = @(80, 443)
 } | ConvertTo-Yaml -ExplicitDocumentStart
-
-$roundTrip = $yaml | ConvertFrom-Yaml
 ```
 
-Multiple pipeline records are collected into one top-level YAML sequence:
+`ConvertTo-Yaml` supports `PSCustomObject` and explicit PSObject note-property
+bags, dictionaries, sequences, strings, characters, Booleans, integer and
+floating-point numbers, `BigInteger`, `DateTime`, `DateTimeOffset`, enums, null,
+and byte arrays. Repeated acyclic collection references are emitted with anchors
+and aliases. Cyclic graphs and unsupported runtime objects fail specifically;
+values are never silently truncated or converted with `ToString()`.
+
+## Read and write files
 
 ```powershell
-'one', 'two' | ConvertTo-Yaml
+$configs = Import-Yaml -Path '.\config\*.yaml' -AsHashtable
+$config | Export-Yaml -Path '.\generated\config.yaml' -CreateDirectory
 ```
 
-Pass an array directly when it represents one input value:
+`Import-Yaml` decodes strictly, detects UTF-8, UTF-16, and UTF-32 byte order
+marks, and parses with `ConvertFrom-Yaml` semantics. `Export-Yaml` serializes the
+complete value before touching the filesystem and publishes it atomically as
+UTF-8 without a byte order mark, LF line endings, and exactly one final newline.
+See [Files](src/functions/public/Files/Files.md) for encodings, `-LiteralPath`
+and wildcard handling, `-NoClobber` and `-Force`, and `-PassThru`.
 
-```powershell
-$items = @('one', 'two')
-ConvertTo-Yaml -InputObject $items
-```
-
-`-EnumsAsStrings` emits enum names instead of their underlying numeric values.
-`-Indent` accepts 2 through 9 spaces. `-Depth`, `-MaxNodes`, and
-`-MaxScalarLength` constrain serialization. The maximum supported depth is
-128, and the default is 100.
-
-Repeated acyclic collection references are emitted with anchors and aliases.
-Cyclic graphs and unsupported runtime objects fail specifically; values are
-never silently truncated or converted with `ToString()`.
-
-## Format YAML streams
-
-`Format-Yaml` normalizes existing YAML without converting it through
-`PSCustomObject` or dictionary values. It retains document order and empty
-documents, node kinds, scalar content, effective tags, anchors and aliases,
-recursive graphs, complex keys, collection structure, and mapping order.
-
-```powershell
-$normalized = Get-Content -Path '.\config.yaml' | Format-Yaml -Indent 4
-```
-
-Pipeline records are joined with LF and parsed as one stream. The output is one
-string with LF line endings and no final newline. Every document starts with
-`---`; document-end markers, comments, directives, flow presentation, scalar
-styles, and original anchor names are normalized. Effective standard tags use
-`!!` shorthand where possible, while local and global tags use a deterministic
-verbatim form.
-
-Formatting is byte-idempotent at the same options:
-
-```powershell
-$normalized -ceq ($normalized | Format-Yaml -Indent 4)
-```
-
-`-Indent` accepts 2 through 9 spaces. The `-Depth`, `-MaxNodes`, `-MaxAliases`,
-`-MaxScalarLength`, `-MaxTagLength`, `-MaxTotalTagLength`, and
-`-MaxNumericLength` defaults and ranges match `ConvertFrom-Yaml`. Invalid YAML,
-duplicate representation keys, undefined aliases, malformed tags, and resource
-limit violations terminate with the same classified YAML errors as parsing.
-
-## Merge YAML streams
-
-`Merge-Yaml` combines two or more complete YAML streams directly through their
-representation graphs. Every array element or pipeline record is one complete
-stream, and every stream must contain the same positive document count. Later
-streams have higher precedence, and documents merge pairwise by zero-based index.
-
-```powershell
-$baseYaml = Get-Content -LiteralPath '.\base.yaml' -Raw
-$overlayYaml = Get-Content -LiteralPath '.\overlay.yaml' -Raw
-$mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
-```
-
-Compatible mappings merge recursively by structural YAML key equality. Base key
-order remains stable, replacing a value retains its position, and new overlay
-keys append in overlay order. Complex and tagged keys are supported. Structural
-fingerprints select comparison candidates only; mutation-aware indexes are
-retained across overlays, and graph-aware equality makes the final key decision.
-
-Compatible sequences use `-SequenceAction Replace`, `Append`, or `Unique`.
-Unequal scalars, collection kinds, and incompatible effective tags use
-`-ConflictAction Replace` or `Error`. A later YAML null uses `-NullAction
-Replace` or `Ignore`; ignoring retains an existing prior node, including at a
-document root.
-
-```powershell
-$baseYaml, $environmentYaml, $secretYaml |
-    Merge-Yaml -SequenceAction Unique -ConflictAction Error -Indent 4
-```
-
-Tags, anchors, aliases, repeated nodes, cycles, mapping order, and selected
-representation nodes remain graph data. Inputs are immutable, and YAML 1.1 `<<`
-merge keys remain ordinary mapping entries rather than being expanded. Output is
-one deterministic string with LF line endings, explicit document starts, and no
-final newline.
-
-The parser safety parameters and defaults match `Format-Yaml`. `-MaxNodes`
-limits each parsed stream and applies independently to invocation-wide clone
-creation, charged merge operations, and the resulting stream graph. Index,
-fingerprint, candidate, alias-traversal, and equality work all consume the merge
-operation budget. Alias and expanded-tag budgets are also enforced on the result.
-
-## Export YAML files
-
-`Export-Yaml` aggregates pipeline records like `ConvertTo-Yaml`, serializes the
-complete value before changing the filesystem, and atomically publishes a
-same-directory temporary file. It writes UTF-8 without a byte order mark, LF
-line endings, and exactly one final newline by default.
-
-```powershell
-$config | Export-Yaml -Path '.\config.yaml'
-'one', 'two' | Export-Yaml -Path '.\items.yaml' -Encoding utf16LE
-$config | Export-Yaml -Path '.\generated\config.yaml' -CreateDirectory -PassThru
-```
-
-Use `-NewLine CRLF` or `-NoFinalNewline` to change presentation. `-NoClobber`
-prevents replacement, while `-Force` permits replacing a read-only destination
-and preserves its read-only state. The switches are mutually exclusive.
-`-WhatIf` creates no directory or temporary file. `-PassThru` is the only mode
-that emits the final `FileInfo`.
-
-## Validate YAML
+## Validate, normalize, and merge YAML
 
 ```powershell
 if (Get-Content -Path '.\config.yaml' | Test-Yaml) {
-    'The YAML stream is valid.'
+    Get-Content -Path '.\config.yaml' | Format-Yaml -Indent 4
 }
+
+$baseYaml, $environmentYaml | Merge-Yaml -SequenceAction Unique
 ```
 
-`Test-Yaml` uses the same parser and limits as `ConvertFrom-Yaml`. It returns
-`$false` for YAML-specific failures, including duplicate keys and resource
-limit violations. Unexpected runtime failures are not suppressed.
+`Format-Yaml` is byte-idempotent at the same options and retains node kinds,
+effective tags, anchors and aliases, recursive graphs, complex keys, and mapping
+order. `Merge-Yaml` combines complete streams pairwise by document index with
+configurable sequence, conflict, and null handling. See
+[Streams](src/functions/public/Streams/Streams.md) for the full options and
+guarantees.
 
 ## Data model and safety
 
@@ -274,7 +144,9 @@ limit violations. Unexpected runtime failures are not suppressed.
 
 Default object projection requires mapping keys that can be represented
 without loss as PowerShell properties. Use `-AsHashtable` when that restriction
-does not fit the data.
+does not fit the data. The
+[Conversion](src/functions/public/Conversion/Conversion.md) guide lists every
+resulting type and every rejection case.
 
 ## Conformance corpus
 
@@ -337,6 +209,16 @@ Exact integer CLR widths and enum CLR types are not reconstructed after a YAML
 round trip. Finite non-exponent decimal values are constructed as `Decimal`
 when representable; other finite floats use `Double`. The emitter writes a
 deliberately limited YAML 1.2-compatible subset.
+
+## Documentation
+
+The command reference and the group guides are published at
+[psmodule.io/Yaml](https://psmodule.io/Yaml/). Help is also available in the
+console:
+
+```powershell
+Get-Help -Name ConvertFrom-Yaml -Examples
+```
 
 ## Contributing
 

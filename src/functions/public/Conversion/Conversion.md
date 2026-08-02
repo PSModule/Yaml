@@ -148,7 +148,7 @@ key order.
 With `-AsHashtable` a mapping becomes a
 `System.Collections.Specialized.OrderedDictionary` instead. The switch is
 recursive: nested mappings are dictionaries too. Dictionary keys are the projected
-key values, so keys that are not usable as property names survive:
+keys themselves, so keys that are not usable as property names survive:
 
 ```powershell
 $d = @'
@@ -181,8 +181,8 @@ item. `-NoEnumerate` writes the whole sequence as a single record:
 (ConvertFrom-Yaml -Yaml "- 1`n- 2" -NoEnumerate | Measure-Object).Count  # 1
 ```
 
-An empty top-level sequence therefore writes nothing by default, and one empty
-array with `-NoEnumerate`.
+An empty top-level sequence emits nothing by default, and one empty array with
+`-NoEnumerate`.
 
 ### Multi-document streams
 
