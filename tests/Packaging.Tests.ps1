@@ -37,19 +37,18 @@ Describe 'Dependency-free package source' {
         Test-Path (Join-Path $repositoryRoot 'src\THIRD-PARTY-NOTICES.txt') | Should -BeFalse
     }
 
-    It 'declares the 7.6 Core runtime in the source manifest and header' {
-        $manifestPath = Join-Path $repositoryRoot 'src\manifest.psd1'
+    It 'declares the 7.6 Core runtime in the module header' {
         $headerPath = Join-Path $repositoryRoot 'src\header.ps1'
-        Test-Path $manifestPath | Should -BeTrue
         Test-Path $headerPath | Should -BeTrue
-
-        $manifest = Import-PowerShellDataFile -Path $manifestPath
-        $manifest.PowerShellVersion | Should -Be '7.6'
-        @($manifest.CompatiblePSEditions) | Should -Be @('Core')
 
         $header = Get-Content -Path $headerPath -Raw
         $header | Should -Match '#Requires -Version 7\.6'
         $header | Should -Match '#Requires -PSEdition Core'
+    }
+
+    It 'keeps the source free of a hand-authored manifest' {
+        Test-Path (Join-Path $repositoryRoot 'src\manifest.psd1') | Should -BeFalse
+        Test-Path (Join-Path $repositoryRoot 'src\Yaml.psd1') | Should -BeFalse
     }
 
     It 'contains no external parser references or custom assembly loader' {
