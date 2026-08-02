@@ -15,8 +15,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'Yaml' {
-    Describe 'Import-Yaml' {
+Describe 'Import-Yaml' {
     Context 'Command contract' {
         It 'declares the Path and LiteralPath parameter sets' {
             $command = Get-Command -Name Import-Yaml
@@ -530,5 +529,4 @@ Describe 'Yaml' {
             }
         }
     }
-}
 }

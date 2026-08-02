@@ -15,8 +15,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'Yaml' {
-    Describe 'ConvertFrom-Yaml' {
+Describe 'ConvertFrom-Yaml' {
     Context 'YAML 1.2 core schema' {
         It 'resolves <Text> as <Type>' -ForEach @(
             @{ Text = ''; Type = 'null'; Expected = $null }
@@ -40,12 +39,12 @@ Describe 'Yaml' {
             $result.value | Should -Be $Expected
             if ($Type -ne 'null') {
                 $result.value.GetType().Name | Should -Be $Type
-                }
             }
         }
+    }
 
-        It 'keeps YAML 1.1-only implicit values and timestamps as strings' {
-            $result = @'
+    It 'keeps YAML 1.1-only implicit values and timestamps as strings' {
+        $result = @'
 yes: yes
 no: NO
 on: on
@@ -53,15 +52,15 @@ off: Off
 timestamp: 2001-12-15T02:59:43.1Z
 '@ | ConvertFrom-Yaml
 
-            $result.yes | Should -BeOfType [string]
-            $result.no | Should -BeOfType [string]
-            $result.on | Should -BeOfType [string]
-            $result.off | Should -BeOfType [string]
-            $result.timestamp | Should -BeOfType [string]
-        }
+        $result.yes | Should -BeOfType [string]
+        $result.no | Should -BeOfType [string]
+        $result.on | Should -BeOfType [string]
+        $result.off | Should -BeOfType [string]
+        $result.timestamp | Should -BeOfType [string]
+    }
 
-        It 'keeps quoted and block scalars as strings' {
-            $result = @'
+    It 'keeps quoted and block scalars as strings' {
+        $result = @'
 quoted: "true"
 literal: |
   42
@@ -70,242 +69,242 @@ folded: >
   text
 '@ | ConvertFrom-Yaml
 
-            $result.quoted | Should -Be 'true'
-            $result.quoted | Should -BeOfType [string]
-            $result.literal | Should -Be "42`n"
-            $result.folded | Should -Be "null text`n"
-        }
-
-        It 'uses BigInteger beyond Int64' {
-            $result = 'value: 9223372036854775808' | ConvertFrom-Yaml
-
-            $result.value | Should -BeOfType [System.Numerics.BigInteger]
-            $result.value.ToString() | Should -Be '9223372036854775808'
-        }
+        $result.quoted | Should -Be 'true'
+        $result.quoted | Should -BeOfType [string]
+        $result.literal | Should -Be "42`n"
+        $result.folded | Should -Be "null text`n"
     }
 
-    Context 'Mappings and sequences' {
-        It 'returns ordinary mappings as ordered PSCustomObject properties' {
-            $result = "zebra: 1`napple: 2" | ConvertFrom-Yaml
+    It 'uses BigInteger beyond Int64' {
+        $result = 'value: 9223372036854775808' | ConvertFrom-Yaml
 
-            $result | Should -BeOfType [pscustomobject]
-            @($result.PSObject.Properties.Name) | Should -Be @('zebra', 'apple')
-        }
+        $result.value | Should -BeOfType [System.Numerics.BigInteger]
+        $result.value.ToString() | Should -Be '9223372036854775808'
+    }
+}
 
-        It 'returns recursive ordered dictionaries with AsHashtable' {
-            $result = "outer:`n  inner: value" | ConvertFrom-Yaml -AsHashtable
+Context 'Mappings and sequences' {
+    It 'returns ordinary mappings as ordered PSCustomObject properties' {
+        $result = "zebra: 1`napple: 2" | ConvertFrom-Yaml
 
-            $result | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            $result['outer'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            $result['outer']['inner'] | Should -Be 'value'
-        }
+        $result | Should -BeOfType [pscustomobject]
+        @($result.PSObject.Properties.Name) | Should -Be @('zebra', 'apple')
+    }
 
-        It 'preserves a complex key with AsHashtable' {
-            $result = "? [Detroit Tigers, Chicago Cubs]`n: 2001-07-23" |
-                ConvertFrom-Yaml -AsHashtable
-            $enumerator = $result.GetEnumerator()
-            $null = $enumerator.MoveNext()
-            $key = $enumerator.Key
+    It 'returns recursive ordered dictionaries with AsHashtable' {
+        $result = "outer:`n  inner: value" | ConvertFrom-Yaml -AsHashtable
 
-            , $key | Should -BeOfType [object[]]
-            $key | Should -Be @('Detroit Tigers', 'Chicago Cubs')
-            $enumerator.Value | Should -Be '2001-07-23'
-        }
+        $result | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $result['outer'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $result['outer']['inner'] | Should -Be 'value'
+    }
 
-        It 'fails rather than losing a complex key in PSCustomObject mode' {
-            { "? [a, b]`n: value" | ConvertFrom-Yaml } |
+    It 'preserves a complex key with AsHashtable' {
+        $result = "? [Detroit Tigers, Chicago Cubs]`n: 2001-07-23" |
+            ConvertFrom-Yaml -AsHashtable
+        $enumerator = $result.GetEnumerator()
+        $null = $enumerator.MoveNext()
+        $key = $enumerator.Key
+
+        , $key | Should -BeOfType [object[]]
+        $key | Should -Be @('Detroit Tigers', 'Chicago Cubs')
+        $enumerator.Value | Should -Be '2001-07-23'
+    }
+
+    It 'fails rather than losing a complex key in PSCustomObject mode' {
+        { "? [a, b]`n: value" | ConvertFrom-Yaml } |
+            Should -Throw -ExpectedMessage '*Use -AsHashtable*'
+    }
+
+    It 'fails on case-insensitive property collisions but preserves them with AsHashtable' {
+        { "Name: one`nname: two" | ConvertFrom-Yaml } |
+            Should -Throw -ExpectedMessage '*case-insensitive property collision*'
+
+        $result = "Name: one`nname: two" | ConvertFrom-Yaml -AsHashtable
+        $result.Count | Should -Be 2
+        $result['Name'] | Should -Be 'one'
+        $result['name'] | Should -Be 'two'
+    }
+
+    It 'classifies ETS-reserved property names and preserves them with AsHashtable' {
+        foreach ($name in @(
+                'PSObject',
+                'psobject',
+                'PSTypeNames',
+                'PSBase',
+                'PSAdapted',
+                'PSExtended'
+            )) {
+            { "$name`: value" | ConvertFrom-Yaml } |
                 Should -Throw -ExpectedMessage '*Use -AsHashtable*'
-        }
 
-        It 'fails on case-insensitive property collisions but preserves them with AsHashtable' {
-            { "Name: one`nname: two" | ConvertFrom-Yaml } |
-                Should -Throw -ExpectedMessage '*case-insensitive property collision*'
-
-            $result = "Name: one`nname: two" | ConvertFrom-Yaml -AsHashtable
-            $result.Count | Should -Be 2
-            $result['Name'] | Should -Be 'one'
-            $result['name'] | Should -Be 'two'
-        }
-
-        It 'classifies ETS-reserved property names and preserves them with AsHashtable' {
-            foreach ($name in @(
-                    'PSObject',
-                    'psobject',
-                    'PSTypeNames',
-                    'PSBase',
-                    'PSAdapted',
-                    'PSExtended'
-                )) {
-                { "$name`: value" | ConvertFrom-Yaml } |
-                    Should -Throw -ExpectedMessage '*Use -AsHashtable*'
-
-                $result = "$name`: value" | ConvertFrom-Yaml -AsHashtable
-                $result[$name] | Should -Be 'value'
-            }
-        }
-
-        It 'enumerates only top-level sequences by default' {
-            $result = "- one`n- two" | ConvertFrom-Yaml
-
-            @($result) | Should -Be @('one', 'two')
-        }
-
-        It 'preserves a top-level sequence with NoEnumerate' {
-            $result = "- one`n- two" | ConvertFrom-Yaml -NoEnumerate
-
-            , $result | Should -BeOfType [object[]]
-            $result | Should -Be @('one', 'two')
-        }
-
-        It 'treats only YAML s-white as structural whitespace' {
-            $nbsp = [char] 0x00A0
-
-            ("key:${nbsp}value" | ConvertFrom-Yaml) | Should -Be "key:${nbsp}value"
-            ("-${nbsp}item" | ConvertFrom-Yaml) | Should -Be "-${nbsp}item"
-
-            $flow = "[foo${nbsp}bar]" | ConvertFrom-Yaml -NoEnumerate
-            $flow | Should -Be @("foo${nbsp}bar")
-        }
-
-        It 'preserves flow scalar spaces and folds flow line breaks' {
-            $result = "[foo  bar, foo`n`n  bar]" | ConvertFrom-Yaml -NoEnumerate
-
-            $result | Should -Be @('foo  bar', "foo`nbar")
-        }
-
-        It 'accepts adjacent flow collection values after a colon' {
-            $sequenceValue = '{foo:[bar]}' | ConvertFrom-Yaml
-            $mappingValue = '{foo:{bar: baz}}' | ConvertFrom-Yaml
-            $sequencePair = '[foo:[bar]]' | ConvertFrom-Yaml -NoEnumerate
-
-            $sequenceValue.foo | Should -Be @('bar')
-            $mappingValue.foo.bar | Should -Be 'baz'
-            $sequencePair.Count | Should -Be 1
-            $sequencePair[0].foo | Should -Be @('bar')
-        }
-
-        It 'accepts tabs after explicit block mapping indicators' {
-            $tabAfterQuestion = "?`tkey`n: value" | ConvertFrom-Yaml -AsHashtable
-            $tabAfterColon = "? key`n:`tvalue" | ConvertFrom-Yaml -AsHashtable
-
-            $tabAfterQuestion['key'] | Should -Be 'value'
-            $tabAfterColon['key'] | Should -Be 'value'
-            $tabAfterColon.Count | Should -Be 1
+            $result = "$name`: value" | ConvertFrom-Yaml -AsHashtable
+            $result[$name] | Should -Be 'value'
         }
     }
 
-    Context 'Streams and pipeline input' {
-        It 'joins pipeline lines as one YAML stream' {
-            $result = 'name: Ada', 'active: true' | ConvertFrom-Yaml
+    It 'enumerates only top-level sequences by default' {
+        $result = "- one`n- two" | ConvertFrom-Yaml
 
-            $result.name | Should -Be 'Ada'
-            $result.active | Should -BeTrue
-        }
-
-        It 'returns every document separately' {
-            $result = @(
-                "---`nname: first`n...`n---`nname: second" | ConvertFrom-Yaml
-            )
-
-            $result.Count | Should -Be 2
-            $result[0].name | Should -Be 'first'
-            $result[1].name | Should -Be 'second'
-        }
-
-        It 'consumes byte order marks only at legal document boundaries' {
-            $bom = [char] 0xFEFF
-            $documents = @(
-                "${bom}%YAML 1.2`n---`none`n...`n${bom}# prefix comment`n`n---`ntwo" |
-                    ConvertFrom-Yaml
-            )
-            $implicitBoundaryDocuments = @(
-                "---`none`n${bom}# prefix comment`n---`ntwo" | ConvertFrom-Yaml
-            )
-            $commentThenBom = @(
-                "# first`n${bom}---`nvalue" | ConvertFrom-Yaml
-            )
-            $alternatingPrefixes = @(
-                "# first`n${bom}# second`n${bom}---`nvalue" | ConvertFrom-Yaml
-            )
-            $trailingPrefix = @(
-                "---`nvalue`n...`n${bom}# trailing prefix" | ConvertFrom-Yaml
-            )
-            $barePrefixDocument = @(
-                "# prefix`n${bom}value" | ConvertFrom-Yaml
-            )
-            $bareBoundaryDocuments = @(
-                "---`none`n...`n${bom}two" | ConvertFrom-Yaml
-            )
-            $commentedBareBoundaryDocuments = @(
-                "---`none`n...`n${bom}# comment`ntwo" | ConvertFrom-Yaml
-            )
-
-            $documents | Should -Be @('one', 'two')
-            $implicitBoundaryDocuments | Should -Be @('one', 'two')
-            $commentThenBom | Should -Be @('value')
-            $alternatingPrefixes | Should -Be @('value')
-            $trailingPrefix | Should -Be @('value')
-            $barePrefixDocument | Should -Be @('value')
-            $bareBoundaryDocuments | Should -Be @('one', 'two')
-            $commentedBareBoundaryDocuments | Should -Be @('one', 'two')
-            ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
-            ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
-            ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
-            ("---`none`n${bom}two" | Test-Yaml) | Should -BeFalse
-            ("${bom}%YAML 1.2`nvalue" | Test-Yaml) | Should -BeFalse
-            ('"foo' + $bom + 'bar"' | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
-            ("'foo${bom}bar'" | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
-            ("`"a`n${bom}%foo`nb`"" | ConvertFrom-Yaml) |
-                Should -Be "a ${bom}%foo b"
-            ("|-`n${bom}%foo" | Test-Yaml) | Should -BeFalse
-            ("%FOO before${bom}after`n---`nvalue" | Test-Yaml) | Should -BeFalse
-            ("value # a${bom}b" | Test-Yaml) | Should -BeFalse
-            ("# a${bom}b`nvalue" | Test-Yaml) | Should -BeFalse
-            ("[value # a${bom}b`n ]" | Test-Yaml) | Should -BeFalse
-            ("| # a${bom}b`n  value" | Test-Yaml) | Should -BeFalse
-        }
-
-        It 'validates repeated document prefixes with one suffix scan' {
-            $bom = [char] 0xFEFF
-            $yaml = ((([string] $bom + "# prefix`n") * 64) -join '') + "---`nvalue"
-            $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
-            if ($null -eq $loadedModule) {
-                Mock Test-YamlDocumentPrefix { $true }
-            } else {
-                Mock Test-YamlDocumentPrefix -ModuleName $loadedModule.Name { $true }
-            }
-
-            ($yaml | ConvertFrom-Yaml) | Should -Be 'value'
-            if ($null -eq $loadedModule) {
-                Should -Invoke Test-YamlDocumentPrefix -Times 1 -Exactly
-            } else {
-                Should -Invoke Test-YamlDocumentPrefix -ModuleName $loadedModule.Name `
-                    -Times 1 -Exactly
-            }
-        }
+        @($result) | Should -Be @('one', 'two')
     }
 
-    Context 'Tags, anchors, and aliases' {
-        It 'stops anchor and alias names before mapping indicators' {
-            $emptyKey = '&a: value' | ConvertFrom-Yaml -AsHashtable
-            $aliasedKey = '{anchor: &a foo, *a: value}' |
-                ConvertFrom-Yaml -AsHashtable
-            $blockAliasedKey = "source: &a key`n*a: value" |
-                ConvertFrom-Yaml -AsHashtable
-            $colonAliasName = "&a: key: &a value`nfoo:`n  *a:" |
-                ConvertFrom-Yaml -AsHashtable
+    It 'preserves a top-level sequence with NoEnumerate' {
+        $result = "- one`n- two" | ConvertFrom-Yaml -NoEnumerate
 
-            $emptyKey.Count | Should -Be 1
-            $emptyKey[[System.DBNull]::Value] | Should -Be 'value'
-            @($aliasedKey.Keys) | Should -Be @('anchor', 'foo')
-            @($aliasedKey.Values) | Should -Be @('foo', 'value')
-            @($blockAliasedKey.Keys) | Should -Be @('source', 'key')
-            @($blockAliasedKey.Values) | Should -Be @('key', 'value')
-            $colonAliasName['foo'] | Should -Be 'key'
+        , $result | Should -BeOfType [object[]]
+        $result | Should -Be @('one', 'two')
+    }
+
+    It 'treats only YAML s-white as structural whitespace' {
+        $nbsp = [char] 0x00A0
+
+        ("key:${nbsp}value" | ConvertFrom-Yaml) | Should -Be "key:${nbsp}value"
+        ("-${nbsp}item" | ConvertFrom-Yaml) | Should -Be "-${nbsp}item"
+
+        $flow = "[foo${nbsp}bar]" | ConvertFrom-Yaml -NoEnumerate
+        $flow | Should -Be @("foo${nbsp}bar")
+    }
+
+    It 'preserves flow scalar spaces and folds flow line breaks' {
+        $result = "[foo  bar, foo`n`n  bar]" | ConvertFrom-Yaml -NoEnumerate
+
+        $result | Should -Be @('foo  bar', "foo`nbar")
+    }
+
+    It 'accepts adjacent flow collection values after a colon' {
+        $sequenceValue = '{foo:[bar]}' | ConvertFrom-Yaml
+        $mappingValue = '{foo:{bar: baz}}' | ConvertFrom-Yaml
+        $sequencePair = '[foo:[bar]]' | ConvertFrom-Yaml -NoEnumerate
+
+        $sequenceValue.foo | Should -Be @('bar')
+        $mappingValue.foo.bar | Should -Be 'baz'
+        $sequencePair.Count | Should -Be 1
+        $sequencePair[0].foo | Should -Be @('bar')
+    }
+
+    It 'accepts tabs after explicit block mapping indicators' {
+        $tabAfterQuestion = "?`tkey`n: value" | ConvertFrom-Yaml -AsHashtable
+        $tabAfterColon = "? key`n:`tvalue" | ConvertFrom-Yaml -AsHashtable
+
+        $tabAfterQuestion['key'] | Should -Be 'value'
+        $tabAfterColon['key'] | Should -Be 'value'
+        $tabAfterColon.Count | Should -Be 1
+    }
+}
+
+Context 'Streams and pipeline input' {
+    It 'joins pipeline lines as one YAML stream' {
+        $result = 'name: Ada', 'active: true' | ConvertFrom-Yaml
+
+        $result.name | Should -Be 'Ada'
+        $result.active | Should -BeTrue
+    }
+
+    It 'returns every document separately' {
+        $result = @(
+            "---`nname: first`n...`n---`nname: second" | ConvertFrom-Yaml
+        )
+
+        $result.Count | Should -Be 2
+        $result[0].name | Should -Be 'first'
+        $result[1].name | Should -Be 'second'
+    }
+
+    It 'consumes byte order marks only at legal document boundaries' {
+        $bom = [char] 0xFEFF
+        $documents = @(
+            "${bom}%YAML 1.2`n---`none`n...`n${bom}# prefix comment`n`n---`ntwo" |
+                ConvertFrom-Yaml
+        )
+        $implicitBoundaryDocuments = @(
+            "---`none`n${bom}# prefix comment`n---`ntwo" | ConvertFrom-Yaml
+        )
+        $commentThenBom = @(
+            "# first`n${bom}---`nvalue" | ConvertFrom-Yaml
+        )
+        $alternatingPrefixes = @(
+            "# first`n${bom}# second`n${bom}---`nvalue" | ConvertFrom-Yaml
+        )
+        $trailingPrefix = @(
+            "---`nvalue`n...`n${bom}# trailing prefix" | ConvertFrom-Yaml
+        )
+        $barePrefixDocument = @(
+            "# prefix`n${bom}value" | ConvertFrom-Yaml
+        )
+        $bareBoundaryDocuments = @(
+            "---`none`n...`n${bom}two" | ConvertFrom-Yaml
+        )
+        $commentedBareBoundaryDocuments = @(
+            "---`none`n...`n${bom}# comment`ntwo" | ConvertFrom-Yaml
+        )
+
+        $documents | Should -Be @('one', 'two')
+        $implicitBoundaryDocuments | Should -Be @('one', 'two')
+        $commentThenBom | Should -Be @('value')
+        $alternatingPrefixes | Should -Be @('value')
+        $trailingPrefix | Should -Be @('value')
+        $barePrefixDocument | Should -Be @('value')
+        $bareBoundaryDocuments | Should -Be @('one', 'two')
+        $commentedBareBoundaryDocuments | Should -Be @('one', 'two')
+        ("${bom}---`nvalue" | ConvertFrom-Yaml) | Should -Be 'value'
+        ("foo${bom}bar" | Test-Yaml) | Should -BeFalse
+        ("---`n${bom}value" | Test-Yaml) | Should -BeFalse
+        ("---`none`n${bom}two" | Test-Yaml) | Should -BeFalse
+        ("${bom}%YAML 1.2`nvalue" | Test-Yaml) | Should -BeFalse
+        ('"foo' + $bom + 'bar"' | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
+        ("'foo${bom}bar'" | ConvertFrom-Yaml) | Should -Be "foo${bom}bar"
+        ("`"a`n${bom}%foo`nb`"" | ConvertFrom-Yaml) |
+            Should -Be "a ${bom}%foo b"
+        ("|-`n${bom}%foo" | Test-Yaml) | Should -BeFalse
+        ("%FOO before${bom}after`n---`nvalue" | Test-Yaml) | Should -BeFalse
+        ("value # a${bom}b" | Test-Yaml) | Should -BeFalse
+        ("# a${bom}b`nvalue" | Test-Yaml) | Should -BeFalse
+        ("[value # a${bom}b`n ]" | Test-Yaml) | Should -BeFalse
+        ("| # a${bom}b`n  value" | Test-Yaml) | Should -BeFalse
+    }
+
+    It 'validates repeated document prefixes with one suffix scan' {
+        $bom = [char] 0xFEFF
+        $yaml = ((([string] $bom + "# prefix`n") * 64) -join '') + "---`nvalue"
+        $loadedModule = Get-Module -Name Yaml | Select-Object -First 1
+        if ($null -eq $loadedModule) {
+            Mock Test-YamlDocumentPrefix { $true }
+        } else {
+            Mock Test-YamlDocumentPrefix -ModuleName $loadedModule.Name { $true }
         }
 
-        It 'constructs explicit standard scalar tags safely' {
-            $result = @'
+        ($yaml | ConvertFrom-Yaml) | Should -Be 'value'
+        if ($null -eq $loadedModule) {
+            Should -Invoke Test-YamlDocumentPrefix -Times 1 -Exactly
+        } else {
+            Should -Invoke Test-YamlDocumentPrefix -ModuleName $loadedModule.Name `
+                -Times 1 -Exactly
+        }
+    }
+}
+
+Context 'Tags, anchors, and aliases' {
+    It 'stops anchor and alias names before mapping indicators' {
+        $emptyKey = '&a: value' | ConvertFrom-Yaml -AsHashtable
+        $aliasedKey = '{anchor: &a foo, *a: value}' |
+            ConvertFrom-Yaml -AsHashtable
+        $blockAliasedKey = "source: &a key`n*a: value" |
+            ConvertFrom-Yaml -AsHashtable
+        $colonAliasName = "&a: key: &a value`nfoo:`n  *a:" |
+            ConvertFrom-Yaml -AsHashtable
+
+        $emptyKey.Count | Should -Be 1
+        $emptyKey[[System.DBNull]::Value] | Should -Be 'value'
+        @($aliasedKey.Keys) | Should -Be @('anchor', 'foo')
+        @($aliasedKey.Values) | Should -Be @('foo', 'value')
+        @($blockAliasedKey.Keys) | Should -Be @('source', 'key')
+        @($blockAliasedKey.Values) | Should -Be @('key', 'value')
+        $colonAliasName['foo'] | Should -Be 'key'
+    }
+
+    It 'constructs explicit standard scalar tags safely' {
+        $result = @'
 text: !!str 42
 number: !!int "42"
 binary: !!binary SGVsbG8=
@@ -313,89 +312,89 @@ offset: !!timestamp 2026-07-19T15:49:21+02:00
 date: !!timestamp 2026-07-19
 '@ | ConvertFrom-Yaml
 
-            $result.text | Should -BeOfType [string]
-            $result.number | Should -BeOfType [int]
-            [Text.Encoding]::UTF8.GetString($result.binary) | Should -Be 'Hello'
-            $result.offset | Should -BeOfType [datetimeoffset]
-            $result.date | Should -BeOfType [datetime]
-        }
+        $result.text | Should -BeOfType [string]
+        $result.number | Should -BeOfType [int]
+        [Text.Encoding]::UTF8.GetString($result.binary) | Should -Be 'Hello'
+        $result.offset | Should -BeOfType [datetimeoffset]
+        $result.date | Should -BeOfType [datetime]
+    }
 
-        It 'treats unknown application tags as neutral non-activating metadata' {
-            $result = @'
+    It 'treats unknown application tags as neutral non-activating metadata' {
+        $result = @'
 scalar: !System.Management.Automation.PSObject 42
 mapping: !<tag:example.test,2026:object>
   name: safe
 '@ | ConvertFrom-Yaml
 
-            $result.scalar | Should -Be '42'
-            $result.scalar | Should -BeOfType [string]
-            $result.mapping.name | Should -Be 'safe'
-        }
+        $result.scalar | Should -Be '42'
+        $result.scalar | Should -BeOfType [string]
+        $result.mapping.name | Should -Be 'safe'
+    }
 
-        It 'retains unknown local and global tags before neutral value projection' {
-            $local = Get-TestYamlRepresentationRoot -Yaml '!local value'
-            $global = Get-TestYamlRepresentationRoot -Yaml (
-                '!<tag:example.test,2026:object> value'
-            )
+    It 'retains unknown local and global tags before neutral value projection' {
+        $local = Get-TestYamlRepresentationRoot -Yaml '!local value'
+        $global = Get-TestYamlRepresentationRoot -Yaml (
+            '!<tag:example.test,2026:object> value'
+        )
 
-            $local.Tag | Should -Be '!local'
-            $local.HasUnknownTag | Should -BeTrue
-            $global.Tag | Should -Be 'tag:example.test,2026:object'
-            $global.HasUnknownTag | Should -BeTrue
-            ('!local value' | ConvertFrom-Yaml) | Should -Be 'value'
-            ('!<tag:example.test,2026:object> value' | ConvertFrom-Yaml) |
-                Should -Be 'value'
-        }
+        $local.Tag | Should -Be '!local'
+        $local.HasUnknownTag | Should -BeTrue
+        $global.Tag | Should -Be 'tag:example.test,2026:object'
+        $global.HasUnknownTag | Should -BeTrue
+        ('!local value' | ConvertFrom-Yaml) | Should -Be 'value'
+        ('!<tag:example.test,2026:object> value' | ConvertFrom-Yaml) |
+            Should -Be 'value'
+    }
 
-        It 'preserves repeated collection references' {
-            $result = @'
+    It 'preserves repeated collection references' {
+        $result = @'
 source: &source
   value: 1
 copy: *source
 '@ | ConvertFrom-Yaml
 
-            [object]::ReferenceEquals($result.source, $result.copy) | Should -BeTrue
-        }
+        [object]::ReferenceEquals($result.source, $result.copy) | Should -BeTrue
+    }
 
-        It 'constructs recursive aliases without recursing forever' {
-            $result = '&root [*root]' | ConvertFrom-Yaml -NoEnumerate
+    It 'constructs recursive aliases without recursing forever' {
+        $result = '&root [*root]' | ConvertFrom-Yaml -NoEnumerate
 
-            [object]::ReferenceEquals($result, $result[0]) | Should -BeTrue
-        }
+        [object]::ReferenceEquals($result, $result[0]) | Should -BeTrue
+    }
 
-        It 'constructs set, ordered-map, and pairs tags safely' {
-            $set = "!!set`n? one`n? two" | ConvertFrom-Yaml
-            $orderedMap = "!!omap`n- one: 1`n- two: 2" | ConvertFrom-Yaml
-            $pairs = "!!pairs`n- one: 1`n- one: 2" | ConvertFrom-Yaml -NoEnumerate
+    It 'constructs set, ordered-map, and pairs tags safely' {
+        $set = "!!set`n? one`n? two" | ConvertFrom-Yaml
+        $orderedMap = "!!omap`n- one: 1`n- two: 2" | ConvertFrom-Yaml
+        $pairs = "!!pairs`n- one: 1`n- one: 2" | ConvertFrom-Yaml -NoEnumerate
 
-            $set | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            $set.Count | Should -Be 2
-            $orderedMap | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            @($orderedMap.Keys) | Should -Be @('one', 'two')
-            $pairs.Count | Should -Be 2
-            $pairs[0] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-        }
+        $set | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $set.Count | Should -Be 2
+        $orderedMap | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        @($orderedMap.Keys) | Should -Be @('one', 'two')
+        $pairs.Count | Should -Be 2
+        $pairs[0] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+    }
 
-        It 'caches binary scalar construction and preserves binary alias identity' {
-            $result = "first: &bytes !!binary SGVsbG8=`nsecond: *bytes" |
-                ConvertFrom-Yaml -AsHashtable
+    It 'caches binary scalar construction and preserves binary alias identity' {
+        $result = "first: &bytes !!binary SGVsbG8=`nsecond: *bytes" |
+            ConvertFrom-Yaml -AsHashtable
 
-            , $result['first'] | Should -BeOfType [byte[]]
-            [object]::ReferenceEquals($result['first'], $result['second']) | Should -BeTrue
-        }
+        , $result['first'] | Should -BeOfType [byte[]]
+        [object]::ReferenceEquals($result['first'], $result['second']) | Should -BeTrue
+    }
 
-        It 'constructs ordered mappings with complex keys without re-enumerating them' {
-            $result = "!!omap`n- ? [a, b]`n  : value" | ConvertFrom-Yaml -AsHashtable
-            $enumerator = $result.GetEnumerator()
-            $null = $enumerator.MoveNext()
+    It 'constructs ordered mappings with complex keys without re-enumerating them' {
+        $result = "!!omap`n- ? [a, b]`n  : value" | ConvertFrom-Yaml -AsHashtable
+        $enumerator = $result.GetEnumerator()
+        $null = $enumerator.MoveNext()
 
-            , $enumerator.Key | Should -BeOfType [object[]]
-            $enumerator.Key | Should -Be @('a', 'b')
-            $enumerator.Value | Should -Be 'value'
-        }
+        , $enumerator.Key | Should -BeOfType [object[]]
+        $enumerator.Key | Should -Be @('a', 'b')
+        $enumerator.Value | Should -Be 'value'
+    }
 
-        It 'parses explicit complex keys whose sequence content starts on the next line' {
-            $yaml = @'
+    It 'parses explicit complex keys whose sequence content starts on the next line' {
+        $yaml = @'
 --- &mapping
 ? &key
 - &item a
@@ -403,262 +402,261 @@ copy: *source
 - c
 : value
 '@
-            $result = @($yaml | ConvertFrom-Yaml -AsHashtable -NoEnumerate)
+        $result = @($yaml | ConvertFrom-Yaml -AsHashtable -NoEnumerate)
 
-            $result.Count | Should -Be 1
-            $mapping = $result[0]
-            $mapping.Count | Should -Be 1
-            $entry = $mapping.GetEnumerator() | Select-Object -First 1
-            , $entry.Key | Should -BeOfType [object[]]
-            $entry.Key | Should -Be @('a', 'b', 'c')
-            $entry.Value | Should -Be 'value'
-        }
+        $result.Count | Should -Be 1
+        $mapping = $result[0]
+        $mapping.Count | Should -Be 1
+        $entry = $mapping.GetEnumerator() | Select-Object -First 1
+        , $entry.Key | Should -BeOfType [object[]]
+        $entry.Key | Should -Be @('a', 'b', 'c')
+        $entry.Value | Should -Be 'value'
+    }
 
-        It 'preserves empty sequence keys inside nested complex mapping keys' {
-            $result = '? []: x' | ConvertFrom-Yaml -AsHashtable
-            $result.Count | Should -Be 1
-            $outerKey = @($result.Keys)[0]
-            $outerValue = $result[$outerKey]
+    It 'preserves empty sequence keys inside nested complex mapping keys' {
+        $result = '? []: x' | ConvertFrom-Yaml -AsHashtable
+        $result.Count | Should -Be 1
+        $outerKey = @($result.Keys)[0]
+        $outerValue = $result[$outerKey]
 
-            $outerKey | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            $outerKey.Count | Should -Be 1
-            $innerEntry = $outerKey.GetEnumerator() | Select-Object -First 1
-            $innerKey = $innerEntry.Key
-            , $innerKey | Should -BeOfType [object[]]
-            $innerKey.Count | Should -Be 0
-            $innerEntry.Value | Should -Be 'x'
-            $outerValue | Should -BeNullOrEmpty
-        }
+        $outerKey | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $outerKey.Count | Should -Be 1
+        $innerEntry = $outerKey.GetEnumerator() | Select-Object -First 1
+        $innerKey = $innerEntry.Key
+        , $innerKey | Should -BeOfType [object[]]
+        $innerKey.Count | Should -Be 0
+        $innerEntry.Value | Should -Be 'x'
+        $outerValue | Should -BeNullOrEmpty
+    }
 
-        It 'matches standard tags ordinally and treats case variants as unknown' {
-            $result = "integer: !!INT 12`nset: !!SET {one: null}" |
-                ConvertFrom-Yaml -AsHashtable
+    It 'matches standard tags ordinally and treats case variants as unknown' {
+        $result = "integer: !!INT 12`nset: !!SET {one: null}" |
+            ConvertFrom-Yaml -AsHashtable
 
-            $result['integer'] | Should -BeOfType [string]
-            $result['integer'] | Should -Be '12'
-            $result['set'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
-            $result['set']['one'] | Should -BeNullOrEmpty
-        }
+        $result['integer'] | Should -BeOfType [string]
+        $result['integer'] | Should -Be '12'
+        $result['set'] | Should -BeOfType [System.Collections.Specialized.OrderedDictionary]
+        $result['set']['one'] | Should -BeNullOrEmpty
+    }
 
-        It 'classifies projection collisions from representation-distinct tagged keys' {
-            $yaml = "!foo x: one`n!bar x: two"
+    It 'classifies projection collisions from representation-distinct tagged keys' {
+        $yaml = "!foo x: one`n!bar x: two"
 
-            ($yaml | Test-Yaml) | Should -BeTrue
-            { $yaml | ConvertFrom-Yaml -AsHashtable } |
-                Should -Throw -ExpectedMessage '*cannot be projected distinctly*'
-        }
+        ($yaml | Test-Yaml) | Should -BeTrue
+        { $yaml | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*cannot be projected distinctly*'
+    }
 
-        It 'uses deterministic UTC semantics for zone-less explicit timestamps' {
-            $result = @'
+    It 'uses deterministic UTC semantics for zone-less explicit timestamps' {
+        $result = @'
 offset: !!timestamp 2001-12-14T21:59:43.1+5:30
 wholeHour: !!timestamp 2001-12-14T21:59:43+5
 zoneLess: !!timestamp 2001-12-14T21:59:43.1
 date: !!timestamp 2001-12-14
 '@ | ConvertFrom-Yaml
 
-            $result.offset | Should -BeOfType [datetimeoffset]
-            $result.offset.Offset | Should -Be ([timespan]::FromHours(5.5))
-            $result.wholeHour | Should -BeOfType [datetimeoffset]
-            $result.wholeHour.Offset | Should -Be ([timespan]::FromHours(5))
-            $result.zoneLess | Should -BeOfType [datetime]
-            $result.zoneLess.Kind | Should -Be ([DateTimeKind]::Utc)
-            $result.date.Kind | Should -Be ([DateTimeKind]::Utc)
-        }
+        $result.offset | Should -BeOfType [datetimeoffset]
+        $result.offset.Offset | Should -Be ([timespan]::FromHours(5.5))
+        $result.wholeHour | Should -BeOfType [datetimeoffset]
+        $result.wholeHour.Offset | Should -Be ([timespan]::FromHours(5))
+        $result.zoneLess | Should -BeOfType [datetime]
+        $result.zoneLess.Kind | Should -Be ([DateTimeKind]::Utc)
+        $result.date.Kind | Should -Be ([DateTimeKind]::Utc)
+    }
+}
+
+Context 'Validation and limits' {
+    It 'rejects duplicate scalar, canonical numeric, and complex keys' {
+        { "key: one`nkey: two" | ConvertFrom-Yaml } | Should -Throw
+        { "1: one`n01: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { "1.0: one`n1.00: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { "1.0: one`n1e0: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { "? [a, b]`n: one`n? [a, b]`n: two" | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw
+        { "? {a: 1, A: 1}`n: one`n? {A: 1, a: 1}`n: two" | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw
     }
 
-    Context 'Validation and limits' {
-        It 'rejects duplicate scalar, canonical numeric, and complex keys' {
-            { "key: one`nkey: two" | ConvertFrom-Yaml } | Should -Throw
-            { "1: one`n01: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-            { "1.0: one`n1.00: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-            { "1.0: one`n1e0: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-            { "? [a, b]`n: one`n? [a, b]`n: two" | ConvertFrom-Yaml -AsHashtable } |
-                Should -Throw
-            { "? {a: 1, A: 1}`n: one`n? {A: 1, a: 1}`n: two" | ConvertFrom-Yaml -AsHashtable } |
-                Should -Throw
-        }
-
-        It 'normalizes cross-type finite floats for key equality' {
-            $yaml = @'
+    It 'normalizes cross-type finite floats for key equality' {
+        $yaml = @'
 100000000000000000000.0: decimal
 1e20: double
 '@
 
-            ($yaml | Test-Yaml) | Should -BeFalse
-            { $yaml | ConvertFrom-Yaml -AsHashtable } |
-                Should -Throw -ExpectedMessage '*duplicate mapping key*'
-        }
+        ($yaml | Test-Yaml) | Should -BeFalse
+        { $yaml | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
+    }
 
-        It 'treats signed zero keys as the same YAML representation value' {
-            $yaml = @'
+    It 'treats signed zero keys as the same YAML representation value' {
+        $yaml = @'
 0.0: positive
 -0.0: negative
 '@
 
-            ($yaml | Test-Yaml) | Should -BeFalse
-            { $yaml | ConvertFrom-Yaml -AsHashtable } |
-                Should -Throw -ExpectedMessage '*duplicate mapping key*'
-        }
+        ($yaml | Test-Yaml) | Should -BeFalse
+        { $yaml | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
+    }
 
-        It 'rejects equivalent offset timestamps as duplicate keys' {
-            $yaml = @'
+    It 'rejects equivalent offset timestamps as duplicate keys' {
+        $yaml = @'
 ? !!timestamp 2001-12-15T02:59:43.1Z
 : one
 ? !!timestamp 2001-12-14T21:59:43.1-05:00
 : two
 '@
 
-            { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-            ($yaml | Test-Yaml) | Should -BeFalse
-        }
+        { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        ($yaml | Test-Yaml) | Should -BeFalse
+    }
 
-        It 'rejects equivalent zone-less and UTC timestamp keys' {
-            $yaml = @'
+    It 'rejects equivalent zone-less and UTC timestamp keys' {
+        $yaml = @'
 ? !!timestamp 2001-12-15T02:59:43.1
 : one
 ? !!timestamp 2001-12-15T02:59:43.1Z
 : two
 '@
 
-            { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-            ($yaml | Test-Yaml) | Should -BeFalse
-        }
+        { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        ($yaml | Test-Yaml) | Should -BeFalse
+    }
 
-        It 'rejects finite floating-point values outside the supported range' {
-            { 'value: 1e9999' | ConvertFrom-Yaml } |
-                Should -Throw -ExpectedMessage '*outside the supported range*'
-            ('value: 1e9999' | Test-Yaml) | Should -BeFalse
-        }
+    It 'rejects finite floating-point values outside the supported range' {
+        { 'value: 1e9999' | ConvertFrom-Yaml } |
+            Should -Throw -ExpectedMessage '*outside the supported range*'
+        ('value: 1e9999' | Test-Yaml) | Should -BeFalse
+    }
 
-        It 'rejects undefined aliases' {
-            { 'value: *missing' | ConvertFrom-Yaml } | Should -Throw
-        }
+    It 'rejects undefined aliases' {
+        { 'value: *missing' | ConvertFrom-Yaml } | Should -Throw
+    }
 
-        It 'enforces depth, node, alias, and scalar limits' {
-            { "a:`n  b:`n    c: value" | ConvertFrom-Yaml -Depth 2 } | Should -Throw
-            { "[one, two]" | ConvertFrom-Yaml -MaxNodes 2 } | Should -Throw
-            { "a: &a value`nb: *a" | ConvertFrom-Yaml -MaxAliases 0 } | Should -Throw
-            { 'value: long' | ConvertFrom-Yaml -MaxScalarLength 4 } | Should -Throw
-        }
+    It 'enforces depth, node, alias, and scalar limits' {
+        { "a:`n  b:`n    c: value" | ConvertFrom-Yaml -Depth 2 } | Should -Throw
+        { "[one, two]" | ConvertFrom-Yaml -MaxNodes 2 } | Should -Throw
+        { "a: &a value`nb: *a" | ConvertFrom-Yaml -MaxAliases 0 } | Should -Throw
+        { 'value: long' | ConvertFrom-Yaml -MaxScalarLength 4 } | Should -Throw
+    }
 
-        It 'enforces tag and numeric limits before expensive construction' {
-            $prefix = 'x' * 2000
-            $tagged = "%TAG ! tag:example.test,$prefix`n---`n- !value one"
-            $manyTags = "%TAG ! tag:e,`n---`n- !a one`n- !b two"
-            $largeInteger = '9' * 5000
+    It 'enforces tag and numeric limits before expensive construction' {
+        $prefix = 'x' * 2000
+        $tagged = "%TAG ! tag:example.test,$prefix`n---`n- !value one"
+        $manyTags = "%TAG ! tag:e,`n---`n- !a one`n- !b two"
+        $largeInteger = '9' * 5000
 
-            ($tagged | Test-Yaml -MaxTagLength 1024) | Should -BeFalse
-            ($manyTags | Test-Yaml -MaxTagLength 1024 -MaxTotalTagLength 13) | Should -BeFalse
-            ($largeInteger | Test-Yaml -MaxNumericLength 4096) | Should -BeFalse
-            { $largeInteger | ConvertFrom-Yaml -MaxNumericLength 4096 } | Should -Throw
-        }
+        ($tagged | Test-Yaml -MaxTagLength 1024) | Should -BeFalse
+        ($manyTags | Test-Yaml -MaxTagLength 1024 -MaxTotalTagLength 13) | Should -BeFalse
+        ($largeInteger | Test-Yaml -MaxNumericLength 4096) | Should -BeFalse
+        { $largeInteger | ConvertFrom-Yaml -MaxNumericLength 4096 } | Should -Throw
+    }
 
-        It 'decodes percent escapes in expanded tags using UTF-8' {
-            $escaped = Get-TestYamlRepresentationRoot -Yaml (
-                "%TAG !e! tag:example.com,2000:app/`n--- !e!tag%21 value"
-            )
-            $multibyte = Get-TestYamlRepresentationRoot -Yaml (
-                "%TAG !e! tag:example.com,2000:app/`n--- !e!currency%E2%82%AC amount"
-            )
+    It 'decodes percent escapes in expanded tags using UTF-8' {
+        $escaped = Get-TestYamlRepresentationRoot -Yaml (
+            "%TAG !e! tag:example.com,2000:app/`n--- !e!tag%21 value"
+        )
+        $multibyte = Get-TestYamlRepresentationRoot -Yaml (
+            "%TAG !e! tag:example.com,2000:app/`n--- !e!currency%E2%82%AC amount"
+        )
 
-            $escaped.Tag | Should -Be 'tag:example.com,2000:app/tag!'
-            $escaped.HasUnknownTag | Should -BeTrue
-            $multibyte.Tag |
-                Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
-            $multibyte.HasUnknownTag | Should -BeTrue
-        }
+        $escaped.Tag | Should -Be 'tag:example.com,2000:app/tag!'
+        $escaped.HasUnknownTag | Should -BeTrue
+        $multibyte.Tag |
+            Should -Be ('tag:example.com,2000:app/currency' + [char] 0x20AC)
+        $multibyte.HasUnknownTag | Should -BeTrue
+    }
 
-        It 'rejects malformed or non-UTF8 tag percent escapes' {
-            $truncated = @'
+    It 'rejects malformed or non-UTF8 tag percent escapes' {
+        $truncated = @'
 %TAG !e! tag:example.com,2000:app/
 ---
 !e!tag%2 value
 '@
-            $invalidHex = @'
+        $invalidHex = @'
 %TAG !e! tag:example.com,2000:app/
 ---
 !e!tag%ZZ value
 '@
-            $invalidUtf8 = @'
+        $invalidUtf8 = @'
 %TAG !e! tag:example.com,2000:app/
 ---
 !e!tag%E2%28%A1 value
 '@
 
-            ($truncated | Test-Yaml) | Should -BeFalse
-            ($invalidHex | Test-Yaml) | Should -BeFalse
-            ($invalidUtf8 | Test-Yaml) | Should -BeFalse
-            { $truncated | ConvertFrom-Yaml } | Should -Throw
-            { $invalidHex | ConvertFrom-Yaml } | Should -Throw
-            { $invalidUtf8 | ConvertFrom-Yaml } | Should -Throw
+        ($truncated | Test-Yaml) | Should -BeFalse
+        ($invalidHex | Test-Yaml) | Should -BeFalse
+        ($invalidUtf8 | Test-Yaml) | Should -BeFalse
+        { $truncated | ConvertFrom-Yaml } | Should -Throw
+        { $invalidHex | ConvertFrom-Yaml } | Should -Throw
+        { $invalidUtf8 | ConvertFrom-Yaml } | Should -Throw
+    }
+
+    It 'bounds expanded-tag storage and rejects huge numerics promptly' {
+        $prefix = 'x' * 20000
+        $taggedItems = 1..500 | ForEach-Object { '- !e!value item' }
+        $tagAmplification = (
+            @("%TAG !e! tag:example.test,$prefix", '---') + $taggedItems
+        ) -join "`n"
+        $hugeInteger = '9' * 32000
+
+        ($tagAmplification | Test-Yaml -MaxTagLength 25000) |
+            Should -BeFalse
+        $testResult = $null
+        $testDuration = Measure-Command {
+            $testResult = $hugeInteger | Test-Yaml -MaxNumericLength 4096
+        }
+        $convertFailed = $false
+        $convertDuration = Measure-Command {
+            try {
+                $null = $hugeInteger |
+                    ConvertFrom-Yaml -MaxNumericLength 4096
+            } catch {
+                $convertFailed = $true
+            }
         }
 
-        It 'bounds expanded-tag storage and rejects huge numerics promptly' {
-            $prefix = 'x' * 20000
-            $taggedItems = 1..500 | ForEach-Object { '- !e!value item' }
-            $tagAmplification = (
-                @("%TAG !e! tag:example.test,$prefix", '---') + $taggedItems
-            ) -join "`n"
-            $hugeInteger = '9' * 32000
+        $testResult | Should -BeFalse
+        $convertFailed | Should -BeTrue
+        $testDuration.TotalSeconds | Should -BeLessThan 2
+        $convertDuration.TotalSeconds | Should -BeLessThan 2
+    }
 
-            ($tagAmplification | Test-Yaml -MaxTagLength 25000) |
-                Should -BeFalse
-            $testResult = $null
-            $testDuration = Measure-Command {
-                $testResult = $hugeInteger | Test-Yaml -MaxNumericLength 4096
-            }
-            $convertFailed = $false
-            $convertDuration = Measure-Command {
-                try {
-                    $null = $hugeInteger |
-                        ConvertFrom-Yaml -MaxNumericLength 4096
-                } catch {
-                    $convertFailed = $true
-                }
-            }
-
-            $testResult | Should -BeFalse
-            $convertFailed | Should -BeTrue
-            $testDuration.TotalSeconds | Should -BeLessThan 2
-            $convertDuration.TotalSeconds | Should -BeLessThan 2
-        }
-
-        It 'preserves finite decimal precision and IEEE negative zero' {
-            $result = @'
+    It 'preserves finite decimal precision and IEEE negative zero' {
+        $result = @'
 precise: 0.1234567890123456789012345678
 negativeZero: -0.0
 '@ | ConvertFrom-Yaml
 
-            $result.precise | Should -BeOfType [decimal]
-            $result.precise.ToString([cultureinfo]::InvariantCulture) |
-                Should -Be '0.1234567890123456789012345678'
-            $result.negativeZero | Should -BeOfType [decimal]
-            ([decimal]::GetBits($result.negativeZero)[3] -band [int]::MinValue) |
-                Should -Be ([int]::MinValue)
-        }
+        $result.precise | Should -BeOfType [decimal]
+        $result.precise.ToString([cultureinfo]::InvariantCulture) |
+            Should -Be '0.1234567890123456789012345678'
+        $result.negativeZero | Should -BeOfType [decimal]
+        ([decimal]::GetBits($result.negativeZero)[3] -band [int]::MinValue) |
+            Should -Be ([int]::MinValue)
+    }
 
-        It 'preserves flow-looking text inside block scalars without repairing it' {
-            $result = "value: |`n  [`n    keep`n" | ConvertFrom-Yaml
+    It 'preserves flow-looking text inside block scalars without repairing it' {
+        $result = "value: |`n  [`n    keep`n" | ConvertFrom-Yaml
 
-            $result.value | Should -Be "[`n  keep`n"
-        }
+        $result.value | Should -Be "[`n  keep`n"
+    }
 
-        It 'applies block scalar indentation, folding, and chomping exactly' {
-            ("|2`n  text`n" | ConvertFrom-Yaml) | Should -Be "text`n"
-            (">`n  one`n`n  two`n" | ConvertFrom-Yaml) | Should -Be "one`ntwo`n"
-            ("|+`n  text`n`n" | ConvertFrom-Yaml) | Should -Be "text`n`n"
-        }
+    It 'applies block scalar indentation, folding, and chomping exactly' {
+        ("|2`n  text`n" | ConvertFrom-Yaml) | Should -Be "text`n"
+        (">`n  one`n`n  two`n" | ConvertFrom-Yaml) | Should -Be "one`ntwo`n"
+        ("|+`n  text`n`n" | ConvertFrom-Yaml) | Should -Be "text`n`n"
+    }
 
-        It 'applies YAML flow folding to multiline quoted scalars' {
-            ('"one' + "`n`n  two`n  " + '"') | ConvertFrom-Yaml |
-                Should -Be "one`ntwo "
-        }
+    It 'applies YAML flow folding to multiline quoted scalars' {
+        ('"one' + "`n`n  two`n  " + '"') | ConvertFrom-Yaml |
+            Should -Be "one`ntwo "
+    }
 
-        It 'rejects raw non-printable characters and unpaired surrogates' {
-            { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0) } | Should -Throw
-            { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 1) } | Should -Throw
-            { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 11) } | Should -Throw
-            { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0xD800) } | Should -Throw
-        }
+    It 'rejects raw non-printable characters and unpaired surrogates' {
+        { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0) } | Should -Throw
+        { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 1) } | Should -Throw
+        { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 11) } | Should -Throw
+        { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0xD800) } | Should -Throw
     }
 }

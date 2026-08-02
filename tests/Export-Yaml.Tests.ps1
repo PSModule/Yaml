@@ -15,8 +15,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'Yaml' {
-    Describe 'Export-Yaml' {
+Describe 'Export-Yaml' {
     Context 'Command contract' {
         It 'declares pipeline, ShouldProcess, and output metadata' {
             $command = Get-Command -Name Export-Yaml
@@ -699,5 +698,4 @@ Describe 'Yaml' {
             }
         }
     }
-}
 }

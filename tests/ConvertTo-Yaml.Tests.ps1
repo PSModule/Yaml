@@ -114,8 +114,7 @@ namespace YamlTests
     }
 }
 
-Describe 'Yaml' {
-    Describe 'ConvertTo-Yaml' {
+Describe 'ConvertTo-Yaml' {
     Context 'Supported values' {
         It 'serializes mappings, sequences, and core scalars to valid YAML' {
             $inputObject = [ordered]@{
@@ -661,5 +660,4 @@ Describe 'Yaml' {
                 Should -Throw
         }
     }
-}
 }
