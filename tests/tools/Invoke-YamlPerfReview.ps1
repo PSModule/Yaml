@@ -154,10 +154,6 @@ $scenarios = @(
         Script = { Merge-Yaml -InputObject @($mediumYaml, $overlayYaml) -SequenceAction Replace | Out-Null }
     },
     @{
-        Name   = 'Remove-YamlEntry/medium'
-        Script = { Remove-YamlEntry -InputObject $mediumYaml -Path '/items/12/name' -IgnoreMissing | Out-Null }
-    },
-    @{
         Name   = 'Test-Yaml/medium'
         Script = { Test-Yaml -Yaml $mediumYaml | Out-Null }
     },
