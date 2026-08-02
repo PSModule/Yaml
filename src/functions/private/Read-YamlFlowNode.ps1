@@ -412,6 +412,19 @@ function Read-YamlFlowNode {
                         $Context.Text[$Cursor.Index] -in @(' ', "`t")) {
                         Move-YamlCursor -Cursor $Cursor -Context $Context
                     }
+                    # Rule 74 lets l-empty lines follow an escaped break. The escaped break
+                    # itself emits nothing, but each empty line after it is a b-as-line-feed
+                    # rather than a foldable break.
+                    while ($Cursor.Index -lt $Context.Text.Length -and
+                        $Context.Text[$Cursor.Index] -eq "`n") {
+                        [void] $builder.Append("`n")
+                        Move-YamlCursor -Cursor $Cursor -Context $Context
+                        while ($Cursor.Index -lt $Context.Text.Length -and
+                            $Context.Text[$Cursor.Index] -in @(' ', "`t")) {
+                            Move-YamlCursor -Cursor $Cursor -Context $Context
+                        }
+                    }
+                    $rawTrailingWhitespace = 0
                     continue
                 }
                 $simpleEscape = $true

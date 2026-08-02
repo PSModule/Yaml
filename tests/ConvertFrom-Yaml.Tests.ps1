@@ -664,6 +664,14 @@ negativeZero: -0.0
             Should -Be "one`ntwo "
     }
 
+    It 'treats empty lines after an escaped break as line feeds' {
+        ("value: `"one\`n`n  two`"" | ConvertFrom-Yaml).value | Should -Be "one`ntwo"
+        ("value: `"one\`n`n`n  two`"" | ConvertFrom-Yaml).value | Should -Be "one`n`ntwo"
+        ("value: `"one\`n  `n  two`"" | ConvertFrom-Yaml).value | Should -Be "one`ntwo"
+        ("value: `"one\`n  two`"" | ConvertFrom-Yaml).value | Should -Be 'onetwo'
+        ("value: `"one`n`n  two`"" | ConvertFrom-Yaml).value | Should -Be "one`ntwo"
+    }
+
     It 'rejects raw non-printable characters and unpaired surrogates' {
         { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0) } | Should -Throw
         { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 1) } | Should -Throw
