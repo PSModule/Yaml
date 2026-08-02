@@ -52,7 +52,7 @@ Describe 'Yaml' {
             @($help.Parameters.Parameter.Name) | Should -Contain 'Path'
             @($help.Parameters.Parameter.Name) | Should -Contain 'NoClobber'
             @($help.Parameters.Parameter.Name) | Should -Contain 'Force'
-            $help.returnValues.returnValue.Type.Name | Should -Contain 'System.IO.FileInfo'
+            $help.returnValues.returnValue.Type.Name | Should -Match 'System\.IO\.FileInfo'
         }
     }
 

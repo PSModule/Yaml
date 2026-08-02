@@ -50,7 +50,7 @@ Describe 'Yaml' {
             @($help.Parameters.Parameter.Name) | Should -Contain 'Path'
             @($help.Parameters.Parameter.Name) | Should -Contain 'LiteralPath'
             @($help.Parameters.Parameter.Name) | Should -Contain 'Encoding'
-            $help.returnValues.returnValue.Type.Name | Should -Contain 'System.Object'
+            $help.returnValues.returnValue.Type.Name | Should -Match 'System\.Object'
         }
     }
 
