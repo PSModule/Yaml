@@ -102,7 +102,7 @@ function Measure-Scenario {
     }
 }
 
-Write-Host "Preparing performance fixtures for mode: $Mode"
+Write-Information "Preparing performance fixtures for mode: $Mode" -InformationAction Continue
 
 $smallYaml = @'
 name: small
@@ -168,7 +168,7 @@ $scenarios = @(
 
 $results = [System.Collections.Generic.List[object]]::new()
 foreach ($scenario in $scenarios) {
-    Write-Host "Measuring $($scenario.Name)"
+    Write-Information "Measuring $($scenario.Name)" -InformationAction Continue
     $results.Add((Measure-Scenario -Name $scenario.Name -Script $scenario.Script -RunCount $Runs -WarmupCount $Preheat))
 }
 
@@ -182,15 +182,15 @@ if (-not [string]::IsNullOrWhiteSpace($outputDirectory) -and -not (Test-Path -Li
 }
 
 $report = [pscustomobject]@{
-    Mode            = $Mode
-    TimestampUtc    = [DateTime]::UtcNow.ToString('o')
-    PowerShell      = $PSVersionTable.PSVersion.ToString()
-    Edition         = $PSVersionTable.PSEdition
-    Runs            = $Runs
-    Preheat         = $Preheat
-    RegressionFail  = 'Greater than 5 percent slowdown on critical-path scenarios.'
-    Scenarios       = $results
+    Mode           = $Mode
+    TimestampUtc   = [DateTime]::UtcNow.ToString('o')
+    PowerShell     = $PSVersionTable.PSVersion.ToString()
+    Edition        = $PSVersionTable.PSEdition
+    Runs           = $Runs
+    Preheat        = $Preheat
+    RegressionFail = 'Greater than 5 percent slowdown on critical-path scenarios.'
+    Scenarios      = $results
 }
 
 $report | ConvertTo-Json -Depth 8 | Set-Content -Path $OutputPath -Encoding utf8NoBOM
-Write-Host "Performance report written to: $OutputPath"
+Write-Information "Performance report written to: $OutputPath" -InformationAction Continue
