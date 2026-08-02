@@ -225,6 +225,24 @@ function Read-YamlBlockScalar {
         $lines[$lines.Count - 1].Length -eq 0) {
         $value += "`n"
     }
+    if ($chomp -eq '+' -and $style -eq '>') {
+        # Rule 182 splits folded content into l-nb-diff-lines b-chomped-last l-chomped-empty.
+        # Folding emits nothing for the break that closes the last non-empty line unless that
+        # line or the next one is more indented, so the b-chomped-last feed has to be added
+        # back in the plain-fold case whenever trailing empty lines are kept.
+        $lastContentIndex = -1
+        for ($index = $lines.Count - 1; $index -ge 0; $index--) {
+            if ($lines[$index].Length -gt 0) {
+                $lastContentIndex = $index
+                break
+            }
+        }
+        if ($lastContentIndex -ge 0 -and $lastContentIndex -lt $lines.Count - 1 -and
+            -not $moreIndented[$lastContentIndex] -and
+            -not $moreIndented[$lastContentIndex + 1]) {
+            $value += "`n"
+        }
+    }
     if ($chomp -eq '-') {
         $value = $value.TrimEnd("`n")
     } elseif ($chomp -ne '+') {

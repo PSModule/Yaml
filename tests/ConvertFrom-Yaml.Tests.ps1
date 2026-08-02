@@ -648,6 +648,17 @@ negativeZero: -0.0
         ("|+`n  text`n`n" | ConvertFrom-Yaml) | Should -Be "text`n`n"
     }
 
+    It 'keeps the folded last-line break separately from trailing empty lines' {
+        (">+`n  one`n  two`n`n" | ConvertFrom-Yaml) | Should -Be "one two`n`n"
+        (">+`n  one`n`n" | ConvertFrom-Yaml) | Should -Be "one`n`n"
+        (">+`n  one`n  two`n`n`n" | ConvertFrom-Yaml) | Should -Be "one two`n`n`n"
+        (">+`n  one`n`n  two`n`n" | ConvertFrom-Yaml) | Should -Be "one`ntwo`n`n"
+        (">2+`n  one`n`n" | ConvertFrom-Yaml) | Should -Be "one`n`n"
+        (">+`n  one`n   more`n`n" | ConvertFrom-Yaml) | Should -Be "one`n more`n`n"
+        (">`n  one`n  two`n`n" | ConvertFrom-Yaml) | Should -Be "one two`n"
+        (">-`n  one`n  two`n`n" | ConvertFrom-Yaml) | Should -Be 'one two'
+    }
+
     It 'applies YAML flow folding to multiline quoted scalars' {
         ('"one' + "`n`n  two`n  " + '"') | ConvertFrom-Yaml |
             Should -Be "one`ntwo "
