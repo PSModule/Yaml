@@ -14,7 +14,7 @@ function Read-YamlBlockMapping {
         Returns a mapping node with the supplied compact first entry parsed.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

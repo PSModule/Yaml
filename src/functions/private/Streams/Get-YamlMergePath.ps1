@@ -15,7 +15,7 @@ function Get-YamlMergePath {
         Returns a diagnostic child path such as $.spec.name or $.spec{key:2}.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

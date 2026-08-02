@@ -14,7 +14,7 @@ function Get-YamlTagPresentationLimit {
         Returns the maximum escaped tag-token presentation length allowed for the current context.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

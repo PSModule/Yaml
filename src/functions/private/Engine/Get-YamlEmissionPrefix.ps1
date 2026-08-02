@@ -13,7 +13,7 @@ function Get-YamlEmissionPrefix {
         Returns the anchor and tag prefix text that should be written before the node value.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

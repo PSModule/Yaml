@@ -14,7 +14,7 @@ function Skip-YamlFlowTrivia {
         Leaves the cursor positioned at the next non-trivia flow token.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

@@ -14,7 +14,7 @@ function Get-YamlEffectiveTag {
         Returns the standard YAML tag that represents the node's effective value.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

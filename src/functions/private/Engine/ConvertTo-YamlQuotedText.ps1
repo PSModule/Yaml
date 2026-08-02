@@ -14,7 +14,7 @@ function ConvertTo-YamlQuotedText {
         Returns a YAML double-quoted scalar with required escape sequences.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

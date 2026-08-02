@@ -14,7 +14,7 @@ function Set-YamlNodeAnchor {
         Updates repeated nodes in the state with deterministic id-style anchor names.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

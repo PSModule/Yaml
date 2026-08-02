@@ -14,7 +14,7 @@ function Read-YamlDirectiveBlock {
         Returns directive state and the tag handles active for the document.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

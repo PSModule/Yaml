@@ -15,7 +15,7 @@ function Find-YamlMappingColon {
         Returns the zero-based index of the mapping colon in the line.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

@@ -14,7 +14,7 @@ function New-YamlSerializationException {
         Returns an InvalidOperationException decorated with the YAML error identifier.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

@@ -14,7 +14,7 @@ function Test-YamlDocumentPrefix {
         Returns true because the prefix after the BOM begins with a document-start marker.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

@@ -14,7 +14,7 @@ function Set-YamlParsedNodeProperty {
         Applies scalar metadata and registers anchor a1 for subsequent alias lookup.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

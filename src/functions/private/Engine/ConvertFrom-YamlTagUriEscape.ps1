@@ -14,7 +14,7 @@ function ConvertFrom-YamlTagUriEscape {
         Decodes the escaped colon and returns tag:test.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

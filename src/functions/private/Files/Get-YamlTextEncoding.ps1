@@ -14,7 +14,7 @@ function Get-YamlTextEncoding {
         Returns strict UTF-8 without a byte order mark.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Import-Yaml/
+        https://psmodule.io/Yaml/Functions/Files/Import-Yaml/
     #>
     [OutputType(
         [System.Text.UTF8Encoding],

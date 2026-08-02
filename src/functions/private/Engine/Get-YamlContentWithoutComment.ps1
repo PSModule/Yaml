@@ -14,7 +14,7 @@ function Get-YamlContentWithoutComment {
         Returns name after removing the separated comment and trailing space.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

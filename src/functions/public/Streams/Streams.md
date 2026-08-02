@@ -4,13 +4,13 @@ Work on YAML as YAML, without projecting it to PowerShell values.
 
 | Command | Purpose |
 | --- | --- |
-| [`Test-Yaml`](https://psmodule.io/Yaml/Functions/Test-Yaml/) | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
-| [`Format-Yaml`](https://psmodule.io/Yaml/Functions/Format-Yaml/) | Normalize YAML streams without projecting representation nodes to PowerShell values. |
-| [`Merge-Yaml`](https://psmodule.io/Yaml/Functions/Merge-Yaml/) | Merge complete YAML streams without losing representation graph details. |
+| [`Test-Yaml`](https://psmodule.io/Yaml/Functions/Streams/Test-Yaml/) | Test YAML syntax, tags, duplicate keys, and configured resource limits. |
+| [`Format-Yaml`](https://psmodule.io/Yaml/Functions/Streams/Format-Yaml/) | Normalize YAML streams without projecting representation nodes to PowerShell values. |
+| [`Merge-Yaml`](https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/) | Merge complete YAML streams without losing representation graph details. |
 
 These three commands share one defining property: they operate on YAML text at the
 representation level and never project to PowerShell objects. That is what
-separates them from [Conversion](../Conversion/Conversion.md). A stream keeps its
+separates them from [Conversion](https://psmodule.io/Yaml/Functions/Conversion/). A stream keeps its
 node kinds, effective tags, anchors and aliases, complex keys, recursive graphs,
 empty documents and mapping order all the way through, because nothing is ever
 turned into a `PSCustomObject` or a dictionary along the way.
@@ -115,12 +115,12 @@ budget. Alias and expanded-tag budgets are also enforced on the result.
 
 | You want to | Use |
 | --- | --- |
-| Read configuration values into PowerShell | [`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/) or [`Import-Yaml`](https://psmodule.io/Yaml/Functions/Import-Yaml/) |
+| Read configuration values into PowerShell | [`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/) or [`Import-Yaml`](https://psmodule.io/Yaml/Functions/Files/Import-Yaml/) |
 | Check a file before using it | `Test-Yaml` |
 | Canonicalize YAML for diffing or storage | `Format-Yaml` |
 | Layer environment or secret overlays onto a base file | `Merge-Yaml` |
-| Emit YAML from PowerShell values | [`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/) or [`Export-Yaml`](https://psmodule.io/Yaml/Functions/Export-Yaml/) |
+| Emit YAML from PowerShell values | [`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/) or [`Export-Yaml`](https://psmodule.io/Yaml/Functions/Files/Export-Yaml/) |
 
 If the YAML must come back out looking like YAML, stay in this group. If you need
 to read or compute with the data, cross over to
-[Conversion](../Conversion/Conversion.md).
+[Conversion](https://psmodule.io/Yaml/Functions/Conversion/).

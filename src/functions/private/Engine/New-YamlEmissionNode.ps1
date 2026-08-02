@@ -14,7 +14,7 @@ function New-YamlEmissionNode {
         Returns an empty mapping emission node ready to receive entries.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

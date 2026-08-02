@@ -14,7 +14,7 @@ function Find-YamlCommentStart {
         Returns the zero-based index where the trailing comment begins.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

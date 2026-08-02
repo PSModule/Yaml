@@ -14,7 +14,7 @@ function Get-YamlSerializationShape {
         Returns a mapping shape that the serializer can normalize into YAML emission nodes.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

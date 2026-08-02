@@ -14,7 +14,7 @@ function Test-YamlWhiteSpace {
         Returns true because a tab is YAML white space.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

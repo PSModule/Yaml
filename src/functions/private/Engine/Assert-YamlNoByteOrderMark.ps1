@@ -15,7 +15,7 @@ function Assert-YamlNoByteOrderMark {
         Returns nothing because the text contains no byte order mark.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (

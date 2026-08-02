@@ -14,7 +14,7 @@ function Get-YamlEmissionImplicitKeyLength {
         Returns the number of Unicode scalar values that the rendered implicit key would occupy.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

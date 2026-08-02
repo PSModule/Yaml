@@ -17,7 +17,7 @@ function Merge-YamlRepresentationNode {
         nodes and throwing on conflicts.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

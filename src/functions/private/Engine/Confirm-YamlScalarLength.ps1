@@ -14,7 +14,7 @@ function Confirm-YamlScalarLength {
         Returns nothing because the scalar value is within the configured limit.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     param (

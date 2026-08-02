@@ -14,7 +14,7 @@ function Read-YamlBlockScalar {
         Returns a scalar node containing the chomped literal block content.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

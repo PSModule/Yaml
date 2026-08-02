@@ -38,7 +38,7 @@ function Format-Yaml {
         The normalized YAML stream emitted from the representation graph.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Format-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Format-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

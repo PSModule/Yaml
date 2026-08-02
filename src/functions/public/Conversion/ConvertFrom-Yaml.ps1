@@ -33,7 +33,7 @@ function ConvertFrom-Yaml {
         The PowerShell value constructed from each YAML document in the stream.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([object])]

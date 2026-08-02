@@ -16,7 +16,7 @@ function Test-YamlNodeGraph {
         Completes without output when the graph has compatible tags and unique mapping keys.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (

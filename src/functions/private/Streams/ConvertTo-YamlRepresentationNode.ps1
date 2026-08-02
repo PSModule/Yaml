@@ -14,7 +14,7 @@ function ConvertTo-YamlRepresentationNode {
         Returns an emission node graph for the representation document.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

@@ -14,7 +14,7 @@ function Get-YamlRuneCount {
         Returns 2 because the emoji surrogate pair counts as one Unicode scalar value.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

@@ -14,7 +14,7 @@ function ConvertTo-YamlNode {
         Returns the root emission node for the input object graph, using enum names when requested.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

@@ -4,13 +4,13 @@ Convert between YAML text and PowerShell values.
 
 | Command | Purpose |
 | --- | --- |
-| [`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/) | Parse one or more YAML documents into PowerShell values. |
-| [`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/) | Serialize supported PowerShell values as YAML 1.2-compatible text. |
+| [`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/) | Parse one or more YAML documents into PowerShell values. |
+| [`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/) | Serialize supported PowerShell values as YAML 1.2-compatible text. |
 
 Conversion projects YAML through to PowerShell values: a parsed document becomes
 objects, arrays and scalars you can index, filter and pass down the pipeline, and
 a PowerShell value becomes YAML text. If you need to keep YAML *as* YAML, with its
-tags, anchors and node kinds intact, use the [Streams](../Streams/Streams.md)
+tags, anchors and node kinds intact, use the [Streams](https://psmodule.io/Yaml/Functions/Streams/)
 commands instead.
 
 ## Parse YAML
@@ -361,5 +361,5 @@ representable; other finite floats use `Double`. The emitter writes a deliberate
 limited YAML 1.2-compatible subset.
 
 When presentation matters more than the values, format or merge the YAML directly
-with the [Streams](../Streams/Streams.md) commands, which never project through
+with the [Streams](https://psmodule.io/Yaml/Functions/Streams/) commands, which never project through
 PowerShell values at all.

@@ -14,7 +14,7 @@ function ConvertTo-YamlFlowText {
         Returns flow-style text for the mapping key, using an alias when already emitted.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

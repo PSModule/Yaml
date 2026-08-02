@@ -4,16 +4,16 @@ Read and write YAML files.
 
 | Command | Purpose |
 | --- | --- |
-| [`Import-Yaml`](https://psmodule.io/Yaml/Functions/Import-Yaml/) | Strictly decode and parse YAML files. |
-| [`Export-Yaml`](https://psmodule.io/Yaml/Functions/Export-Yaml/) | Serialize values and atomically write one YAML file. |
+| [`Import-Yaml`](https://psmodule.io/Yaml/Functions/Files/Import-Yaml/) | Strictly decode and parse YAML files. |
+| [`Export-Yaml`](https://psmodule.io/Yaml/Functions/Files/Export-Yaml/) | Serialize values and atomically write one YAML file. |
 
 These two commands own everything the filesystem adds on top of conversion:
 resolving paths, decoding and encoding text, and publishing a file safely. The
 value semantics are unchanged — `Import-Yaml` parses exactly like
-[`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/) and
+[`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/) and
 `Export-Yaml` serializes exactly like
-[`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/), so the
-[Conversion](../Conversion/Conversion.md) page is the reference for what you get
+[`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/), so the
+[Conversion](https://psmodule.io/Yaml/Functions/Conversion/) page is the reference for what you get
 back and what you can write.
 
 ## Import YAML files
@@ -83,7 +83,7 @@ document parsed with `-AsHashtable` and edited as a dictionary.
 This rewrites the values, not the presentation: comments, scalar styles, anchor
 names and original formatting are not carried through a PowerShell object. When
 the file's YAML presentation must survive the edit, use
-[`Merge-Yaml`](https://psmodule.io/Yaml/Functions/Merge-Yaml/) or
-[`Format-Yaml`](https://psmodule.io/Yaml/Functions/Format-Yaml/) from the
-[Streams](../Streams/Streams.md) group instead, which work on the representation
+[`Merge-Yaml`](https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/) or
+[`Format-Yaml`](https://psmodule.io/Yaml/Functions/Streams/Format-Yaml/) from the
+[Streams](https://psmodule.io/Yaml/Functions/Streams/) group instead, which work on the representation
 graph directly.

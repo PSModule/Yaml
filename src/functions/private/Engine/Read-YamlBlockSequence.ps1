@@ -14,7 +14,7 @@ function Read-YamlBlockSequence {
         Returns a sequence syntax node with the compact first item parsed.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

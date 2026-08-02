@@ -14,7 +14,7 @@ function ConvertTo-YamlText {
         Returns YAML text for the emission graph with an explicit document start marker.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

@@ -14,7 +14,7 @@ function Test-YamlTagUriText {
         Returns true because the text uses characters allowed in YAML tag URI text.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

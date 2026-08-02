@@ -15,7 +15,7 @@ function Assert-YamlText {
         Returns nothing because every character is c-printable.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (

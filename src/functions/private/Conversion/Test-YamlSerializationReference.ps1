@@ -14,7 +14,7 @@ function Test-YamlSerializationReference {
         Returns true because the custom object can participate in YAML anchor identity.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

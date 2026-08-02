@@ -14,7 +14,7 @@ function ConvertTo-YamlTimestampText {
         Returns invariant YAML timestamp text for the supplied CLR timestamp.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

@@ -15,7 +15,7 @@ function Read-YamlStream {
         Parses the supplied YAML stream and returns the boxed document collection.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

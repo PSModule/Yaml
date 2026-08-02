@@ -14,7 +14,7 @@ function ConvertFrom-YamlInteger {
         Returns 42 as an Int32 value.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int], [long], [System.Numerics.BigInteger])]

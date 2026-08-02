@@ -53,7 +53,7 @@ function Merge-Yaml {
         YAML 1.1 merge keys are ordinary mapping data and are never expanded.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [OutputType([string])]
     [CmdletBinding()]

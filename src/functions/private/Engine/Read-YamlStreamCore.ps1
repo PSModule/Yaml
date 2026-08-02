@@ -15,7 +15,7 @@ function Read-YamlStreamCore {
         Reads all documents in the stream and returns them as a boxed array.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

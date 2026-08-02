@@ -14,7 +14,7 @@ function Test-YamlMappingValueIndicator {
         Returns true because the colon is followed by YAML white space.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

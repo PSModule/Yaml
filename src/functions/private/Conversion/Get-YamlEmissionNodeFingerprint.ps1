@@ -14,7 +14,7 @@ function Get-YamlEmissionNodeFingerprint {
         Returns the stable fingerprint used to compare the normalized emission node with other nodes.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

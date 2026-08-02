@@ -14,7 +14,7 @@ function Resolve-YamlScalar {
         Returns a value box containing the resolved scalar and caches it on the node.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

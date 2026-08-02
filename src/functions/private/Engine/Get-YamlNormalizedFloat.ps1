@@ -14,7 +14,7 @@ function Get-YamlNormalizedFloat {
         Returns 1234e-2 as the normalized decimal significand and exponent.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

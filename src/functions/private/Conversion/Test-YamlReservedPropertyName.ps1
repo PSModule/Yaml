@@ -14,7 +14,7 @@ function Test-YamlReservedPropertyName {
         Returns true because PSObject is reserved by PowerShell ETS.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

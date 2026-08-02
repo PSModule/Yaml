@@ -16,7 +16,7 @@ function Get-YamlNodeFingerprint {
         Returns a stable hash string for comparing mapping-key candidates.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

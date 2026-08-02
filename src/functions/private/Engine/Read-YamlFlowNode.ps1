@@ -14,7 +14,7 @@ function Read-YamlFlowNode {
         Returns the next flow node and leaves the cursor at the following token.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

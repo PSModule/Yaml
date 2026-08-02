@@ -15,7 +15,7 @@ function ConvertFrom-YamlSyntaxTree {
         Returns the composed representation graph rooted at the parsed syntax tree.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

@@ -42,7 +42,7 @@ function Export-Yaml {
         Only FileSystem provider destinations are supported.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Export-Yaml/
+        https://psmodule.io/Yaml/Functions/Files/Export-Yaml/
     #>
     [OutputType([System.IO.FileInfo])]
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]

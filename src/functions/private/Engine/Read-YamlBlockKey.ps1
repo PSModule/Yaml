@@ -14,7 +14,7 @@ function Read-YamlBlockKey {
         Returns a scalar key node for the implicit mapping entry.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

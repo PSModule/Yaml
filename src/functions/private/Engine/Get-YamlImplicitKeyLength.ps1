@@ -14,7 +14,7 @@ function Get-YamlImplicitKeyLength {
         Returns the key length up to the supplied colon index in Unicode scalar values.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([int])]

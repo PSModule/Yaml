@@ -27,7 +27,7 @@ function Test-Yaml {
         True when the stream parses within limits; false for a classified YAML failure.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Test-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Test-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

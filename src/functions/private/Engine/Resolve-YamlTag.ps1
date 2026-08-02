@@ -14,7 +14,7 @@ function Resolve-YamlTag {
         Returns an object whose Tag is tag:yaml.org,2002:str and IsUnknown is false.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

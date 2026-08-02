@@ -16,7 +16,7 @@ function Add-YamlMergeWork {
         the configured limit is exceeded.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [CmdletBinding()]
     param (

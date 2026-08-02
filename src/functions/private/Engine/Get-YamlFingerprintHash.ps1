@@ -14,7 +14,7 @@ function Get-YamlFingerprintHash {
         Returns the Base64 digest for the canonical fingerprint input.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

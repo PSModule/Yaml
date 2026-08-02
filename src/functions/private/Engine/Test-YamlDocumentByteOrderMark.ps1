@@ -14,7 +14,7 @@ function Test-YamlDocumentByteOrderMark {
         Returns true when the current line begins with a BOM followed by a legal document start.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

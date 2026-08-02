@@ -16,7 +16,7 @@ function Set-YamlMergeNodeChanged {
         mapping node.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',

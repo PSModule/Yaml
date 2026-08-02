@@ -15,7 +15,7 @@ function Assert-YamlNodeKeyUnique {
         Returns nothing and indexes the key when no equal mapping key is present.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     param (

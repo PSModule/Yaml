@@ -15,7 +15,7 @@ function ConvertFrom-YamlNode {
         Projects the document root into a value box containing ordered dictionaries.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

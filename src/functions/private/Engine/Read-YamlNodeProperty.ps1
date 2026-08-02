@@ -14,7 +14,7 @@ function Read-YamlNodeProperty {
         Returns the resolved tag, anchor name, remaining text, and consumed width.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

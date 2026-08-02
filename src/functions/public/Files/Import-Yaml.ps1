@@ -47,7 +47,7 @@ function Import-Yaml {
         Only FileSystem provider paths are supported.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Import-Yaml/
+        https://psmodule.io/Yaml/Functions/Files/Import-Yaml/
     #>
     [OutputType([object])]
     [CmdletBinding(DefaultParameterSetName = 'Path')]

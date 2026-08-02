@@ -14,7 +14,7 @@ function Test-YamlReservedDirective {
         Returns true because the directive has a name and separated parameters.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

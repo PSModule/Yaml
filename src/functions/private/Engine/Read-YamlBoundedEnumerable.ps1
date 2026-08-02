@@ -14,7 +14,7 @@ function Read-YamlBoundedEnumerable {
         Returns a list containing only items admitted by the current node budget.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[object]])]

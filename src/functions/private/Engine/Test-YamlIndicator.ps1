@@ -14,7 +14,7 @@ function Test-YamlIndicator {
         Returns true because the sequence indicator is followed by a space.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([bool])]

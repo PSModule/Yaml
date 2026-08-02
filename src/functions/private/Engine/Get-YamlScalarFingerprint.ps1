@@ -14,7 +14,7 @@ function Get-YamlScalarFingerprint {
         Returns the canonical scalar fingerprint for the resolved timestamp value.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

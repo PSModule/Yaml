@@ -33,7 +33,7 @@ function ConvertTo-Yaml {
         The YAML 1.2-compatible text emitted for the input values.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

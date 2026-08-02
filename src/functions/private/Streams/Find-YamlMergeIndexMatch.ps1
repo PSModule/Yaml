@@ -15,7 +15,7 @@ function Find-YamlMergeIndexMatch {
         equal, or nothing when no match exists.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

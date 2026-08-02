@@ -14,7 +14,7 @@ function ConvertTo-YamlRepresentationText {
         Returns the formatted YAML stream for all supplied representation documents.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertTo-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]

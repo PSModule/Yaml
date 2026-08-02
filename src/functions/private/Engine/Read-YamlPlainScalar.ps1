@@ -14,7 +14,7 @@ function Read-YamlPlainScalar {
         Returns a plain scalar node with the folded value from the current block.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/ConvertFrom-Yaml/
+        https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]

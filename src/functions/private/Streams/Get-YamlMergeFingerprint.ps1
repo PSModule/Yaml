@@ -17,7 +17,7 @@ function Get-YamlMergeFingerprint {
         candidate bucket.
 
         .LINK
-        https://psmodule.io/Yaml/Functions/Merge-Yaml/
+        https://psmodule.io/Yaml/Functions/Streams/Merge-Yaml/
     #>
     [CmdletBinding()]
     [OutputType([string])]
