@@ -96,6 +96,18 @@ Describe 'Dependency-free package source' {
         }
     }
 
+    It 'ships a group overview page beside every public domain' {
+        $publicPath = Join-Path $repositoryRoot 'src\functions\public'
+        $groups = @(Get-ChildItem -LiteralPath $publicPath -Directory)
+        $groups.Count | Should -BeGreaterThan 0
+
+        foreach ($group in $groups) {
+            $overviewPath = Join-Path $group.FullName "$($group.Name).md"
+            Test-Path -LiteralPath $overviewPath |
+                Should -BeTrue -Because "$($group.Name) needs a $($group.Name).md section landing page"
+        }
+    }
+
     It 'uses Process-PSModule 6.1.15 and treats tests as important changes' {
         $workflow = Get-Content -Path (
             Join-Path $repositoryRoot '.github\workflows\Process-PSModule.yml'
