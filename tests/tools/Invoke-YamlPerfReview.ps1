@@ -27,11 +27,31 @@ Import-Module -Name Profiler -ErrorAction Stop
 . (Join-Path $PSScriptRoot '..\TestBootstrap.ps1')
 
 function Get-Percentile {
+    <#
+        .SYNOPSIS
+        Gets the value at a percentile within a sample set.
+
+        .DESCRIPTION
+        Sorts the supplied measurements and returns the value at the requested
+        percentile using nearest-rank selection. An empty sample set returns zero
+        so callers can report a stable baseline.
+
+        .EXAMPLE
+        Get-Percentile -Values 1, 2, 3, 4 -Percentile 0.95
+
+        Returns the 95th-percentile measurement from the sample set.
+
+        .OUTPUTS
+        System.Double
+    #>
     [CmdletBinding()]
+    [OutputType([double])]
     param (
+        # Supplies the measured sample values to rank.
         [Parameter(Mandatory)]
         [double[]] $Values,
 
+        # Sets the percentile to select, expressed as a fraction between 0 and 1.
         [Parameter(Mandatory)]
         [ValidateRange(0.0, 1.0)]
         [double] $Percentile
@@ -48,17 +68,39 @@ function Get-Percentile {
 }
 
 function Measure-Scenario {
+    <#
+        .SYNOPSIS
+        Measures the runtime of a benchmark scenario.
+
+        .DESCRIPTION
+        Runs a scenario script block through warm-up and timed iterations, then
+        returns timing statistics together with the top self-duration functions
+        captured by the Profiler trace.
+
+        .EXAMPLE
+        Measure-Scenario -Name 'ConvertFrom-Yaml/small' -Script { ConvertFrom-Yaml -Yaml $yaml } -RunCount 12 -WarmupCount 2
+
+        Returns timing statistics for the named scenario over 12 timed runs.
+
+        .OUTPUTS
+        System.Management.Automation.PSCustomObject
+    #>
     [CmdletBinding()]
+    [OutputType([pscustomobject])]
     param (
+        # Names the scenario in the emitted report.
         [Parameter(Mandatory)]
         [string] $Name,
 
+        # Supplies the script block to benchmark.
         [Parameter(Mandatory)]
         [scriptblock] $Script,
 
+        # Sets the number of timed iterations to run.
         [Parameter(Mandatory)]
         [int] $RunCount,
 
+        # Sets the number of untimed warm-up iterations to run first.
         [Parameter(Mandatory)]
         [int] $WarmupCount
     )
