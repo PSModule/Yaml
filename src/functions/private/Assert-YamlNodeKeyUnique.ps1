@@ -5,9 +5,8 @@ function Assert-YamlNodeKeyUnique {
 
         .DESCRIPTION
         Computes a structural fingerprint for one YAML mapping key and stores it
-        in duplicate-detection buckets. When a fingerprint already exists, it
-        either rejects the key immediately or confirms equality with merge-aware
-        graph comparison before throwing a duplicate-key YAML error.
+        in duplicate-detection buckets. When a matching fingerprint already exists
+        in the bucket, it throws a duplicate-key YAML error.
 
         .EXAMPLE
         Assert-YamlNodeKeyUnique -Node $keyNode -Buckets $buckets -FingerprintCache $fingerprints `
@@ -40,45 +39,19 @@ function Assert-YamlNodeKeyUnique {
 
         # The context-specific message to throw when this key duplicates another.
         [Parameter(Mandatory)]
-        [string] $DuplicateMessage,
-
-        # Optional merge/remove work tracker used to charge fingerprint effort.
-        [Parameter()]
-        [AllowNull()]
-        [pscustomobject] $RemovalWorkState,
-
-        # Optional graph equality state for confirming merge candidate collisions.
-        [Parameter()]
-        [AllowNull()]
-        [pscustomobject] $EqualityState,
-
-        # Optional equality fingerprint cache shared by both comparison sides.
-        [Parameter()]
-        [AllowNull()]
-        [System.Collections.Generic.Dictionary[int, string]] $EqualityFingerprintCache
+        [string] $DuplicateMessage
     )
 
     $fingerprint = Get-YamlNodeFingerprint -Node $Node `
         -Active ([System.Collections.Generic.HashSet[int]]::new()) `
-        -Cache $FingerprintCache -Hasher $FingerprintHasher `
-        -RemovalWorkState $RemovalWorkState
+        -Cache $FingerprintCache -Hasher $FingerprintHasher
     $bucket = $null
     if (-not $Buckets.TryGetValue($fingerprint, [ref] $bucket)) {
         $bucket = [System.Collections.Generic.List[object]]::new()
         $Buckets[$fingerprint] = $bucket
-    } elseif ($null -eq $EqualityState) {
+    } else {
         throw (New-YamlException -Start $Node.Start -End $Node.End `
                 -ErrorId 'YamlDuplicateKey' -Message $DuplicateMessage)
-    } else {
-        foreach ($candidate in $bucket) {
-            if (Test-YamlMergeNodeEqual -Node $candidate -OtherNode $Node `
-                    -State $EqualityState `
-                    -LeftFingerprintCache $EqualityFingerprintCache `
-                    -RightFingerprintCache $EqualityFingerprintCache) {
-                throw (New-YamlException -Start $Node.Start -End $Node.End `
-                        -ErrorId 'YamlDuplicateKey' -Message $DuplicateMessage)
-            }
-        }
     }
     $bucket.Add($Node)
 }

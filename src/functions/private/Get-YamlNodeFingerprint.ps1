@@ -37,12 +37,7 @@ function Get-YamlNodeFingerprint {
 
         # The hash algorithm used by scalar, sequence, and mapping fingerprints.
         [Parameter(Mandatory)]
-        [System.Security.Cryptography.HashAlgorithm] $Hasher,
-
-        # Optional work tracker used to charge expensive removal/merge operations.
-        [Parameter()]
-        [AllowNull()]
-        [pscustomobject] $RemovalWorkState
+        [System.Security.Cryptography.HashAlgorithm] $Hasher
     )
 
     $root = [pscustomobject]@{ Value = '' }
@@ -71,10 +66,6 @@ function Get-YamlNodeFingerprint {
                 $frame.Holder.Value = $cached
                 [void] $stack.Pop()
                 continue
-            }
-            if ($null -ne $RemovalWorkState) {
-                Add-YamlRemovalWork -State $RemovalWorkState `
-                    -Operation 'duplicate-key fingerprint' -Node $effective
             }
             if (-not $Active.Add($effective.Id)) {
                 throw (New-YamlException -Start $effective.Start -End $effective.End `

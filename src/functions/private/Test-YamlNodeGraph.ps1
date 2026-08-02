@@ -36,22 +36,7 @@ function Test-YamlNodeGraph {
 
         # Computes stable fingerprints for complex keys during uniqueness checks.
         [Parameter(Mandatory)]
-        [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher,
-
-        # Shares removal work state used by structural key comparison helpers.
-        [Parameter()]
-        [AllowNull()]
-        [pscustomobject] $RemovalWorkState,
-
-        # Shares graph equality state so alias-aware key comparisons stay iterative.
-        [Parameter()]
-        [AllowNull()]
-        [pscustomobject] $EqualityState,
-
-        # Caches equality fingerprints separately from the primary uniqueness buckets.
-        [Parameter()]
-        [AllowNull()]
-        [System.Collections.Generic.Dictionary[int, string]] $EqualityFingerprintCache
+        [System.Security.Cryptography.HashAlgorithm] $FingerprintHasher
     )
 
     $scalarTags = [System.Collections.Generic.HashSet[string]]::new(
@@ -129,9 +114,7 @@ function Test-YamlNodeGraph {
                             -Node $entryNode.Entries[0].Key `
                             -Buckets $orderedKeys -FingerprintCache $FingerprintCache `
                             -FingerprintHasher $FingerprintHasher `
-                            -DuplicateMessage 'A duplicate key was found in a YAML ordered mapping.' `
-                            -RemovalWorkState $RemovalWorkState -EqualityState $EqualityState `
-                            -EqualityFingerprintCache $EqualityFingerprintCache
+                            -DuplicateMessage 'A duplicate key was found in a YAML ordered mapping.'
                     }
                 }
                 $stack.Push($item)
@@ -157,9 +140,7 @@ function Test-YamlNodeGraph {
             $entry = $current.Entries[$index]
             Assert-YamlNodeKeyUnique -Node $entry.Key -Buckets $keys `
                 -FingerprintCache $FingerprintCache -FingerprintHasher $FingerprintHasher `
-                -DuplicateMessage 'A duplicate mapping key is not allowed.' `
-                -RemovalWorkState $RemovalWorkState -EqualityState $EqualityState `
-                -EqualityFingerprintCache $EqualityFingerprintCache
+                -DuplicateMessage 'A duplicate mapping key is not allowed.'
 
             if ($tag -ceq 'tag:yaml.org,2002:set') {
                 $setValue = $entry.Value
