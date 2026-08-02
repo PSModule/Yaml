@@ -310,7 +310,7 @@ duplicate-key policy cases are not applicable because `Format-Yaml` applies
 the same representation-key uniqueness policy as `ConvertFrom-Yaml`.
 
 The two JSON projection differences are `565N`, where `!!binary` intentionally
-becomes `byte[]` instead of a Base64 string, and `J7PZ`, where legacy `!!omap`
+becomes `byte[]` instead of a base64 string, and `J7PZ`, where legacy `!!omap`
 intentionally becomes `System.Collections.Specialized.OrderedDictionary`
 instead of remaining a sequence of one-entry mappings. `J7PZ` is also a
 self-round-trip policy difference: once projected, its ordered dictionary
