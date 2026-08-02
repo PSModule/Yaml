@@ -125,7 +125,6 @@ Describe 'Yaml' {
                 ratio   = 1.5
                 nothing = $null
                 items   = @('one', 'two')
-                }
             }
 
             $yaml = ConvertTo-Yaml -InputObject $inputObject
@@ -662,4 +661,5 @@ Describe 'Yaml' {
                 Should -Throw
         }
     }
+}
 }
