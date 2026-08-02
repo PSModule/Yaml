@@ -1,0 +1,41 @@
+yaml-test-suite reference fixtures
+==================================
+
+Source repository:
+  https://github.com/yaml/yaml-test-suite
+Pinned commit:
+  da267a5c4782e7361e82889e76c0dc7df0e1e870
+Source directory:
+  src/
+
+The local YAML payloads are copied from these pinned test cases:
+  2JQS  Duplicate empty mapping keys
+  M5DY  Complex sequence keys
+  SBG9  Flow sequence as a mapping key
+  6BFJ  Anchors on a mapping and complex key
+  565N  Explicit binary construction
+  EHF6  Explicit map and sequence tags
+  SF5V  Duplicate YAML directive (invalid)
+  H7TQ  Extra directive words (invalid)
+  VJP3  Multi-line flow indentation, invalid and valid variants
+
+See LICENSE.txt for the upstream MIT license.
+
+The complete released data corpus is vendored as:
+  yaml-test-suite-data-2022-01-17.zip
+Latest source release:
+  v2022-01-17 (verified 2026-07-23)
+Source release commit:
+  45db50aecf9b1520f8258938c88f396e96f30831
+Data release:
+  data-2022-01-17
+Data release commit:
+  6e6c296ae9c9d2d5c4134b4b64d01b29ac19ff6f
+Archive source:
+  https://github.com/yaml/yaml-test-suite/archive/refs/tags/data-2022-01-17.zip
+Archive SHA-256:
+  47C173AFFEB480517B30FB77DC8C76FD48609B9B65DD1C1D3D0D0BAEE48D6AA9
+
+The archive contains 402 released inputs in 352 case directories. It is
+consumed locally by tests/tools/Invoke-YamlTestSuite.ps1 without network
+access.

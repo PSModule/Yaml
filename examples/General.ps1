@@ -1,19 +1,73 @@
-﻿<#
-  .SYNOPSIS
-    This is a general example of how to use the module.
+<#
+    .SYNOPSIS
+    Demonstrates the public Yaml commands.
 #>
 
-# Import the module
-Import-Module -Name 'PSModule'
+Import-Module -Name Yaml
 
-# Define the path to the font file
-$FontFilePath = 'C:\Fonts\CodeNewRoman\CodeNewRomanNerdFontPropo-Regular.tff'
+$yaml = @'
+---
+name: example
+enabled: true
+ports: [80, 443]
+'@
 
-# Install the font
-Install-Font -Path $FontFilePath -Verbose
+# Parse a mapping to an ordered PSCustomObject.
+$config = $yaml | ConvertFrom-Yaml
+$config
 
-# List installed fonts
-Get-Font -Name 'CodeNewRomanNerdFontPropo-Regular'
+# Keep a top-level sequence as one pipeline record.
+$servers = @'
+- name: web-1
+- name: web-2
+'@ | ConvertFrom-Yaml -NoEnumerate
+$servers.Count
 
-# Uninstall the font
-Get-Font -Name 'CodeNewRomanNerdFontPropo-Regular' | Uninstall-Font -Verbose
+# Preserve mappings whose keys cannot be PowerShell property names.
+$complexMapping = @'
+? [region, port]
+: eu-1
+'@ | ConvertFrom-Yaml -AsHashtable
+$complexMapping
+
+# Serialize supported PowerShell data and parse it again.
+$outputYaml = [ordered]@{
+    name    = 'example'
+    enabled = $true
+    ports   = @(80, 443)
+} | ConvertTo-Yaml -ExplicitDocumentStart
+
+$outputYaml
+$outputYaml | ConvertFrom-Yaml
+
+# Normalize YAML presentation without projecting its representation graph.
+$normalizedYaml = @'
+# Presentation differences are removed.
+{ name: example, ports: [80, 443] }
+'@ | Format-Yaml -Indent 4
+$normalizedYaml
+
+# Merge complete YAML streams without projecting their representation graphs.
+$baseYaml = @'
+service:
+  image: example:v1
+  ports: [80]
+'@
+$overlayYaml = @'
+service:
+  image: example:v2
+  ports: [443]
+'@
+$mergedYaml = Merge-Yaml -InputObject @($baseYaml, $overlayYaml)
+$mergedYaml
+
+# Atomically export one file, then import it with strict decoding.
+$configPath = Join-Path $env:TEMP 'yaml-example.yaml'
+$config | Export-Yaml -Path $configPath -PassThru
+$importedConfig = Import-Yaml -LiteralPath $configPath
+$importedConfig
+Remove-Item -LiteralPath $configPath
+
+# Test syntax, duplicate keys, tags, and resource limits without conversion.
+$isValid = $outputYaml | Test-Yaml
+$isValid

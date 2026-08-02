@@ -1,18 +1,32 @@
-# VS Code files for those working on multiple tools
+# Editor and developer tooling
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
-
-# Local History for Visual Studio Code
 .history/*
+.idea/
+
+# Operating system files
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
 
 # PSModule framework outputs folder
 outputs/*
 
-# .Net build output
+# .NET build output
 bin/
 obj/
 libs/
+
+# PowerShell and Pester test/coverage artifacts
+testResults*.xml
+coverage*.xml
+*.coverage
+*.coverage.xml
