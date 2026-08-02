@@ -40,7 +40,6 @@ Describe 'Yaml' {
             $command.Parameters['Encoding'].Attributes.ValidValues |
                 Should -Be @('utf8', 'utf8BOM', 'utf16LE', 'utf16BE', 'utf32LE', 'utf32BE')
             $command.Parameters['NewLine'].Attributes.ValidValues | Should -Be @('LF', 'CRLF')
-            }
         }
 
         It 'provides complete command help' {
@@ -700,4 +699,5 @@ Describe 'Yaml' {
             }
         }
     }
+}
 }
