@@ -15,12 +15,10 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
 }
 
-Describe 'Yaml' {
-    Describe 'Test-Yaml' {
+Describe 'Test-Yaml' {
     It 'returns true for valid YAML and an empty stream' {
         ('name: Ada' | Test-Yaml) | Should -BeTrue
         ('' | Test-Yaml) | Should -BeTrue
-        }
     }
 
     It 'joins pipeline lines consistently with ConvertFrom-Yaml' {
