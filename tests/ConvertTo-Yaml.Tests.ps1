@@ -550,9 +550,12 @@ Describe 'ConvertTo-Yaml' {
         It 'enforces depth, node, and scalar limits without truncating' {
             $nested = [ordered]@{ a = [ordered]@{ b = [ordered]@{ c = 1 } } }
 
-            { $nested | ConvertTo-Yaml -Depth 2 } | Should -Throw
-            { @(1, 2) | ConvertTo-Yaml -MaxNodes 2 } | Should -Throw
-            { 'long' | ConvertTo-Yaml -MaxScalarLength 3 } | Should -Throw
+            { $nested | ConvertTo-Yaml -Depth 2 } |
+                Should -Throw -ExpectedMessage '*configured depth limit of 2*'
+            { @(1, 2) | ConvertTo-Yaml -MaxNodes 2 } |
+                Should -Throw -ExpectedMessage '*configured limit of 2 nodes*'
+            { 'long' | ConvertTo-Yaml -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
         }
 
         It 'stops infinite pipelines at the node budget' {
@@ -649,15 +652,22 @@ Describe 'ConvertTo-Yaml' {
         It 'enforces the scalar limit for every emitted scalar kind' {
             $bigInteger = [System.Numerics.BigInteger]::Parse('12345')
 
-            { ConvertTo-Yaml -InputObject $null -MaxScalarLength 3 } | Should -Throw
-            { ConvertTo-Yaml -InputObject $true -MaxScalarLength 3 } | Should -Throw
-            { ConvertTo-Yaml -InputObject $bigInteger -MaxScalarLength 4 } | Should -Throw
-            { ConvertTo-Yaml -InputObject ([decimal] 12.5) -MaxScalarLength 3 } | Should -Throw
-            { ConvertTo-Yaml -InputObject ([double]::PositiveInfinity) -MaxScalarLength 3 } | Should -Throw
-            { ConvertTo-Yaml -InputObject ([datetime]::UtcNow) -MaxScalarLength 10 } | Should -Throw
-            { ConvertTo-Yaml -InputObject ([byte[]] @(1, 2, 3)) -MaxScalarLength 3 } | Should -Throw
+            { ConvertTo-Yaml -InputObject $null -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            { ConvertTo-Yaml -InputObject $true -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            { ConvertTo-Yaml -InputObject $bigInteger -MaxScalarLength 4 } |
+                Should -Throw -ExpectedMessage '*configured limit of 4 characters*'
+            { ConvertTo-Yaml -InputObject ([decimal] 12.5) -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            { ConvertTo-Yaml -InputObject ([double]::PositiveInfinity) -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
+            { ConvertTo-Yaml -InputObject ([datetime]::UtcNow) -MaxScalarLength 10 } |
+                Should -Throw -ExpectedMessage '*configured limit of 10 characters*'
+            { ConvertTo-Yaml -InputObject ([byte[]] @(1, 2, 3)) -MaxScalarLength 3 } |
+                Should -Throw -ExpectedMessage '*configured limit of 3 characters*'
             { ConvertTo-Yaml -InputObject ([DayOfWeek]::Monday) -EnumsAsStrings -MaxScalarLength 5 } |
-                Should -Throw
+                Should -Throw -ExpectedMessage '*configured limit of 5 characters*'
         }
     }
 }
