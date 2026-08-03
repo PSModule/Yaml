@@ -467,14 +467,18 @@ date: !!timestamp 2001-12-14
 
 Context 'Validation and limits' {
     It 'rejects duplicate scalar, canonical numeric, and complex keys' {
-        { "key: one`nkey: two" | ConvertFrom-Yaml } | Should -Throw
-        { "1: one`n01: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-        { "1.0: one`n1.00: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
-        { "1.0: one`n1e0: two" | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { "key: one`nkey: two" | ConvertFrom-Yaml } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
+        { "1: one`n01: two" | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
+        { "1.0: one`n1.00: two" | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
+        { "1.0: one`n1e0: two" | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
         { "? [a, b]`n: one`n? [a, b]`n: two" | ConvertFrom-Yaml -AsHashtable } |
-            Should -Throw
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
         { "? {a: 1, A: 1}`n: one`n? {A: 1, a: 1}`n: two" | ConvertFrom-Yaml -AsHashtable } |
-            Should -Throw
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
     }
 
     It 'normalizes cross-type finite floats for key equality' {
@@ -507,7 +511,8 @@ Context 'Validation and limits' {
 : two
 '@
 
-        { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { $yaml | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
         ($yaml | Test-Yaml) | Should -BeFalse
     }
 
@@ -519,7 +524,8 @@ Context 'Validation and limits' {
 : two
 '@
 
-        { $yaml | ConvertFrom-Yaml -AsHashtable } | Should -Throw
+        { $yaml | ConvertFrom-Yaml -AsHashtable } |
+            Should -Throw -ExpectedMessage '*duplicate mapping key*'
         ($yaml | Test-Yaml) | Should -BeFalse
     }
 
@@ -530,14 +536,19 @@ Context 'Validation and limits' {
     }
 
     It 'rejects undefined aliases' {
-        { 'value: *missing' | ConvertFrom-Yaml } | Should -Throw
+        { 'value: *missing' | ConvertFrom-Yaml } |
+            Should -Throw -ExpectedMessage '*does not refer to a preceding anchor*'
     }
 
     It 'enforces depth, node, alias, and scalar limits' {
-        { "a:`n  b:`n    c: value" | ConvertFrom-Yaml -Depth 2 } | Should -Throw
-        { "[one, two]" | ConvertFrom-Yaml -MaxNodes 2 } | Should -Throw
-        { "a: &a value`nb: *a" | ConvertFrom-Yaml -MaxAliases 0 } | Should -Throw
-        { 'value: long' | ConvertFrom-Yaml -MaxScalarLength 4 } | Should -Throw
+        { "a:`n  b:`n    c: value" | ConvertFrom-Yaml -Depth 2 } |
+            Should -Throw -ExpectedMessage '*configured limit of 2*'
+        { "[one, two]" | ConvertFrom-Yaml -MaxNodes 2 } |
+            Should -Throw -ExpectedMessage '*configured limit of 2 nodes*'
+        { "a: &a value`nb: *a" | ConvertFrom-Yaml -MaxAliases 0 } |
+            Should -Throw -ExpectedMessage '*configured limit of 0 aliases*'
+        { 'value: long' | ConvertFrom-Yaml -MaxScalarLength 4 } |
+            Should -Throw -ExpectedMessage '*configured limit of 4 characters*'
     }
 
     It 'enforces tag and numeric limits before expensive construction' {
