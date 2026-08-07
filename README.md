@@ -44,6 +44,10 @@ works on YAML text at the representation level and never projects to PowerShell
 objects, which is what lets it keep tags, anchors, complex keys, and mapping
 order intact.
 
+For interactive use, the conversion commands also export the short aliases
+`cfy` for `ConvertFrom-Yaml` and `cty` for `ConvertTo-Yaml`. Prefer the
+full command names in shared scripts and documentation.
+
 ## Convert YAML to PowerShell values
 
 Ordinary string-key mappings become ordered `PSCustomObject` values. A top-level

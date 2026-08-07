@@ -16,6 +16,9 @@ function ConvertFrom-Yaml {
         a ToString that renders the value as YAML text, so a parsed value can be shown
         in its source notation. Scalar documents keep their own ToString.
 
+        The short alias cfy is exported for interactive use. Prefer the full
+        command name in shared scripts.
+
         .EXAMPLE
         'name: Ada' | ConvertFrom-Yaml
 
@@ -44,6 +47,7 @@ function ConvertFrom-Yaml {
         .LINK
         https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/
     #>
+    [Alias('cfy')]
     [CmdletBinding()]
     [OutputType([object])]
     param (

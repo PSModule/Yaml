@@ -12,6 +12,9 @@ function ConvertTo-Yaml {
 
         Multiple pipeline records are collected into one top-level sequence.
 
+        The short alias cty is exported for interactive use. Prefer the full
+        command name in shared scripts.
+
         .EXAMPLE
         [ordered]@{ name = 'Ada'; active = $true } | ConvertTo-Yaml
 
@@ -35,6 +38,7 @@ function ConvertTo-Yaml {
         .LINK
         https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/
     #>
+    [Alias('cty')]
     [CmdletBinding()]
     [OutputType([string])]
     param (
