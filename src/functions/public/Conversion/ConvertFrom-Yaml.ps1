@@ -12,10 +12,19 @@ function ConvertFrom-Yaml {
         Pipeline strings are joined with a line feed and parsed as one stream,
         which supports Get-Content. Each YAML document is written separately.
 
+        Mapping and sequence documents carry the PSModule.Yaml.Document type name and
+        a ToString that renders the value as YAML text, so a parsed value can be shown
+        in its source notation. Scalar documents keep their own ToString.
+
         .EXAMPLE
         'name: Ada' | ConvertFrom-Yaml
 
         Converts one mapping to a PSCustomObject.
+
+        .EXAMPLE
+        ('name: Ada' | ConvertFrom-Yaml).ToString()
+
+        Renders the parsed mapping back to YAML text.
 
         .EXAMPLE
         Get-Content -Path '.\config.yaml' | ConvertFrom-Yaml -AsHashtable
@@ -117,9 +126,11 @@ function ConvertFrom-Yaml {
 
                 if ($isTopLevelSequence -and -not $NoEnumerate) {
                     foreach ($item in $value) {
+                        Add-YamlToStringMember -Value $item
                         $PSCmdlet.WriteObject($item, $false)
                     }
                 } else {
+                    Add-YamlToStringMember -Value $value
                     $PSCmdlet.WriteObject($value, $false)
                 }
             }

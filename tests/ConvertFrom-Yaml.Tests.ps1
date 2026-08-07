@@ -690,3 +690,108 @@ negativeZero: -0.0
         { ConvertFrom-Yaml -Yaml ("value: x{0}" -f [char] 0xD800) } | Should -Throw
     }
 }
+
+Describe 'ConvertFrom-Yaml YAML document rendering' {
+    It 'renders a mapping back to YAML text with ToString' {
+        $result = ConvertFrom-Yaml -Yaml "name: Ada`nage: 36"
+
+        $result.ToString() | Should -Be "`"name`": `"Ada`"`n`"age`": 36"
+    }
+
+    It 'renders the same text through string interpolation' {
+        $result = ConvertFrom-Yaml -Yaml 'name: Ada'
+
+        "$result" | Should -Be $result.ToString()
+    }
+
+    It 'round-trips the rendered text back to an equal value' {
+        $result = ConvertFrom-Yaml -Yaml "name: Ada`nports:`n  - 80`n  - 443"
+        $roundTrip = ConvertFrom-Yaml -Yaml $result.ToString()
+
+        $roundTrip.name | Should -Be 'Ada'
+        $roundTrip.ports | Should -Be @(80, 443)
+        $roundTrip.ToString() | Should -Be $result.ToString()
+    }
+
+    It 'tags rendered document roots with the document type name' {
+        $result = ConvertFrom-Yaml -Yaml 'name: Ada'
+
+        $result.PSObject.TypeNames | Should -Contain 'PSModule.Yaml.Document'
+    }
+
+    It 'keeps property access, indexing, and formatting unchanged' {
+        $result = ConvertFrom-Yaml -Yaml "name: Ada`nports: [80, 443]`nnested:`n  key: value"
+
+        $result.name | Should -Be 'Ada'
+        $result.ports[0] | Should -Be 80
+        $result.nested.key | Should -Be 'value'
+        @($result.PSObject.Properties.Name) | Should -Be @('name', 'ports', 'nested')
+    }
+
+    It 'renders ordered dictionaries produced by AsHashtable' {
+        $result = ConvertFrom-Yaml -Yaml 'name: Ada' -AsHashtable
+
+        $result | Should -BeOfType ([System.Collections.Specialized.OrderedDictionary])
+        $result.ToString() | Should -Be '"name": "Ada"'
+    }
+
+    It 'renders a sequence document held together by NoEnumerate' {
+        $result = ConvertFrom-Yaml -Yaml "- 1`n- 2" -NoEnumerate
+
+        $result.ToString() | Should -Be "- 1`n- 2"
+    }
+
+    It 'renders each enumerated top-level sequence item' {
+        $results = @(ConvertFrom-Yaml -Yaml "- name: Ada`n- name: Grace")
+
+        $results.Count | Should -Be 2
+        $results[0].ToString() | Should -Be '"name": "Ada"'
+        $results[1].ToString() | Should -Be '"name": "Grace"'
+    }
+
+    It 'renders each document of a multi-document stream separately' {
+        $results = @(ConvertFrom-Yaml -Yaml "name: Ada`n---`nname: Grace")
+
+        $results.Count | Should -Be 2
+        $results[0].ToString() | Should -Be '"name": "Ada"'
+        $results[1].ToString() | Should -Be '"name": "Grace"'
+    }
+
+    It 'reflects edits made after parsing' {
+        $result = ConvertFrom-Yaml -Yaml 'name: Ada'
+        $result.name = 'Grace'
+
+        $result.ToString() | Should -Be '"name": "Grace"'
+    }
+
+    It 'leaves scalar documents converting to text as themselves' -ForEach @(
+        @{ Yaml = '42'; Expected = '42' }
+        @{ Yaml = 'true'; Expected = 'True' }
+        @{ Yaml = 'plain text'; Expected = 'plain text' }
+    ) {
+        (ConvertFrom-Yaml -Yaml $Yaml).ToString() | Should -Be $Expected
+    }
+
+    It 'leaves an empty document as null' {
+        ConvertFrom-Yaml -Yaml '---' | Should -BeNullOrEmpty
+    }
+
+    It 'does not emit the rendering members as YAML content' {
+        $result = ConvertFrom-Yaml -Yaml 'name: Ada'
+        $yaml = ConvertTo-Yaml -InputObject $result
+
+        $yaml | Should -Not -Match 'ToString'
+        $yaml | Should -Not -Match 'PSModule\.Yaml\.Document'
+    }
+
+    It 'renders documents parsed from a file by Import-Yaml' {
+        $path = Join-Path ([System.IO.Path]::GetTempPath()) "yaml-tostring-$([guid]::NewGuid()).yaml"
+        try {
+            Set-Content -LiteralPath $path -Value "name: Ada" -Encoding utf8
+            (Import-Yaml -Path $path).ToString() | Should -Be '"name": "Ada"'
+        } finally {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+

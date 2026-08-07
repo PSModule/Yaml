@@ -196,6 +196,39 @@ One object is emitted per document, in document order. An empty document emits
 `-NoEnumerate` applies per document, so a stream of two sequence documents writes
 two records instead of one per item.
 
+### Rendering a parsed value back to YAML
+
+Parsed mappings and sequences carry the type name `PSModule.Yaml.Document` and a
+`ToString()` that renders the value as YAML text, so a value can be inspected in
+its source notation without calling `ConvertTo-Yaml` explicitly:
+
+```powershell
+$config = @'
+name: example
+ports: [80, 443]
+'@ | ConvertFrom-Yaml
+
+$config.ToString()
+# "name": "example"
+# "ports":
+#   - 80
+#   - 443
+
+"$config"           # same text through string interpolation
+$config.name        # example - property access is unchanged
+```
+
+`ToString()` reports the value's current state, so edits made after parsing appear
+in the rendered text. Rendering is equivalent to `ConvertTo-Yaml`, which means it
+describes the constructed value rather than the original source text: comments,
+anchors, and the original scalar styles are not part of the output. Use
+`Format-Yaml` when those representation details must survive.
+
+Only mappings and sequences are decorated. Scalar documents keep their own
+`ToString()`, so a parsed number, string, or date still converts to text the way
+that type normally does. Nested values are not decorated either, because only the
+document root is a document.
+
 ### Anchors and aliases
 
 An alias to a collection projects to the **same object instance**, in both
