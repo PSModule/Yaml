@@ -60,6 +60,18 @@ $config.name        # example
 $config.ports[0]    # 80
 ```
 
+Mapping and sequence documents render themselves as YAML through `ToString()`, so a
+parsed value can be shown in its source notation:
+
+```powershell
+$config.ToString()
+# "name": "example"
+# "enabled": true
+# "ports":
+#   - 80
+#   - 443
+```
+
 Use `-AsHashtable` for insertion-ordered dictionaries and mappings with complex,
 non-string, empty, or case-colliding keys, and `-NoEnumerate` to keep a top-level
 sequence as one pipeline record. Every document in a multi-document stream is
@@ -219,6 +231,8 @@ console:
 ```powershell
 Get-Help -Name ConvertFrom-Yaml -Examples
 ```
+
+Normative specifications for planned capabilities live in [spec](spec/README.md).
 
 ## Contributing
 
