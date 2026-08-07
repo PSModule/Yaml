@@ -20,6 +20,10 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestBootstrap.ps1')
     $repositoryRoot = Split-Path -Parent $PSScriptRoot
     $loadedYamlModule = $yamlModule
+    $conversionAliases = [ordered]@{
+        cfyaml = 'ConvertFrom-Yaml'
+        ctyaml = 'ConvertTo-Yaml'
+    }
     $artifactManifestPath = if ($null -ne $loadedYamlModule) {
         Join-Path $loadedYamlModule.ModuleBase 'Yaml.psd1'
     } else {
@@ -126,6 +130,24 @@ Describe 'Dependency-free package source' {
         $configuration | Should -Not -Match '(?ms)Build:\s+Docs:\s+.*Skip:\s*true'
     }
 
+    It 'exports the documented conversion command aliases' {
+        foreach ($aliasName in $conversionAliases.Keys) {
+            $alias = Get-Alias -Name $aliasName -ErrorAction Stop
+
+            $alias.Source | Should -Be $loadedYamlModule.Name
+            $alias.Definition | Should -Be $conversionAliases[$aliasName]
+        }
+    }
+
+    It 'uses aliases that do not conflict with built-in PowerShell commands' {
+        $builtInCommands = Get-Command -Module Microsoft.PowerShell.* -CommandType Alias, Function, Cmdlet |
+            Select-Object -ExpandProperty Name
+
+        foreach ($aliasName in $conversionAliases.Keys) {
+            $builtInCommands | Should -Not -Contain $aliasName
+        }
+    }
+
     It 'uses zensical configuration and does not skip site build' {
         $configuration = Get-Content -Path (
             Join-Path $repositoryRoot '.github\PSModule.yml'
@@ -157,6 +179,11 @@ Describe 'Generated artifact package' {
                 'Import-Yaml',
                 'Merge-Yaml',
                 'Test-Yaml'
+            )
+        @($manifest.AliasesToExport | Sort-Object) |
+            Should -Be @(
+                'cfyaml',
+                'ctyaml'
             )
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
         $packagedFiles = @(
