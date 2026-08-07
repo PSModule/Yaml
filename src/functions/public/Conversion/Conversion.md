@@ -7,6 +7,15 @@ Convert between YAML text and PowerShell values.
 | [`ConvertFrom-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertFrom-Yaml/) | Parse one or more YAML documents into PowerShell values. |
 | [`ConvertTo-Yaml`](https://psmodule.io/Yaml/Functions/Conversion/ConvertTo-Yaml/) | Serialize supported PowerShell values as YAML 1.2-compatible text. |
 
+Short aliases are available for interactive pipelines:
+
+| Alias | Command |
+| --- | --- |
+| `cfy` | `ConvertFrom-Yaml` |
+| `cty` | `ConvertTo-Yaml` |
+
+Use the full command names in shared scripts and examples where clarity matters.
+
 Conversion projects YAML through to PowerShell values: a parsed document becomes
 objects, arrays and scalars you can index, filter and pass down the pipeline, and
 a PowerShell value becomes YAML text. If you need to keep YAML *as* YAML, with its

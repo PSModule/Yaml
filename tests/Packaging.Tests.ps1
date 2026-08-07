@@ -21,8 +21,8 @@ BeforeAll {
     $repositoryRoot = Split-Path -Parent $PSScriptRoot
     $loadedYamlModule = $yamlModule
     $conversionAliases = [ordered]@{
-        cfyaml = 'ConvertFrom-Yaml'
-        ctyaml = 'ConvertTo-Yaml'
+        cfy = 'ConvertFrom-Yaml'
+        cty = 'ConvertTo-Yaml'
     }
     $artifactManifestPath = if ($null -ne $loadedYamlModule) {
         Join-Path $loadedYamlModule.ModuleBase 'Yaml.psd1'
@@ -182,8 +182,8 @@ Describe 'Generated artifact package' {
             )
         @($manifest.AliasesToExport | Sort-Object) |
             Should -Be @(
-                'cfyaml',
-                'ctyaml'
+                'cfy',
+                'cty'
             )
         @($manifest.FileList) | Should -Contain 'Yaml.psm1'
         $packagedFiles = @(
