@@ -6,7 +6,7 @@ Please follow the canonical contribution flow from MSX and PSModule:
 
 - MSX contribution workflow: <https://msxorg.github.io/docs/Ways-of-Working/Contribution-Workflow/>
 - MSX PR format: <https://msxorg.github.io/docs/Ways-of-Working/PR-Format/>
-- PSModule standards: <https://github.com/PSModule/docs>
+- PSModule standards: <https://github.com/PSModule/Process-PSModule>
 
 ## Ground rules
 
